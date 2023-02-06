@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Reflection.Emit;
@@ -427,6 +428,12 @@ public static unsafe class ProgramRunner
 
     private static void InsertCode(IntPtr functionPointer, String code)
     {
+        if (functionPointer == IntPtr.Zero)
+        {
+            ErrorReporter.Report("Attempted to insert code into function that does not exist");
+            return;
+        }
+
         var codeString = Marshal.PtrToStringAnsi(code.Data, (int)code.Length);
         var function = Marshal.PtrToStructure<Function>(functionPointer);
 
@@ -435,7 +442,30 @@ public static unsafe class ProgramRunner
 
         if (functionDef?.Body != null)
         {
-            TypeChecker.InsertCode(codeString, functionDef, null, functionDef.Body);
+            var inserted = TypeChecker.InsertCode(codeString, functionDef, null, functionDef.Body);
+            if (functionDef.Flags.HasFlag(FunctionFlags.Verified))
+            {
+                TypeChecker.VerifyScope(functionDef.Body, functionDef, endIndex: inserted);
+                if (!ErrorReporter.Errors.Any() && !functionDef.Flags.HasFlag(FunctionFlags.Inline))
+                {
+                    TypeChecker.ClearAstQueue();
+                    ThreadPool.CompleteWork();
+                    Init();
+
+                    if (functionDef is FunctionAst functionAst)
+                    {
+                        ProgramIRBuilder.AddFunction(functionAst);
+                    }
+                    else if (functionDef is OperatorOverloadAst overload)
+                    {
+                        ProgramIRBuilder.AddOperatorOverload(overload);
+                    }
+                }
+            }
+        }
+        else
+        {
+            ErrorReporter.Report($"Cannot insert code into function '{functionDef.Name}' without a body'");
         }
     }
 

@@ -1,1 +1,2 @@
+- Change function IR generation to be on-demand. Create the FunctionIR object with the source when the function is declared, and when the function is called when not yet initted, build the IR
 - Compiler messages and event loop

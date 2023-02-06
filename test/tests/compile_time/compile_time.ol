@@ -14,7 +14,7 @@ main() {
     main();
 
     main_function := get_function("main");
-    insert_code(main_function, format_string("print(\"Executing function: %\\n\");\\nfoo();", main_function.name));
+    insert_code(main_function, format_string("print(\"Executing function: %\\n\");\nfoo();", main_function.name));
 
     main();
 }
