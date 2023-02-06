@@ -221,7 +221,7 @@ public static class TypeChecker
         } while (Parser.Directives.Head != null);
     }
 
-    private static void ClearAstQueue()
+    public static void ClearAstQueue()
     {
         while (_astCompleteQueue.TryDequeue(out var ast))
         {
@@ -1579,7 +1579,7 @@ public static class TypeChecker
         do {
             if (scope.Identifiers.TryGetValue(name, out ast))
             {
-                global = scope is GlobalScope || scope is PrivateScope;
+                global = scope is not ScopeAst;
                 return true;
             }
             scope = scope.Parent;
@@ -1702,9 +1702,10 @@ public static class TypeChecker
         ProgramIRBuilder.AddOperatorOverload((OperatorOverloadAst)overload);
     }
 
-    private static void VerifyScope(ScopeAst scope, IFunction function, bool inDefer = false, bool canBreak = false)
+    public static void VerifyScope(ScopeAst scope, IFunction function, bool inDefer = false, bool canBreak = false, int? endIndex = null)
     {
-        for (var i = 0; i < scope.Children.Count; i++)
+        var end = endIndex ?? scope.Children.Count;
+        for (var i = 0; i < end; i++)
         {
             var ast = scope.Children[i];
             switch (ast)
@@ -1755,6 +1756,7 @@ public static class TypeChecker
                     {
                         case DirectiveType.If:
                             scope.Children.RemoveAt(i);
+                            end--;
                             var conditional = directive.Value as ConditionalAst;
                             if (VerifyCondition(conditional.Condition, null, scope, out var constant, true))
                             {
@@ -1767,10 +1769,12 @@ public static class TypeChecker
 
                                 if (ProgramRunner.ExecuteCondition(condition, conditional.Condition))
                                 {
+                                    end += conditional.IfBlock.Children.Count;
                                     scope.Children.InsertRange(i, conditional.IfBlock.Children);
                                 }
                                 else if (conditional.ElseBlock != null)
                                 {
+                                    end += conditional.ElseBlock.Children.Count;
                                     scope.Children.InsertRange(i, conditional.ElseBlock.Children);
                                 }
                             }
@@ -1778,6 +1782,7 @@ public static class TypeChecker
                             break;
                         case DirectiveType.Assert:
                             scope.Children.RemoveAt(i--);
+                            end--;
                             if (VerifyCondition(directive.Value, null, scope, out constant, true))
                             {
                                 if (!constant)
@@ -1808,6 +1813,7 @@ public static class TypeChecker
                             break;
                         case DirectiveType.Insert:
                             scope.Children.RemoveAt(i);
+                            end--;
                             var insertDirectiveFunction = new RunDirectiveFunction { ReturnType = TypeTable.StringType };
                             var insertScope = (ScopeAst)directive.Value;
                             VerifyScope(insertScope, insertDirectiveFunction);
@@ -1827,7 +1833,7 @@ public static class TypeChecker
                                     ProgramRunner.Init();
 
                                     var code = ProgramRunner.ExecuteInsert(insertFunction, insertScope);
-                                    InsertCode(code, function, directive, scope, i);
+                                    end += InsertCode(code, function, directive, scope, i);
                                 }
                             }
                             i--;
@@ -1889,10 +1895,10 @@ public static class TypeChecker
         ClearDirectiveQueue();
     }
 
-    public static void InsertCode(string code, IFunction function, IAst source, ScopeAst scope, int index = 0)
+    public static int InsertCode(string code, IFunction function, IAst source, ScopeAst scope, int index = 0)
     {
         var line = AddCodeString(code, function, source);
-        Parser.ParseInsertedCode(code, scope, _generatedCodeFileIndex, line, index);
+        return Parser.ParseInsertedCode(code, scope, _generatedCodeFileIndex, line, index);
     }
 
     private static uint AddCodeString(string code, IFunction function, IAst source)
