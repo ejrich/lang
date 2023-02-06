@@ -19,10 +19,6 @@ main() {
     main();
 }
 
-macro(string message) {
-    print(message);
-}
-
 string macro_with_code(string code) {
     return format_string("each j in 0..4 {\n    %;\n}", code);
 }

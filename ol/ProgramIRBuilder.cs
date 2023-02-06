@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -11,17 +11,33 @@ public static class ProgramIRBuilder
 {
     private static readonly Mutex _printFunctionMutex = new();
 
-    public static void AddFunction(FunctionAst function)
+    public static int AddFunction(IFunction function)
     {
-        var functionIR = new FunctionIR {Source = function, Constants = new InstructionValue[function.ConstantCount], Allocations = new(), Pointers = new(), Instructions = new(), BasicBlocks = new()};
+        int index;
+        lock (Program.Functions)
+        {
+            index = Program.Functions.Count;
+            var functionIR = new FunctionIR { Source = function };
+            Program.Functions.Add(functionIR);
+        }
+
+        return index;
+    }
+
+    public static void BuildFunction(FunctionAst function)
+    {
+        var functionIR = Program.Functions[function.FunctionIndex];
+        functionIR.Writing = true;
+
+        functionIR.Constants = new InstructionValue[function.ConstantCount];
+        functionIR.Allocations = new();
+        functionIR.Pointers = new();
+        functionIR.Instructions = new();
+        functionIR.BasicBlocks = new();
 
         if (function.Name == "__start")
         {
             Program.EntryPoint = functionIR;
-        }
-        else
-        {
-            Program.Functions[function.FunctionIndex] = functionIR;
         }
 
         var entryBlock = AddBasicBlock(functionIR);
@@ -46,6 +62,7 @@ public static class ProgramIRBuilder
         {
             functionIR.Instructions.Add(new Instruction {Type = InstructionType.ReturnVoid, Scope = function.Body});
         }
+        functionIR.Written = true;
 
         if (function.Flags.HasFlag(FunctionFlags.PrintIR))
         {
@@ -53,16 +70,17 @@ public static class ProgramIRBuilder
         }
     }
 
-    public static void AddFunctionDefinition(FunctionAst function)
+    public static void BuildOperatorOverload(OperatorOverloadAst overload)
     {
-        var functionIR = new FunctionIR {Source = function};
+        var functionIR = Program.Functions[overload.FunctionIndex];
+        functionIR.Writing = true;
 
-        Program.Functions[function.FunctionIndex] = functionIR;
-    }
+        functionIR.Constants = new InstructionValue[overload.ConstantCount];
+        functionIR.Allocations = new();
+        functionIR.Pointers = new();
+        functionIR.Instructions = new();
+        functionIR.BasicBlocks = new();
 
-    public static void AddOperatorOverload(OperatorOverloadAst overload)
-    {
-        var functionIR = new FunctionIR {Source = overload, Constants = new InstructionValue[overload.ConstantCount], Allocations = new(), Pointers = new(), Instructions = new(), BasicBlocks = new()};
         AddBasicBlock(functionIR);
 
         for (var i = 0; i < overload.Arguments.Count; i++)
@@ -74,9 +92,8 @@ public static class ProgramIRBuilder
             functionIR.Instructions.Add(new Instruction {Type = InstructionType.DebugDeclareParameter, Scope = overload.Body, Index = i});
         }
 
-        Program.Functions[overload.FunctionIndex] = functionIR;
-
         EmitScope(functionIR, overload.Body, overload.ReturnType, null, null);
+        functionIR.Written = true;
 
         if (overload.Flags.HasFlag(FunctionFlags.PrintIR))
         {

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -8,7 +8,6 @@ namespace ol;
 public unsafe static class TypeTable
 {
     public static int Count;
-    public static int FunctionCount;
 
     public static List<IType> Types { get; } = new();
     public static List<IntPtr> TypeInfos { get; } = new();
@@ -40,17 +39,6 @@ public unsafe static class TypeTable
             Types.Add(type);
             TypeInfos.Add(IntPtr.Zero);
         }
-    }
-
-    public static int GetFunctionIndex()
-    {
-        int index;
-        do {
-            index = FunctionCount;
-        }
-        while (Interlocked.CompareExchange(ref FunctionCount, index + 1, index) != index);
-
-        return index;
     }
 
     private const int TypeInfoSize = 24;

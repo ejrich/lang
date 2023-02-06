@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -554,7 +554,7 @@ public static class TypeChecker
     {
         if (name == null) return;
 
-        function.FunctionIndex = TypeTable.GetFunctionIndex();
+        function.FunctionIndex = ProgramIRBuilder.AddFunction(function);
 
         if (function.Private)
         {
@@ -590,7 +590,7 @@ public static class TypeChecker
         else
         {
             overload.Name = $"operator {PrintOperator(overload.Operator)} {overload.Type.Name}";
-            overload.FunctionIndex = TypeTable.GetFunctionIndex();
+            overload.FunctionIndex = ProgramIRBuilder.AddFunction(overload);
             if (!_operatorOverloads.TryGetValue(overload.Type.Name, out var overloads))
             {
                 _operatorOverloads[overload.Type.Name] = overloads = new Dictionary<Operator, OperatorOverloadAst>();
@@ -1322,14 +1322,8 @@ public static class TypeChecker
                 }
 
                 function.Flags |= FunctionFlags.Verified;
-                ProgramIRBuilder.AddFunctionDefinition(function);
             }
-            else if (function.Flags.HasFlag(FunctionFlags.Compiler))
-            {
-                function.Flags |= FunctionFlags.Verified;
-                ProgramIRBuilder.AddFunctionDefinition(function);
-            }
-            else if (function.Flags.HasFlag(FunctionFlags.Syscall))
+            else if (function.Flags.HasFlag(FunctionFlags.Compiler) || function.Flags.HasFlag(FunctionFlags.Syscall))
             {
                 function.Flags |= FunctionFlags.Verified;
             }
@@ -1652,7 +1646,7 @@ public static class TypeChecker
 
     private static void WriteFunctionJob(object function)
     {
-        ProgramIRBuilder.AddFunction((FunctionAst)function);
+        ProgramIRBuilder.BuildFunction((FunctionAst)function);
     }
 
     private static void VerifyOperatorOverload(OperatorOverloadAst overload)
@@ -1699,7 +1693,7 @@ public static class TypeChecker
 
     private static void WriteOverloadJob(object overload)
     {
-        ProgramIRBuilder.AddOperatorOverload((OperatorOverloadAst)overload);
+        ProgramIRBuilder.BuildOperatorOverload((OperatorOverloadAst)overload);
     }
 
     public static void VerifyScope(ScopeAst scope, IFunction function, bool inDefer = false, bool canBreak = false, int? endIndex = null)
