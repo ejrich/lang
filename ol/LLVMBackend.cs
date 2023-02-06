@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -80,8 +80,8 @@ public static unsafe class LLVMBackend
         _types = new LLVMTypeRef[TypeTable.Count];
         _typeInfos = new LLVMValueRef[TypeTable.Count];
         _interfaceTypes = new LLVMTypeRef[TypeTable.Count];
-        _functionTypes = new LLVMTypeRef[TypeTable.FunctionCount];
-        _functions = new LLVMValueRef[TypeTable.FunctionCount];
+        _functionTypes = new LLVMTypeRef[Program.Functions.Count];
+        _functions = new LLVMValueRef[Program.Functions.Count];
         _fileNames = new LLVMValueRef[BuildSettings.Files.Count];
         _functionsToWrite = new();
 
@@ -245,7 +245,7 @@ public static unsafe class LLVMBackend
             AddModuleFlag("PIE Level", 2);
 
             _debugTypes = new LLVMMetadataRef[TypeTable.Count];
-            _debugFunctions = new LLVMMetadataRef[TypeTable.FunctionCount];
+            _debugFunctions = new LLVMMetadataRef[Program.Functions.Count];
         }
 
         LLVM.ContextSetOpaquePointers(_context, 1); // Can be removed once llvm gets rid of non-opaque pointers

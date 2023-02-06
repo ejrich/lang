@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
@@ -9,7 +9,7 @@ namespace ol;
 public static class Program
 {
     public static FunctionIR EntryPoint { get; set; }
-    public static ConcurrentDictionary<int, FunctionIR> Functions { get; } = new();
+    public static List<FunctionIR> Functions { get; } = new();
     public static List<InstructionValue> Constants { get; } = new();
     public static uint GlobalVariablesSize { get; set; }
     public static List<GlobalVariable> GlobalVariables { get; } = new();
@@ -17,6 +17,8 @@ public static class Program
 
 public class FunctionIR
 {
+    public bool Writing { get; set; }
+    public bool Written { get; set; }
     public uint StackSize { get; set; }
     public int ValueCount { get; set; }
     public int PointerOffset { get; set; }
