@@ -80,7 +80,7 @@ public static class Parser
         AddModule("runtime");
         QueueFileIfNotExists(entrypoint);
 
-        ThreadPool.CompleteWork();
+        ThreadPool.CompleteWork(ThreadPool.ParseQueue);
     }
 
     private static void AddModule(string module)
@@ -155,7 +155,7 @@ public static class Parser
         var fileIndex = BuildSettings.Files.Count;
         BuildSettings.Files.Add(file);
         TypeChecker.PrivateScopes.Add(null);
-        ThreadPool.QueueWork(ParseFile, new ParseData {File = file, FileIndex = fileIndex});
+        ThreadPool.QueueWork(ThreadPool.ParseQueue, ParseFile, new ParseData {File = file, FileIndex = fileIndex});
     }
 
     private class ParseData
