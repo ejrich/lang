@@ -446,20 +446,9 @@ public static unsafe class ProgramRunner
             if (functionDef.Flags.HasFlag(FunctionFlags.Verified))
             {
                 TypeChecker.VerifyScope(functionDef.Body, functionDef, endIndex: inserted);
-                if (!ErrorReporter.Errors.Any() && !functionDef.Flags.HasFlag(FunctionFlags.Inline))
-                {
-                    TypeChecker.ClearAstQueue();
-                    Init();
-
-                    if (functionDef is FunctionAst functionAst)
-                    {
-                        ProgramIRBuilder.BuildFunction(functionAst, true);
-                    }
-                    else if (functionDef is OperatorOverloadAst overload)
-                    {
-                        ProgramIRBuilder.BuildOperatorOverload(overload, true);
-                    }
-                }
+                var functionIR = Program.Functions[functionDef.FunctionIndex];
+                functionIR.Writing = false;
+                functionIR.Written = false;
             }
         }
         else
