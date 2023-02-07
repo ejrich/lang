@@ -125,7 +125,7 @@ struct InterfaceAst : TypeAst {
     argument_count: int;
 }
 
-struct Function : InterfaceAst {
+struct IFunction : InterfaceAst {
     constant_count: int;
     function_index: int;
     generics: Array<string>;
@@ -162,7 +162,7 @@ struct ScopeAst : Scope {
     deferred_asts: Array<ScopeAst*>;
 }
 
-struct FunctionAst : Function {
+struct FunctionAst : IFunction {
     extern_lib: string;
     library_name: string;
     library: Library*;
@@ -358,7 +358,7 @@ struct CastAst : Ast {
     value: Ast*;
 }
 
-struct OperatorOverloadAst : Function {
+struct OperatorOverloadAst : IFunction {
     op: Operator;
     type: TypeDefinition*;
 }

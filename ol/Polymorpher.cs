@@ -277,12 +277,20 @@ public static class Polymorpher
     private static EachAst CopyEach(EachAst each, IType[] genericTypes, List<string> generics)
     {
         var copy = CopyAst(each);
-        copy.IterationVariable = each.IterationVariable;
-        copy.IndexVariable = each.IndexVariable;
+        copy.IterationVariable = CopyVariable(each.IterationVariable);
+        copy.IndexVariable = CopyVariable(each.IndexVariable);
         copy.Iteration = CopyExpression(each.Iteration, genericTypes, generics);
         copy.RangeBegin = CopyExpression(each.RangeBegin, genericTypes, generics);
         copy.RangeEnd = CopyExpression(each.RangeEnd, genericTypes, generics);
         copy.Body = CopyScope(each.Body, genericTypes, generics);
+        return copy;
+    }
+
+    private static VariableAst CopyVariable(VariableAst variable)
+    {
+        if (variable == null) return null;
+        var copy = CopyAst(variable);
+        copy.Name = variable.Name;
         return copy;
     }
 
