@@ -794,7 +794,7 @@ bool verify_function_definition(FunctionAst* function) {
     return true;
 }
 
-bool verify_condition(Ast* ast, Function* function, bool* constant, bool will_run = false) {
+bool verify_condition(Ast* ast, IFunction* function, bool* constant, bool will_run = false) {
     type := verify_expression(ast, function, constant);
 
     if will_run && !*constant clear_ast_queue();
@@ -815,7 +815,7 @@ bool verify_condition(Ast* ast, Function* function, bool* constant, bool will_ru
     return false;
 }
 
-TypeAst* get_reference(Ast* ast, Function* function, Scope* scope, bool* has_pointer, bool from_unary_reference = false) {
+TypeAst* get_reference(Ast* ast, IFunction* function, Scope* scope, bool* has_pointer, bool from_unary_reference = false) {
     // TODO Implement me
     return null;
 }
@@ -852,7 +852,7 @@ TypeAst* get_variable(string name, Ast* ast, Scope* scope, bool* constant, bool 
     return null;
 }
 
-verify_function_if_necessary(FunctionAst* function, Function* current_function) {
+verify_function_if_necessary(FunctionAst* function, IFunction* current_function) {
     if function.flags & AstFlags.Verified return;
 
     if function.flags & AstFlags.Extern {
@@ -867,36 +867,36 @@ verify_function_if_necessary(FunctionAst* function, Function* current_function) 
     }
 }
 
-TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope) #inline {
+TypeAst* verify_expression(Ast* ast, IFunction* function, Scope* scope) #inline {
     _: bool;
     return verify_expression(ast, function, scope, &_, &_);
 }
 
-TypeAst* verify_expression(Ast* ast, Function* function, bool* is_constant) #inline {
+TypeAst* verify_expression(Ast* ast, IFunction* function, bool* is_constant) #inline {
     _: bool;
     scope := private_scopes[ast.file_index];
     if scope == null scope = &global_scope;
     return verify_expression(ast, function, scope, is_constant, &_);
 }
 
-TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant) #inline {
+TypeAst* verify_expression(Ast* ast, IFunction* function, Scope* scope, bool* is_constant) #inline {
     _: bool;
     return verify_expression(ast, function, scope, is_constant, &_);
 }
 
-TypeAst* verify_expression(Ast* ast, Function* function, bool* is_constant, s32* array_length) #inline {
+TypeAst* verify_expression(Ast* ast, IFunction* function, bool* is_constant, s32* array_length) #inline {
     _: bool;
     scope := private_scopes[ast.file_index];
     if scope == null scope = &global_scope;
     return verify_expression(ast, function, scope, is_constant, &_, true, array_length);
 }
 
-TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant, s32* array_length) #inline {
+TypeAst* verify_expression(Ast* ast, IFunction* function, Scope* scope, bool* is_constant, s32* array_length) #inline {
     _: bool;
     return verify_expression(ast, function, scope, is_constant, &_, true, array_length);
 }
 
-TypeAst* verify_expression(Ast* ast, Function* function, Scope* scope, bool* is_constant, bool* is_type, bool get_array_length = false, s32* array_length = null) {
+TypeAst* verify_expression(Ast* ast, IFunction* function, Scope* scope, bool* is_constant, bool* is_type, bool get_array_length = false, s32* array_length = null) {
     if ast == null return null;
 
     switch ast.ast_type {
@@ -1403,7 +1403,7 @@ TypeAst* verify_call() {
     return null;
 }
 
-TypeAst* verify_index(IndexAst* index, TypeAst* type, Function* function, Scope* scope, bool* overloaded) {
+TypeAst* verify_index(IndexAst* index, TypeAst* type, IFunction* function, Scope* scope, bool* overloaded) {
     element_type: TypeAst*;
 
     if type {
@@ -1443,7 +1443,7 @@ TypeAst* verify_index(IndexAst* index, TypeAst* type, Function* function, Scope*
     return element_type;
 }
 
-OperatorOverloadAst* verify_operator_overload_call(StructAst* type, Operator op, Function* function, Ast* ast, Scope* scope) {
+OperatorOverloadAst* verify_operator_overload_call(StructAst* type, Operator op, IFunction* function, Ast* ast, Scope* scope) {
     // TODO
     return null;
 }

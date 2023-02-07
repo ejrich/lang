@@ -1166,7 +1166,7 @@ bool search_for_generic(string generic, int index, TypeDefinition* type) {
     return has_generic;
 }
 
-Ast* parse_line(TokenEnumerator* enumerator, ScopeAst* scope, Function* current_function, bool in_defer = false) {
+Ast* parse_line(TokenEnumerator* enumerator, ScopeAst* scope, IFunction* current_function, bool in_defer = false) {
     if !enumerator.remaining {
         report_error("End of file reached without closing scope", enumerator.file_index, enumerator.last);
         return null;
@@ -1257,7 +1257,7 @@ Ast* parse_line(TokenEnumerator* enumerator, ScopeAst* scope, Function* current_
     return null;
 }
 
-ScopeAst* parse_scope_body(TokenEnumerator* enumerator, Function* current_function, bool top_level = false, bool in_defer = false) {
+ScopeAst* parse_scope_body(TokenEnumerator* enumerator, IFunction* current_function, bool top_level = false, bool in_defer = false) {
     if (enumerator.current.type == TokenType.OpenBrace)
         return parse_scope(enumerator, current_function, top_level);
 
@@ -1277,7 +1277,7 @@ ScopeAst* parse_scope_body(TokenEnumerator* enumerator, Function* current_functi
     return scope_ast;
 }
 
-ScopeAst* parse_scope(TokenEnumerator* enumerator, Function* current_function, bool top_level = false) {
+ScopeAst* parse_scope(TokenEnumerator* enumerator, IFunction* current_function, bool top_level = false) {
     scope_ast := create_ast<ScopeAst>(enumerator, AstType.Scope);
 
     closed := false;
@@ -1300,7 +1300,7 @@ ScopeAst* parse_scope(TokenEnumerator* enumerator, Function* current_function, b
     return scope_ast;
 }
 
-ConditionalAst* parse_conditional(TokenEnumerator* enumerator, Function* current_function, bool top_level = false) {
+ConditionalAst* parse_conditional(TokenEnumerator* enumerator, IFunction* current_function, bool top_level = false) {
     conditional_ast := create_ast<ConditionalAst>(enumerator, AstType.Conditional);
 
     // 1. Parse the conditional expression by first iterating over the initial 'if'
@@ -1335,7 +1335,7 @@ ConditionalAst* parse_conditional(TokenEnumerator* enumerator, Function* current
     return conditional_ast;
 }
 
-WhileAst* parse_while(TokenEnumerator* enumerator, Function* current_function) {
+WhileAst* parse_while(TokenEnumerator* enumerator, IFunction* current_function) {
     while_ast := create_ast<WhileAst>(enumerator, AstType.While);
 
     // 1. Parse the conditional expression by first iterating over the initial 'while'
@@ -1352,7 +1352,7 @@ WhileAst* parse_while(TokenEnumerator* enumerator, Function* current_function) {
     return while_ast;
 }
 
-EachAst* parse_each(TokenEnumerator* enumerator, Function* current_function) {
+EachAst* parse_each(TokenEnumerator* enumerator, IFunction* current_function) {
     each_ast := create_ast<EachAst>(enumerator, AstType.Each);
 
     // 1. Parse the iteration variable by first iterating over the initial 'each'
@@ -1416,7 +1416,7 @@ EachAst* parse_each(TokenEnumerator* enumerator, Function* current_function) {
     return each_ast;
 }
 
-Ast* parse_condition_expression(TokenEnumerator* enumerator, Function* current_function) {
+Ast* parse_condition_expression(TokenEnumerator* enumerator, IFunction* current_function) {
     // Parse l-value
     first_token := enumerator.current;
     l_value := parse_next_expression_unit(enumerator, current_function);
@@ -1538,7 +1538,7 @@ Ast* parse_condition_expression(TokenEnumerator* enumerator, Function* current_f
     return expression;
 }
 
-DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current_function = null, bool global = false) {
+DeclarationAst* parse_declaration(TokenEnumerator* enumerator, IFunction* current_function = null, bool global = false) {
     declaration := create_ast<DeclarationAst>(enumerator, AstType.Declaration);
     if global {
         if enumerator.private declaration.flags = AstFlags.Global | AstFlags.Private;
@@ -1614,7 +1614,7 @@ DeclarationAst* parse_declaration(TokenEnumerator* enumerator, Function* current
     return declaration;
 }
 
-bool parse_value(Values* values, TokenEnumerator* enumerator, Function* current_function) {
+bool parse_value(Values* values, TokenEnumerator* enumerator, IFunction* current_function) {
     // 1. Step over '=' sign
     if !move_next(enumerator) {
         report_error("Expected declaration to have a value", enumerator.file_index, enumerator.last);
@@ -1666,7 +1666,7 @@ bool parse_value(Values* values, TokenEnumerator* enumerator, Function* current_
     return false;
 }
 
-AssignmentAst* parse_assignment(TokenEnumerator* enumerator, Function* current_function, bool* move_next, Ast* reference = null) {
+AssignmentAst* parse_assignment(TokenEnumerator* enumerator, IFunction* current_function, bool* move_next, Ast* reference = null) {
     // 1. Set the variable
     assignment: AssignmentAst*;
     if reference assignment = create_ast<AssignmentAst>(reference, AstType.Assignment);
@@ -1748,7 +1748,7 @@ bool is_end_token(TokenType token, Array<TokenType> end_tokens) {
     return false;
 }
 
-Ast* parse_expression(TokenEnumerator* enumerator, Function* current_function, Params<TokenType> end_tokens) {
+Ast* parse_expression(TokenEnumerator* enumerator, IFunction* current_function, Params<TokenType> end_tokens) {
     if !enumerator.remaining {
         report_error("Expected expression", enumerator.file_index, enumerator.last);
         return null;
@@ -1965,7 +1965,7 @@ parse_change_by_one(TokenEnumerator* enumerator, Ast** l_value, Token token, Ast
     *l_value = change_by_one;
 }
 
-Ast* parse_compound_expression(TokenEnumerator* enumerator, Function* current_function, Ast* initial) {
+Ast* parse_compound_expression(TokenEnumerator* enumerator, IFunction* current_function, Ast* initial) {
     compound_expression := create_ast<CompoundExpressionAst>(initial, AstType.CompoundExpression);
     array_insert(&compound_expression.children, initial, allocate, reallocate);
     first_token := enumerator.current;
@@ -2053,7 +2053,7 @@ Ast* parse_compound_expression(TokenEnumerator* enumerator, Function* current_fu
     return compound_expression;
 }
 
-Ast* parse_struct_field_ref(TokenEnumerator* enumerator, Ast* initial_ast, Function* current_function) {
+Ast* parse_struct_field_ref(TokenEnumerator* enumerator, Ast* initial_ast, IFunction* current_function) {
     // 1. Initialize and move over the dot operator
     struct_field_ref := create_ast<StructFieldRefAst>(initial_ast, AstType.StructFieldRef);
     array_insert(&struct_field_ref.children, initial_ast, allocate, reallocate);
@@ -2079,7 +2079,7 @@ Ast* parse_struct_field_ref(TokenEnumerator* enumerator, Ast* initial_ast, Funct
     return struct_field_ref;
 }
 
-Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_function) {
+Ast* parse_next_expression_unit(TokenEnumerator* enumerator, IFunction* current_function) {
     token := enumerator.current;
     switch token.type {
         case TokenType.Number;
@@ -2205,7 +2205,7 @@ Ast* parse_next_expression_unit(TokenEnumerator* enumerator, Function* current_f
    return null;
 }
 
-CallAst* parse_call(TokenEnumerator* enumerator, Function* current_function, bool requiresSemicolon = false) {
+CallAst* parse_call(TokenEnumerator* enumerator, IFunction* current_function, bool requiresSemicolon = false) {
     call_ast := create_ast<CallAst>(enumerator, AstType.Call);
     call_ast.name = enumerator.current.value;
 
@@ -2232,7 +2232,7 @@ CallAst* parse_call(TokenEnumerator* enumerator, Function* current_function, boo
     return call_ast;
 }
 
-parse_arguments(CallAst* call_ast, TokenEnumerator* enumerator, Function* current_function) {
+parse_arguments(CallAst* call_ast, TokenEnumerator* enumerator, IFunction* current_function) {
     next_argument_required := false;
     while move_next(enumerator) {
         token := enumerator.current;
@@ -2275,7 +2275,7 @@ parse_arguments(CallAst* call_ast, TokenEnumerator* enumerator, Function* curren
     }
 }
 
-ReturnAst* parse_return(TokenEnumerator* enumerator, Function* current_function) {
+ReturnAst* parse_return(TokenEnumerator* enumerator, IFunction* current_function) {
     return_ast := create_ast<ReturnAst>(enumerator, AstType.Return);
 
     if move_next(enumerator) {
@@ -2289,7 +2289,7 @@ ReturnAst* parse_return(TokenEnumerator* enumerator, Function* current_function)
     return return_ast;
 }
 
-IndexAst* parse_index(TokenEnumerator* enumerator, Function* current_function) {
+IndexAst* parse_index(TokenEnumerator* enumerator, IFunction* current_function) {
     // 1. Initialize the index ast
     index := create_ast<IndexAst>(enumerator, AstType.Index);
     index.name = enumerator.current.value;
@@ -2410,7 +2410,7 @@ CompilerDirectiveAst* parse_top_level_directive(TokenEnumerator* enumerator, boo
     return directive;
 }
 
-Ast* parse_compiler_directive(TokenEnumerator* enumerator, Function* current_function) {
+Ast* parse_compiler_directive(TokenEnumerator* enumerator, IFunction* current_function) {
     directive := create_ast<CompilerDirectiveAst>(enumerator, AstType.CompilerDirective);
 
     if !move_next(enumerator) {
@@ -2728,7 +2728,7 @@ bool parse_assembly_pointer(AssemblyValueAst* value, TokenEnumerator* enumerator
     return true;
 }
 
-SwitchAst* parse_switch(TokenEnumerator* enumerator, Function* current_function) {
+SwitchAst* parse_switch(TokenEnumerator* enumerator, IFunction* current_function) {
     switch_ast := create_ast<SwitchAst>(enumerator, AstType.Switch);
     if !move_next(enumerator) {
         report_error("Expected value for switch statement", enumerator.file_index, enumerator.last);
@@ -3133,7 +3133,7 @@ InterfaceAst* parse_interface(TokenEnumerator* enumerator) {
     return interface_ast;
 }
 
-TypeDefinition* parse_type(TokenEnumerator* enumerator, Function* current_function = null, bool argument = false, int depth = 0) {
+TypeDefinition* parse_type(TokenEnumerator* enumerator, IFunction* current_function = null, bool argument = false, int depth = 0) {
     type_definition := create_ast<TypeDefinition>(enumerator, AstType.TypeDefinition);
     type_definition.name = enumerator.current.value;
 
@@ -3535,7 +3535,7 @@ bool try_parse_float64(string input, float64* value) {
     return try_parse_float(input, value);
 }
 
-CastAst* parse_cast(TokenEnumerator* enumerator, Function* current_function) {
+CastAst* parse_cast(TokenEnumerator* enumerator, IFunction* current_function) {
     cast_ast := create_ast<CastAst>(enumerator, AstType.Cast);
 
     // 1. Try to get the open paren to begin the cast
