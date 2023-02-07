@@ -489,7 +489,7 @@ public static unsafe class ProgramRunner
             }
             else if (function.Source is FunctionAst functionAst)
             {
-                if (functionAst.Flags.HasFlag(FunctionFlags.Verified))
+                if (!functionAst.Flags.HasFlag(FunctionFlags.Verified))
                 {
                     TypeChecker.VerifyFunction(functionAst, false);
                     Init();

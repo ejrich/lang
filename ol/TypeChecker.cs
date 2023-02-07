@@ -164,12 +164,8 @@ public static class TypeChecker
                 {
                     case DirectiveType.If:
                         var conditional = directive.Value as ConditionalAst;
-                        if (VerifyCondition(conditional.Condition, null, GetFileScope(conditional), out var constant, true))
+                        if (VerifyCondition(conditional.Condition, null, GetFileScope(conditional), true))
                         {
-                            if (!constant)
-                            {
-                                // ThreadPool.CompleteWork();
-                            }
                             var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
                             ProgramRunner.Init();
 
@@ -193,12 +189,8 @@ public static class TypeChecker
                         }
                         break;
                     case DirectiveType.Assert:
-                        if (VerifyCondition(directive.Value, null, GetFileScope(directive), out constant, true))
+                        if (VerifyCondition(directive.Value, null, GetFileScope(directive), true))
                         {
-                            if (!constant)
-                            {
-                                // ThreadPool.CompleteWork();
-                            }
                             var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
                             ProgramRunner.Init();
 
@@ -1716,7 +1708,7 @@ public static class TypeChecker
                     break;
                 case WhileAst whileAst:
                     whileAst.Body.Parent = scope;
-                    VerifyCondition(whileAst.Condition, function, scope, out _);
+                    VerifyCondition(whileAst.Condition, function, scope);
                     VerifyScope(whileAst.Body, function, inDefer, true);
                     break;
                 case EachAst each:
@@ -1725,7 +1717,7 @@ public static class TypeChecker
                     VerifyScope(each.Body, function, inDefer, true);
                     break;
                 case ConditionalAst conditional:
-                    VerifyCondition(conditional.Condition, function, scope, out _);
+                    VerifyCondition(conditional.Condition, function, scope);
                     conditional.IfBlock.Parent = scope;
                     VerifyScope(conditional.IfBlock, function, inDefer, canBreak);
                     if (conditional.ElseBlock != null)
@@ -1750,12 +1742,8 @@ public static class TypeChecker
                             scope.Children.RemoveAt(i);
                             end--;
                             var conditional = directive.Value as ConditionalAst;
-                            if (VerifyCondition(conditional.Condition, null, scope, out var constant, true))
+                            if (VerifyCondition(conditional.Condition, null, scope, true))
                             {
-                                if (!constant)
-                                {
-                                    // ThreadPool.CompleteWork();
-                                }
                                 var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
                                 ProgramRunner.Init();
 
@@ -1775,12 +1763,8 @@ public static class TypeChecker
                         case DirectiveType.Assert:
                             scope.Children.RemoveAt(i--);
                             end--;
-                            if (VerifyCondition(directive.Value, null, scope, out constant, true))
+                            if (VerifyCondition(directive.Value, null, scope, true))
                             {
-                                if (!constant)
-                                {
-                                    // ThreadPool.CompleteWork();
-                                }
                                 var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
                                 ProgramRunner.Init();
 
@@ -1819,8 +1803,6 @@ public static class TypeChecker
 
                                 if (!ErrorReporter.Errors.Any())
                                 {
-                                    // ThreadPool.CompleteWork();
-
                                     var insertFunction = ProgramIRBuilder.CreateRunnableFunction(insertScope, insertDirectiveFunction);
                                     ProgramRunner.Init();
 
@@ -3318,9 +3300,9 @@ public static class TypeChecker
         return null;
     }
 
-    private static bool VerifyCondition(IAst ast, IFunction currentFunction, IScope scope, out bool constant, bool willRun = false)
+    private static bool VerifyCondition(IAst ast, IFunction currentFunction, IScope scope, bool willRun = false)
     {
-        var conditionalType = VerifyExpression(ast, currentFunction, scope, out constant);
+        var conditionalType = VerifyExpression(ast, currentFunction, scope, out var constant);
 
         if (willRun && !constant)
         {
