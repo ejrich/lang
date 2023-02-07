@@ -148,7 +148,7 @@ public static class ol
         // 3. Check types and build the program ir
         TypeChecker.CheckTypes();
         ErrorReporter.ListErrorsAndExit(ErrorCodes.CompilationError);
-        ThreadPool.CompleteWork();
+        ThreadPool.CompleteWork(ThreadPool.IRQueue);
         var frontEndTime = stopwatch.Elapsed;
 
         // 4. Build program

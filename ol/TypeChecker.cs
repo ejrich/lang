@@ -206,7 +206,7 @@ public static class TypeChecker
             }
             if (parsingAdditional)
             {
-                ThreadPool.CompleteWork();
+                ThreadPool.CompleteWork(ThreadPool.ParseQueue);
             }
         } while (Parser.Directives.Head != null);
     }
@@ -1630,7 +1630,7 @@ public static class TypeChecker
 
         if (queueBuild && !ErrorReporter.Errors.Any() && !function.Flags.HasFlag(FunctionFlags.Inline))
         {
-            ThreadPool.QueueWork(WriteFunctionJob, function);
+            ThreadPool.QueueWork(ThreadPool.IRQueue, WriteFunctionJob, function);
         }
     }
 
@@ -1677,7 +1677,7 @@ public static class TypeChecker
 
         if (queueBuild && !ErrorReporter.Errors.Any())
         {
-            ThreadPool.QueueWork(WriteOverloadJob, overload);
+            ThreadPool.QueueWork(ThreadPool.IRQueue, WriteOverloadJob, overload);
         }
     }
 

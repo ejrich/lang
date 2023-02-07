@@ -5,10 +5,23 @@ namespace ol;
 
 public static class ThreadPool
 {
-    private static int _completed;
-    private static int _count;
-    private static Semaphore _semaphore = new Semaphore(0, int.MaxValue);
-    private static SafeLinkedList<QueueItem> _queue = new();
+    public struct QueueItem
+    {
+        public Action<object> Function;
+        public object Data;
+    }
+
+    public class WorkQueue
+    {
+        public int Completed;
+        public int Count;
+        public SafeLinkedList<QueueItem> Queue { get; } = new();
+    }
+
+    public static readonly WorkQueue ParseQueue = new();
+    public static readonly WorkQueue IRQueue = new();
+
+    private static readonly Semaphore _semaphore = new(0, int.MaxValue);
 
     public static void Init(bool noThreads)
     {
@@ -23,59 +36,63 @@ public static class ThreadPool
         }
     }
 
+    private static readonly WorkQueue[] Queues = { ParseQueue, IRQueue };
     private static void ThreadWorker()
     {
         while (true)
         {
-            if (ExecuteQueuedItem())
+            var wait = true;
+            foreach (var queue in Queues)
+            {
+                if (!ExecuteQueuedItem(queue))
+                {
+                    wait = false;
+                    break;
+                }
+            }
+            if (wait)
             {
                 _semaphore.WaitOne();
             }
         }
     }
 
-    private static bool ExecuteQueuedItem()
+    private static bool ExecuteQueuedItem(WorkQueue queue)
     {
-        var head = _queue.Head;
+        var head = queue.Queue.Head;
         if (head == null)
         {
             return true;
         }
 
-        var value = Interlocked.CompareExchange(ref _queue.Head, head.Next, head);
+        var value = Interlocked.CompareExchange(ref queue.Queue.Head, head.Next, head);
 
         if (value == head)
         {
             var queueItem = head.Data;
             queueItem.Function(queueItem.Data);
-            Interlocked.Increment(ref _completed);
+            Interlocked.Increment(ref queue.Completed);
         }
 
         return false;
     }
 
-    public static void QueueWork(Action<object> function, object data)
+    public static void QueueWork(WorkQueue queue, Action<object> function, object data)
     {
-        _queue.AddToHead(new QueueItem {Function = function, Data = data});
-        Interlocked.Increment(ref _count);
+        queue.Queue.AddToHead(new QueueItem {Function = function, Data = data});
+        Interlocked.Increment(ref queue.Count);
         _semaphore.Release();
     }
 
-    private struct QueueItem
+    public static void CompleteWork(WorkQueue queue)
     {
-        public Action<object> Function;
-        public object Data;
-    }
-
-    public static void CompleteWork()
-    {
-        while (_completed < _count)
+        while (queue.Completed < queue.Count)
         {
-            ExecuteQueuedItem();
+            ExecuteQueuedItem(queue);
         }
 
-        _completed = 0;
-        _count = 0;
+        queue.Completed = 0;
+        queue.Count = 0;
     }
 }
 
