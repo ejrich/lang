@@ -332,12 +332,8 @@ public static class ProgramIRBuilder
 
             declaration.PointerIndex = Program.GlobalVariables.Count;
             globalVariable.Pointer = AllocationValue(Program.GlobalVariables.Count, globalVariable.Type, true);
-
-            lock (Program.GlobalVariables)
-            {
-                Program.GlobalVariables.Add(globalVariable);
-                Program.GlobalVariablesSize += globalVariable.Size;
-            }
+            Program.GlobalVariables.Add(globalVariable);
+            Program.GlobalVariablesSize += globalVariable.Size;
         }
     }
 
@@ -439,12 +435,8 @@ public static class ProgramIRBuilder
             Name = "____array", Size = length * elementType.Size,
             Array = true, ArrayLength = length, Type = elementType
         };
-
-        lock (Program.GlobalVariables)
-        {
-            Program.GlobalVariables.Add(arrayVariable);
-            Program.GlobalVariablesSize += arrayVariable.Size;
-        }
+        Program.GlobalVariables.Add(arrayVariable);
+        Program.GlobalVariablesSize += arrayVariable.Size;
 
         if (arrayValues != null)
         {
