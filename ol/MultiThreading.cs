@@ -14,11 +14,13 @@ public static class ThreadPool
     public class WorkQueue
     {
         public int Completed;
+        public int Processing;
         public int Count;
         public SafeLinkedList<QueueItem> Queue { get; } = new();
     }
 
     public static readonly WorkQueue ParseQueue = new();
+    public static readonly WorkQueue TypeQueue = new();
     public static readonly WorkQueue IRQueue = new();
 
     private static readonly Semaphore _semaphore = new(0, int.MaxValue);
@@ -36,7 +38,7 @@ public static class ThreadPool
         }
     }
 
-    private static readonly WorkQueue[] Queues = { ParseQueue, IRQueue };
+    private static readonly WorkQueue[] Queues = { ParseQueue, TypeQueue, IRQueue };
     private static void ThreadWorker()
     {
         while (true)
@@ -69,6 +71,7 @@ public static class ThreadPool
 
         if (value == head)
         {
+            Interlocked.Increment(ref queue.Processing);
             var queueItem = head.Data;
             queueItem.Function(queueItem.Data);
             Interlocked.Increment(ref queue.Completed);
@@ -84,15 +87,26 @@ public static class ThreadPool
         _semaphore.Release();
     }
 
-    public static void CompleteWork(WorkQueue queue)
+    public static void CompleteWork(WorkQueue queue, bool determineByCompletions = true)
     {
-        while (queue.Completed < queue.Count)
+        if (determineByCompletions)
         {
-            ExecuteQueuedItem(queue);
-        }
+            while (queue.Completed < queue.Count)
+            {
+                ExecuteQueuedItem(queue);
+            }
 
-        queue.Completed = 0;
-        queue.Count = 0;
+            queue.Completed = 0;
+            queue.Processing = 0;
+            queue.Count = 0;
+        }
+        else
+        {
+            while (queue.Processing < queue.Count)
+            {
+                ExecuteQueuedItem(queue);
+            }
+        }
     }
 }
 
