@@ -18,6 +18,8 @@ public static class TypeChecker
     private static ConcurrentDictionary<string, Dictionary<Operator, OperatorOverloadAst>> _polymorphicOperatorOverloads;
     private static ConcurrentDictionary<string, Library> _libraries;
 
+    private static Queue<IAst> _astCompleteQueue = new();
+
     private static int _generatedCodeFileIndex;
     private static uint _generatedCodeLineCount;
     private static StreamWriter _generatedCodeWriter;
@@ -209,14 +211,12 @@ public static class TypeChecker
         } while (Parser.Directives.Head != null);
     }
 
-    private static void ClearAstQueue(bool determineByCompletions = true)
+    public static void ClearAstQueue()
     {
-        ThreadPool.CompleteWork(ThreadPool.TypeQueue, determineByCompletions);
-    }
-
-    private static void VerifyAstJob(object ast)
-    {
-        VerifyAst((IAst)ast);
+        while (_astCompleteQueue.TryDequeue(out var ast))
+        {
+            VerifyAst(ast);
+        }
     }
 
     private static void VerifyAst(IAst ast)
@@ -1799,7 +1799,7 @@ public static class TypeChecker
                             }
                             else
                             {
-                                ClearAstQueue(false);
+                                ClearAstQueue();
 
                                 if (!ErrorReporter.Errors.Any())
                                 {
@@ -3306,7 +3306,7 @@ public static class TypeChecker
 
         if (willRun && !constant)
         {
-            ClearAstQueue(false);
+            ClearAstQueue();
         }
 
         switch (conditionalType?.TypeKind)
@@ -3614,7 +3614,7 @@ public static class TypeChecker
                 VerifyFunctionDefinition(function);
             }
             function.Flags |= FunctionFlags.Queued;
-            ThreadPool.QueueWork(ThreadPool.TypeQueue, VerifyAstJob, function);
+            _astCompleteQueue.Enqueue(function);
         }
     }
 
@@ -4653,7 +4653,7 @@ public static class TypeChecker
 
                 AddFunction(uniqueName, fileIndex, polymorphedFunction);
                 polymorphedFunction.Flags |= FunctionFlags.Queued;
-                ThreadPool.QueueWork(ThreadPool.TypeQueue, VerifyAstJob, polymorphedFunction);
+                _astCompleteQueue.Enqueue(polymorphedFunction);
 
                 return true;
             }
@@ -5300,12 +5300,11 @@ public static class TypeChecker
             if (!overload.Flags.HasFlag(FunctionFlags.Verified) && overload != currentFunction && !overload.Flags.HasFlag(FunctionFlags.DefinitionVerified))
             {
                 VerifyOperatorOverloadDefinition(overload);
-                ThreadPool.QueueWork(ThreadPool.TypeQueue, VerifyAstJob, overload);
+                _astCompleteQueue.Enqueue(overload);
             }
             return overload;
         }
-
-        if (type.BaseStructName != null && _polymorphicOperatorOverloads.TryGetValue(type.BaseStructName, out var polymorphicOverloads) && polymorphicOverloads.TryGetValue(op, out var polymorphicOverload))
+        else if (type.BaseStructName != null && _polymorphicOperatorOverloads.TryGetValue(type.BaseStructName, out var polymorphicOverloads) && polymorphicOverloads.TryGetValue(op, out var polymorphicOverload))
         {
             var polymorphedOverload = Polymorpher.CreatePolymorphedOperatorOverload(polymorphicOverload, type.GenericTypes.ToArray());
             if (overloads == null)
@@ -5322,13 +5321,15 @@ public static class TypeChecker
             }
 
             VerifyOperatorOverloadDefinition(polymorphedOverload);
-            ThreadPool.QueueWork(ThreadPool.TypeQueue, VerifyAstJob, polymorphedOverload);
+            _astCompleteQueue.Enqueue(polymorphedOverload);
 
             return polymorphedOverload;
         }
-
-        ErrorReporter.Report($"Type '{type.Name}' does not contain an overload for operator '{PrintOperator(op)}'", ast);
-        return null;
+        else
+        {
+            ErrorReporter.Report($"Type '{type.Name}' does not contain an overload for operator '{PrintOperator(op)}'", ast);
+            return null;
+        }
     }
 
     private static bool TypeEquals(IType target, IType source, bool checkPrimitives = false)

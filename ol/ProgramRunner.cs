@@ -111,122 +111,107 @@ public static unsafe class ProgramRunner
 
     private static void CreateFunction(FunctionAst function, Type[] argumentTypes, Type returnType)
     {
-        lock (_moduleBuilder)
+        _functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
+
+        var method = _functionTypeBuilder.DefineMethod(function.Name, MethodAttributes.Public | MethodAttributes.Static, returnType, argumentTypes);
+
+        var library = function.Library == null ? function.ExternLib : function.Library.FileName == null ?
+        #if _LINUX
+            $"{function.Library.AbsolutePath}.so" :
+        #elif _WINDOWS
+            $"{function.Library.AbsolutePath}.dll" :
+        #endif
+            function.Library.FileName;
+
+        if (!_libraries.TryGetValue(library, out var libraryDllImport))
         {
-            _functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
-
-            var method = _functionTypeBuilder.DefineMethod(function.Name, MethodAttributes.Public | MethodAttributes.Static, returnType, argumentTypes);
-
-            var library = function.Library == null ? function.ExternLib : function.Library.FileName == null ?
-            #if _LINUX
-                $"{function.Library.AbsolutePath}.so" :
-            #elif _WINDOWS
-                $"{function.Library.AbsolutePath}.dll" :
-            #endif
-                function.Library.FileName;
-
-            if (!_libraries.TryGetValue(library, out var libraryDllImport))
-            {
-                _dllImportConstructor ??= typeof(DllImportAttribute).GetConstructor(new []{typeof(string)});
-                libraryDllImport = _libraries[library] = new CustomAttributeBuilder(_dllImportConstructor, new []{library});
-            }
-
-            method.SetCustomAttribute(libraryDllImport);
+            _dllImportConstructor ??= typeof(DllImportAttribute).GetConstructor(new []{typeof(string)});
+            libraryDllImport = _libraries[library] = new CustomAttributeBuilder(_dllImportConstructor, new []{library});
         }
+
+        method.SetCustomAttribute(libraryDllImport);
     }
 
     public static void Init()
     {
-        lock (_moduleBuilder)
+        if (_functionTypeBuilder != null)
         {
-            if (_functionTypeBuilder != null)
-            {
-                var library = _functionTypeBuilder.CreateType();
-                _functionTypeBuilder = null;
+            var library = _functionTypeBuilder.CreateType();
+            _functionTypeBuilder = null;
 
-                foreach (var function in library.GetMethods(BindingFlags.Public | BindingFlags.Static))
-                {
-                    if (!_externFunctions.TryGetValue(function.Name, out var functions))
-                    {
-                        _externFunctions[function.Name] = new List<MethodInfo> {function};
-                    }
-                    else
-                    {
-                        functions.Add(function);
-                    }
-                }
-                _version++;
-            }
-        }
-
-        lock (Program.GlobalVariables)
-        {
-            if (_globalVariablesSize < Program.GlobalVariablesSize)
+            foreach (var function in library.GetMethods(BindingFlags.Public | BindingFlags.Static))
             {
-                var i = 0;
-                if (_globals == null)
+                if (!_externFunctions.TryGetValue(function.Name, out var functions))
                 {
-                    _globals = new IntPtr[Program.GlobalVariables.Count];
+                    _externFunctions[function.Name] = new List<MethodInfo> {function};
                 }
                 else
                 {
-                    i = _globals.Length;
-                    var newGlobals = new IntPtr[Program.GlobalVariables.Count];
-                    _globals.CopyTo(newGlobals, 0);
-                    _globals = newGlobals;
+                    functions.Add(function);
                 }
+            }
+            _version++;
+        }
 
-                var pointer = Allocator.Allocate(Program.GlobalVariablesSize - _globalVariablesSize);
-                _globalVariablesSize = Program.GlobalVariablesSize;
+        if (_globalVariablesSize < Program.GlobalVariablesSize)
+        {
+            var i = 0;
+            if (_globals == null)
+            {
+                _globals = new IntPtr[Program.GlobalVariables.Count];
+            }
+            else
+            {
+                i = _globals.Length;
+                var newGlobals = new IntPtr[Program.GlobalVariables.Count];
+                _globals.CopyTo(newGlobals, 0);
+                _globals = newGlobals;
+            }
 
-                for (; i < Program.GlobalVariables.Count; i++)
+            var pointer = Allocator.Allocate(Program.GlobalVariablesSize - _globalVariablesSize);
+            _globalVariablesSize = Program.GlobalVariablesSize;
+
+            for (; i < Program.GlobalVariables.Count; i++)
+            {
+                var variable = Program.GlobalVariables[i];
+
+                if (_typeTablePointer == IntPtr.Zero && variable.Name == "__type_table")
                 {
-                    var variable = Program.GlobalVariables[i];
-
-                    if (_typeTablePointer == IntPtr.Zero && variable.Name == "__type_table")
-                    {
-                        _typeTablePointer = pointer;
-                    }
-                    else if (variable.InitialValue != null)
-                    {
-                        InitializeGlobalVariable(pointer, variable.InitialValue);
-                    }
-
-                    _globals[i] = pointer;
-                    pointer += (int)variable.Size;
+                    _typeTablePointer = pointer;
                 }
+                else if (variable.InitialValue != null)
+                {
+                    InitializeGlobalVariable(pointer, variable.InitialValue);
+                }
+
+                _globals[i] = pointer;
+                pointer += (int)variable.Size;
             }
         }
 
-        lock (TypeTable.TypeInfos)
+        if (_typeCount != TypeTable.Count && _typeTablePointer != IntPtr.Zero)
         {
-            if (_typeCount != TypeTable.Count && _typeTablePointer != IntPtr.Zero)
+            _typeCount = TypeTable.Count;
+
+            // Set the data pointer
+            var typeInfosArray = TypeTable.TypeInfos.ToArray();
+            var arraySize = _typeCount * sizeof(IntPtr);
+            var typeTableArrayPointer = Allocator.Allocate(arraySize);
+            fixed (IntPtr* pointer = &typeInfosArray[0])
             {
-                _typeCount = TypeTable.Count;
-
-                // Set the data pointer
-                var typeInfosArray = TypeTable.TypeInfos.ToArray();
-                var arraySize = _typeCount * sizeof(IntPtr);
-                var typeTableArrayPointer = Allocator.Allocate(arraySize);
-                fixed (IntPtr* pointer = &typeInfosArray[0])
-                {
-                    Buffer.MemoryCopy(pointer, typeTableArrayPointer.ToPointer(), arraySize, arraySize);
-                }
-
-                var typeTableArray = new TypeTable.Array {Length = TypeTable.Count, Data = typeTableArrayPointer};
-                Marshal.StructureToPtr(typeTableArray, _typeTablePointer, false);
+                Buffer.MemoryCopy(pointer, typeTableArrayPointer.ToPointer(), arraySize, arraySize);
             }
+
+            var typeTableArray = new TypeTable.Array {Length = TypeTable.Count, Data = typeTableArrayPointer};
+            Marshal.StructureToPtr(typeTableArray, _typeTablePointer, false);
         }
 
-        lock (BuildSettings.Files)
+        if (BuildSettings.Files.Count > _fileNames.Count)
         {
-            if (BuildSettings.Files.Count > _fileNames.Count)
+            for (var i = _fileNames.Count; i < BuildSettings.Files.Count; i++)
             {
-                for (var i = _fileNames.Count; i < BuildSettings.Files.Count; i++)
-                {
-                    var fileName = Allocator.MakeString(BuildSettings.FileName(i), false);
-                    _fileNames.Add(fileName);
-                }
+                var fileName = Allocator.MakeString(BuildSettings.FileName(i), false);
+                _fileNames.Add(fileName);
             }
         }
     }
