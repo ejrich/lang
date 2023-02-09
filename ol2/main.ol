@@ -318,21 +318,6 @@ remove_node<T>(LinkedList<T>* list, Node<T>* node, Node<T>* previous) {
 
 
 // Messages
-enum CompilerMessageType {
-    ReadyToBeTypeChecked = 1;
-    TypeCheckFailed;
-    TypeCheckSucceeded;
-    IRGenerated;
-    ReadyForCodeGeneration;
-    CodeGenerated;
-    ExecutableLinked;
-}
-
-struct CompilerMessage {
-    type: CompilerMessageType;
-    ast: Ast*;
-}
-
 message_queue: LinkedList<CompilerMessage>;
 
 
