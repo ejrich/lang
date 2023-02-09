@@ -1771,6 +1771,24 @@ public static unsafe class ProgramRunner
                     SetOutputArchitecture(value.Byte);
                     break;
                 }
+                case "report_error":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    var error = Marshal.PtrToStructure<String>(value.Pointer);
+                    var errorString = Marshal.PtrToStringAnsi(error.Data, (int)error.Length);
+                    ErrorReporter.Report(errorString, fileIndex, line, column);
+                    break;
+                }
+                case "intercept_compiler_messages":
+                {
+                    // TODO Implement me
+                    break;
+                }
+                case "get_next_compiler_message":
+                {
+                    // TODO Implement me
+                    break;
+                }
                 case "get_function":
                 {
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);

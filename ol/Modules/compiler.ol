@@ -47,9 +47,40 @@ set_output_architecture(OutputArchitecture arch) #compiler
 
 ///// Metaprogramming features for code exploration and generation
 
-struct Function {
+report_error(string error) #compiler
+
+struct CompilerAst {
+    file: string;
+    line: u32;
+    column: u32;
+}
+
+struct Function : CompilerAst {
     name: string;
 }
+
+enum CompilerMessageType {
+    ReadyToBeTypeChecked = 0;
+    TypeCheckFailed;
+    IRGenerated;
+    ReadyForCodeGeneration;
+    CodeGenerated;
+    ExecutableLinked;
+}
+
+union CompilerMessageValue {
+    ast: CompilerAst*;
+    name: string;
+}
+
+struct CompilerMessage {
+    type: CompilerMessageType;
+    value: CompilerMessageValue;
+}
+
+bool intercept_compiler_messages() #compiler
+
+bool get_next_compiler_message(CompilerMessage* message) #compiler
 
 Function* get_function(string name) #compiler
 
