@@ -351,18 +351,18 @@ public static unsafe class ProgramRunner
         BuildSettings.OutputTypeTable = (OutputTypeTableConfiguration)config;
     }
 
-    private static void SetOutputDirectory(String directory)
+    private static void SetOutputDirectory(String directory, int fileIndex, uint line, uint column)
     {
         var directoryPath = Marshal.PtrToStringAnsi(directory.Data, (int)directory.Length);
         BuildSettings.OutputDirectory = Path.IsPathRooted(directoryPath) ? directoryPath : Path.Combine(BuildSettings.Path, directoryPath);
 
         if (!Directory.Exists(BuildSettings.OutputDirectory))
         {
-            ErrorReporter.Report($"Directory '{directoryPath}' not found, unable to set as output directory");
+            ErrorReporter.Report($"Directory '{directoryPath}' not found, unable to set as output directory", fileIndex, line, column);
         }
     }
 
-    private static void AddLibraryDirectory(String directory)
+    private static void AddLibraryDirectory(String directory, int fileIndex, uint line, uint column)
     {
         var directoryPath = Marshal.PtrToStringAnsi(directory.Data, (int)directory.Length);
         if (Path.IsPathRooted(directoryPath))
@@ -377,11 +377,11 @@ public static unsafe class ProgramRunner
 
         if (!Directory.Exists(directoryPath))
         {
-            ErrorReporter.Report($"Directory '{directoryPath}' not found, unable to set as library directory");
+            ErrorReporter.Report($"Directory '{directoryPath}' not found, unable to set as library directory", fileIndex, line, column);
         }
     }
 
-    private static void CopyToOutputDirectory(String file)
+    private static void CopyToOutputDirectory(String file, int fileIndex, uint line, uint column)
     {
         var filePath = Marshal.PtrToStringAnsi(file.Data, (int)file.Length);
         FileInfo fileInfo;
@@ -397,7 +397,7 @@ public static unsafe class ProgramRunner
 
         if (!fileInfo.Exists)
         {
-            ErrorReporter.Report($"File '{filePath}' not found, unable to copy to output directory");
+            ErrorReporter.Report($"File '{filePath}' not found, unable to copy to output directory", fileIndex, line, column);
         }
         else
         {
@@ -426,11 +426,11 @@ public static unsafe class ProgramRunner
         return pointer;
     }
 
-    private static void InsertCode(IntPtr functionPointer, String code)
+    private static void InsertCode(IntPtr functionPointer, String code, int fileIndex, uint line, uint column)
     {
         if (functionPointer == IntPtr.Zero)
         {
-            ErrorReporter.Report("Attempted to insert code into function that does not exist");
+            ErrorReporter.Report("Attempted to insert code into function that does not exist", fileIndex, line, column);
             return;
         }
 
@@ -453,7 +453,7 @@ public static unsafe class ProgramRunner
         }
         else
         {
-            ErrorReporter.Report($"Cannot insert code into function '{functionDef.Name}' without a body'");
+            ErrorReporter.Report($"Cannot insert code into function '{functionDef.Name}' without a body'", fileIndex, line, column);
         }
     }
 
@@ -501,6 +501,7 @@ public static unsafe class ProgramRunner
 
         var (stackPointer, stackCursor, stackBlock) = Allocator.StackAllocate((int)function.StackSize);
         var additionalBlocks = new List<(MemoryBlock block, int cursor)>();
+        int fileIndex = 0; uint line = 0, column = 0;
 
         while (true)
         {
@@ -688,7 +689,7 @@ public static unsafe class ProgramRunner
                 case InstructionType.Call:
                 {
                     var callingFunction = Program.Functions[instruction.Index];
-                    registers[instruction.ValueIndex] = MakeCall(callingFunction, instruction.Value1.Values, registers, stackPointer, function, arguments, instruction.Index2);
+                    registers[instruction.ValueIndex] = MakeCall(callingFunction, instruction.Value1.Values, registers, stackPointer, function, arguments, instruction.Index2, fileIndex, line, column);
                     break;
                 }
                 case InstructionType.CallFunctionPointer:
@@ -737,7 +738,7 @@ public static unsafe class ProgramRunner
                             {
                                 break;
                             }
-                            else if (!assembly.InRegisters.ContainsKey(register))
+                            if (!assembly.InRegisters.ContainsKey(register))
                             {
                                 stagingRegister = definition;
                                 break;
@@ -775,7 +776,7 @@ public static unsafe class ProgramRunner
                     if (assembly.OutValues.Count > 0)
                     {
                         stagingRegister = null;
-                        foreach (var (register, definition) in Assembly.Registers)
+                        foreach (var (_, definition) in Assembly.Registers)
                         {
                             if (definition.Type != RegisterType.General)
                             {
@@ -865,45 +866,45 @@ public static unsafe class ProgramRunner
                                 2 => (sbyte)value.Short,
                                 4 => (sbyte)value.Integer,
                                 8 => (sbyte)value.Long,
-                                _ => (sbyte)value.Integer,
+                                _ => (sbyte)value.Integer
                             };
                             break;
                         case 2:
                             register.Short = instruction.Value1.Type.Size switch
                             {
-                                1 => (short)value.SByte,
+                                1 => value.SByte,
                                 2 => value.Short,
                                 4 => (short)value.Integer,
                                 8 => (short)value.Long,
-                                _ => (short)value.Integer,
+                                _ => (short)value.Integer
                             };
                             break;
                         case 4:
                             register.Integer = instruction.Value1.Type.Size switch
                             {
-                                1 => (int)value.SByte,
-                                2 => (int)value.Short,
+                                1 => value.SByte,
+                                2 => value.Short,
                                 8 => (int)value.Long,
-                                _ => value.Integer,
+                                _ => value.Integer
                             };
                             break;
                         case 8:
                             register.Long = instruction.Value1.Type.Size switch
                             {
-                                1 => (long)value.SByte,
-                                2 => (long)value.Short,
-                                4 => (long)value.Integer,
+                                1 => value.SByte,
+                                2 => value.Short,
+                                4 => value.Integer,
                                 8 => value.Long,
-                                _ => (long)value.Integer,
+                                _ => value.Integer
                             };
                             break;
                         default:
                             register.Integer = instruction.Value1.Type.Size switch
                             {
-                                1 => (int)value.SByte,
-                                2 => (int)value.Short,
+                                1 => value.SByte,
+                                2 => value.Short,
                                 8 => (int)value.Long,
-                                _ => value.Integer,
+                                _ => value.Integer
                             };
                             break;
                     }
@@ -1029,22 +1030,22 @@ public static unsafe class ProgramRunner
                     {
                         register.Float = instruction.Value1.Type.Size switch
                         {
-                            1 => (float)value.SByte,
-                            2 => (float)value.Short,
-                            4 => (float)value.Integer,
-                            8 => (float)value.Long,
-                            _ => (float)value.Integer,
+                            1 => value.SByte,
+                            2 => value.Short,
+                            4 => value.Integer,
+                            8 => value.Long,
+                            _ => value.Integer
                         };
                     }
                     else
                     {
                         register.Double = instruction.Value1.Type.Size switch
                         {
-                            1 => (double)value.SByte,
-                            2 => (double)value.Short,
-                            4 => (double)value.Integer,
-                            8 => (double)value.Long,
-                            _ => (double)value.Integer,
+                            1 => value.SByte,
+                            2 => value.Short,
+                            4 => value.Integer,
+                            8 => value.Long,
+                            _ => value.Integer
                         };
                     }
                     registers[instruction.ValueIndex] = register;
@@ -1056,11 +1057,11 @@ public static unsafe class ProgramRunner
                     var register = new Register();
                     if (instruction.Value2.Type.Size == 4)
                     {
-                        register.Float = (float)value.ULong;
+                        register.Float = value.ULong;
                     }
                     else
                     {
-                        register.Double = (double)value.ULong;
+                        register.Double = value.ULong;
                     }
                     registers[instruction.ValueIndex] = register;
                     break;
@@ -1075,7 +1076,7 @@ public static unsafe class ProgramRunner
                     }
                     else
                     {
-                        register.Double = (double)value.Float;
+                        register.Double = value.Float;
                     }
                     registers[instruction.ValueIndex] = register;
                     break;
@@ -1630,6 +1631,14 @@ public static unsafe class ProgramRunner
                     registers[instruction.ValueIndex] = new Register {ULong = result};
                     break;
                 }
+                case InstructionType.DebugSetLocation:
+                {
+                    var source = instruction.Source;
+                    fileIndex = source.FileIndex;
+                    line = source.Line;
+                    column = source.Column;
+                    break;
+                }
             }
         }
     }
@@ -1700,7 +1709,7 @@ public static unsafe class ProgramRunner
         return register;
     }
 
-    private static Register MakeCall(FunctionIR callingFunction, InstructionValue[] arguments, ReadOnlySpan<Register> registers, IntPtr stackPointer, FunctionIR function, ReadOnlySpan<Register> functionArgs, int externIndex = 0)
+    private static Register MakeCall(FunctionIR callingFunction, InstructionValue[] arguments, ReadOnlySpan<Register> registers, IntPtr stackPointer, FunctionIR function, ReadOnlySpan<Register> functionArgs, int externIndex, int fileIndex, uint line, uint column)
     {
         if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Extern))
         {
@@ -1739,21 +1748,21 @@ public static unsafe class ProgramRunner
                 {
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
                     var directory = Marshal.PtrToStructure<String>(value.Pointer);
-                    SetOutputDirectory(directory);
+                    SetOutputDirectory(directory, fileIndex, line, column);
                     break;
                 }
                 case "add_library_directory":
                 {
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
                     var directory = Marshal.PtrToStructure<String>(value.Pointer);
-                    AddLibraryDirectory(directory);
+                    AddLibraryDirectory(directory, fileIndex, line, column);
                     break;
                 }
                 case "copy_to_output_directory":
                 {
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
                     var file = Marshal.PtrToStructure<String>(value.Pointer);
-                    CopyToOutputDirectory(file);
+                    CopyToOutputDirectory(file, fileIndex, line, column);
                     break;
                 }
                 case "set_output_architecture":
@@ -1774,7 +1783,7 @@ public static unsafe class ProgramRunner
                     var functionPointer = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
                     var value = GetValue(arguments[1], registers, stackPointer, function, functionArgs);
                     var code = Marshal.PtrToStructure<String>(value.Pointer);
-                    InsertCode(functionPointer.Pointer, code);
+                    InsertCode(functionPointer.Pointer, code, fileIndex, line, column);
                     break;
                 }
                 case "add_code":
