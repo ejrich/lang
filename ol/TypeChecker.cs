@@ -1881,9 +1881,7 @@ public static class TypeChecker
         {
             _generatedCodeWriter = new StreamWriter(BuildSettings.GeneratedCodeFile);
             _generatedCodeLineCount = 1;
-            _generatedCodeFileIndex = BuildSettings.Files.Count;
-            BuildSettings.Files.Add(BuildSettings.GeneratedCodeFile);
-            PrivateScopes.Add(null);
+            _generatedCodeFileIndex = BuildSettings.AddFile(BuildSettings.GeneratedCodeFile);
         }
 
         string header;

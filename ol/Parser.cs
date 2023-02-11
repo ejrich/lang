@@ -152,9 +152,7 @@ public static class Parser
             }
         }
 
-        var fileIndex = BuildSettings.Files.Count;
-        BuildSettings.Files.Add(file);
-        TypeChecker.PrivateScopes.Add(null);
+        var fileIndex = BuildSettings.AddFile(file);
         ThreadPool.QueueWork(ThreadPool.ParseQueue, ParseFile, new ParseData {File = file, FileIndex = fileIndex});
     }
 

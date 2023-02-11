@@ -46,8 +46,6 @@ public static unsafe class ProgramRunner
     private static int _assemblyDataLength;
     private static IntPtr _assemblyDataPointer;
 
-    private static List<IntPtr> _fileNames = new();
-
     static ProgramRunner()
     {
         var assemblyName = new AssemblyName("Runner");
@@ -204,15 +202,6 @@ public static unsafe class ProgramRunner
 
             var typeTableArray = new TypeTable.Array {Length = TypeTable.Count, Data = typeTableArrayPointer};
             Marshal.StructureToPtr(typeTableArray, _typeTablePointer, false);
-        }
-
-        if (BuildSettings.Files.Count > _fileNames.Count)
-        {
-            for (var i = _fileNames.Count; i < BuildSettings.Files.Count; i++)
-            {
-                var fileName = Allocator.MakeString(BuildSettings.FileName(i), false);
-                _fileNames.Add(fileName);
-            }
         }
     }
 
@@ -1671,7 +1660,7 @@ public static unsafe class ProgramRunner
                 var functionDef = Program.Functions[value.ValueIndex];
                 return new Register {Pointer = CreateFunctionPointer(functionDef)};
             case InstructionValueType.FileName:
-                return new Register {Pointer = _fileNames[value.ValueIndex]};
+                return new Register {Pointer = BuildSettings.FileNames[value.ValueIndex]};
         }
 
         return new Register();

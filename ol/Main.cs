@@ -19,6 +19,7 @@ public static class BuildSettings
     public static string OutputDirectory { get; set; }
     public static string GeneratedCodeFile { get; set; }
     public static List<string> Files { get; } = new();
+    public static List<IntPtr> FileNames { get; } = new();
     public static List<FileInfo> FilesToCopy { get; } = new();
     // These are the libraries that are linked in with -l{name}
     public static HashSet<string> LibraryNames { get; } = new();
@@ -28,7 +29,19 @@ public static class BuildSettings
     public static HashSet<Library> Libraries { get; } = new();
     public static Dictionary<string, InputVariable> InputVariables { get; } = new();
 
-    public static string FileName(int index) => BuildSettings.Files[index].Replace(BuildSettings.Path, string.Empty);
+    public static string FileName(int index) => GetFileName(BuildSettings.Files[index]);
+
+    public static int AddFile(string file)
+    {
+        var fileIndex = Files.Count;
+        Files.Add(file);
+        FileNames.Add(Allocator.MakeString(GetFileName(file), false));
+        TypeChecker.PrivateScopes.Add(null);
+        return fileIndex;
+    }
+
+    private static string GetFileName(string name) => name.Replace(BuildSettings.Path, string.Empty);
+
 }
 
 public enum LinkerType : byte
