@@ -452,6 +452,39 @@ string format_string(string format, Allocate allocator = default_allocator, Para
     return value;
 }
 
+union IntFormatValue {
+    signed: s64;
+    unsigned: u64;
+}
+
+struct IntFormat {
+    value: IntFormatValue;
+    signed := true;
+    base: u8 = 10;
+}
+
+IntFormat int_format(s64 value, u8 base = 10) #inline {
+    format: IntFormat = { signed = true; base = base; }
+    format.value.signed = value;
+    return format;
+}
+
+IntFormat uint_format(u64 value, u8 base = 10) #inline {
+    format: IntFormat = { signed = false; base = base; }
+    format.value.unsigned = value;
+    return format;
+}
+
+struct FloatFormat {
+    value: float64;
+    decimal_places := 4;
+}
+
+FloatFormat float_format(float64 value, int decimal_places = 4) #inline {
+    format: FloatFormat = { value = value; decimal_places = decimal_places; }
+    return format;
+}
+
 format_string_arguments(StringBuffer* buffer, string format, Array<Any> args) {
     arg_index := 0;
 
@@ -493,6 +526,18 @@ write_value_to_buffer(StringBuffer* buffer, TypeInfo* type, void* data) {
         return;
     }
 
+    if type == type_of(IntFormat) {
+        format := cast(IntFormat*, data);
+        write_integer(buffer, *format);
+        return;
+    }
+
+    if type == type_of(FloatFormat) {
+        format := cast(FloatFormat*, data);
+        write_float(buffer, *format);
+        return;
+    }
+
     type_kind := type.type;
 
     switch type.type {
@@ -504,11 +549,33 @@ write_value_to_buffer(StringBuffer* buffer, TypeInfo* type, void* data) {
         }
         case TypeKind.Integer; {
             type_info := cast(IntegerTypeInfo*, type);
-            write_integer(buffer, data, type_info.size, type_info.signed);
+            format: IntFormat = { signed = type_info.signed; }
+
+            if type_info.signed {
+                switch type_info.size {
+                    case 1;  format.value.signed = *cast(s8*, data);
+                    case 2;  format.value.signed = *cast(s16*, data);
+                    case 4;  format.value.signed = *cast(s32*, data);
+                    default; format.value.signed = *cast(s64*, data);
+                }
+            }
+            else {
+                switch type_info.size {
+                    case 1;  format.value.unsigned = *cast(u8*, data);
+                    case 2;  format.value.unsigned = *cast(u16*, data);
+                    case 4;  format.value.unsigned = *cast(u32*, data);
+                    default; format.value.unsigned = *cast(u64*, data);
+                }
+            }
+
+            write_integer(buffer, format);
         }
         case TypeKind.Float; {
-            if type.size == 4 write_float(buffer, *cast(float*, data));
-            else write_float(buffer, *cast(float64*, data));
+            format: FloatFormat;
+            if type.size == 4 format.value = *cast(float*, data);
+            else format.value = *cast(float64*, data);
+
+            write_float(buffer, format);
         }
         case TypeKind.String; {
             value := *cast(string*, data);
@@ -625,45 +692,28 @@ write_value_to_buffer(StringBuffer* buffer, TypeInfo* type, void* data) {
 }
 
 add_to_string_buffer(StringBuffer* buffer, string value) {
+    buffer_length := buffer.length;
     each i in 0..value.length-1 {
-        buffer.buffer[buffer.length++] = value[i];
+        buffer.buffer[buffer_length + i] = value[i];
     }
+    buffer.length += value.length;
 }
 
-write_integer(StringBuffer* buffer, void* data, u32 size, bool signed) {
-    value: u64;
-
-    if signed {
-        switch size {
-            case 1;  value = cast(s64, *cast(s8*, data));
-            case 2;  value = cast(s64, *cast(s16*, data));
-            case 4;  value = cast(s64, *cast(s32*, data));
-            default; value = *cast(s64*, data);
-        }
-    }
-    else {
-        switch size {
-            case 1;  value = *cast(u8*, data);
-            case 2;  value = *cast(u16*, data);
-            case 4;  value = *cast(u32*, data);
-            default; value = *cast(u64*, data);
-        }
-    }
-
-    if value == 0 {
+write_integer(StringBuffer* buffer, IntFormat format) {
+    if format.value.unsigned == 0 {
         buffer.buffer[buffer.length++] = '0';
     }
     else {
-        if signed && cast(s64, value) < 0 {
+        if format.signed && format.value.signed < 0 {
             buffer.buffer[buffer.length++] = '-';
-            value = cast(s64, value) * -1;
+            format.value.signed *= -1;
         }
-        write_integer_to_buffer(buffer, value);
+        write_integer_to_buffer(buffer, format.value.unsigned, format.base);
     }
 }
 
-#import math
-write_float(StringBuffer* buffer, float64 value, int decimal_places = 4) {
+write_float(StringBuffer* buffer, FloatFormat format) {
+    value := format.value;
     if value < 0 {
         buffer.buffer[buffer.length++] = '-';
         value *= -1;
@@ -697,7 +747,7 @@ write_float(StringBuffer* buffer, float64 value, int decimal_places = 4) {
     buffer.buffer[buffer.length++] = '.';
     value -= whole;
 
-    each x in 0..decimal_places - 1 {
+    each x in 0..format.decimal_places - 1 {
         value *= 10;
         digit := cast(u8, value);
         buffer.buffer[buffer.length++] = digit + '0';
@@ -710,13 +760,18 @@ write_float(StringBuffer* buffer, float64 value, int decimal_places = 4) {
     }
 }
 
-write_integer_to_buffer(StringBuffer* buffer, u64 value) {
+write_integer_to_buffer(StringBuffer* buffer, u64 value, u8 base = 10) {
     buffer_length := buffer.length;
     length := 0;
     while value > 0 {
-        digit := value % cast(u64, 10);
-        buffer.buffer[buffer.length++] = digit + '0';
-        value /= 10;
+        digit := value % base;
+        if digit < 10 {
+            buffer.buffer[buffer.length++] = digit + '0';
+        }
+        else {
+            buffer.buffer[buffer.length++] = digit + '7';
+        }
+        value /= base;
         length++;
     }
 
