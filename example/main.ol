@@ -393,7 +393,7 @@ type_casts() {
     b := cast(s32, a);
     c := cast(float64, a);
     d := cast(u8, State.Running);
-    print("a = %, b = %, c = %, d = %\n", a, b, c, d);
+    print("a = %, b = %, c = %, d = %\n", uint_format(a, 16), b, float_format(c, 10), d);
 }
 
 break_and_continue() {
