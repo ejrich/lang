@@ -55,7 +55,7 @@ float64 log_2(float64 value) #inline {
         fld1;
         fld [rax];
         fyl2x;
-        fstp[rax];
+        fstp [rax];
     }
 
     return value;

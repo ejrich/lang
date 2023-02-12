@@ -549,7 +549,7 @@ public static unsafe class ProgramRunner
                             break;
                         case TypeKind.Integer:
                         case TypeKind.Enum:
-                            switch (instruction.Value1.Type.Size)
+                            switch (instruction.LoadType.Size)
                             {
                                 case 1:
                                     register.Byte = Marshal.PtrToStructure<byte>(pointer.Pointer);
@@ -569,7 +569,7 @@ public static unsafe class ProgramRunner
                             register.UInteger = Marshal.PtrToStructure<uint>(pointer.Pointer);
                             break;
                         case TypeKind.Float:
-                            if (instruction.Value1.Type.Size == 4)
+                            if (instruction.LoadType.Size == 4)
                             {
                                 register.Float = Marshal.PtrToStructure<float>(pointer.Pointer);
                             }

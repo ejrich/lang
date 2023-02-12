@@ -504,26 +504,11 @@ write_value_to_buffer(StringBuffer* buffer, TypeInfo* type, void* data) {
         }
         case TypeKind.Integer; {
             type_info := cast(IntegerTypeInfo*, type);
-            if type_info.signed {
-                switch type_info.size {
-                    case 1;  write_integer<s8>(buffer, data);
-                    case 2;  write_integer<s16>(buffer, data);
-                    case 4;  write_integer<s32>(buffer, data);
-                    default; write_integer<s64>(buffer, data);
-                }
-            }
-            else {
-                switch type_info.size {
-                    case 1;  write_integer<u8>(buffer, data);
-                    case 2;  write_integer<u16>(buffer, data);
-                    case 4;  write_integer<u32>(buffer, data);
-                    default; write_integer<u64>(buffer, data);
-                }
-            }
+            write_integer(buffer, data, type_info.size, type_info.signed);
         }
         case TypeKind.Float; {
-            if type.size == 4 write_float<float>(buffer, data);
-            else write_float<float64>(buffer, data);
+            if type.size == 4 write_float(buffer, *cast(float*, data));
+            else write_float(buffer, *cast(float64*, data));
         }
         case TypeKind.String; {
             value := *cast(string*, data);
@@ -645,30 +630,63 @@ add_to_string_buffer(StringBuffer* buffer, string value) {
     }
 }
 
-write_integer<T>(StringBuffer* buffer, void* data) {
-    value := *cast(T*, data);
+write_integer(StringBuffer* buffer, void* data, u32 size, bool signed) {
+    value: u64;
+
+    if signed {
+        switch size {
+            case 1;  value = cast(s64, *cast(s8*, data));
+            case 2;  value = cast(s64, *cast(s16*, data));
+            case 4;  value = cast(s64, *cast(s32*, data));
+            default; value = *cast(s64*, data);
+        }
+    }
+    else {
+        switch size {
+            case 1;  value = *cast(u8*, data);
+            case 2;  value = *cast(u16*, data);
+            case 4;  value = *cast(u32*, data);
+            default; value = *cast(u64*, data);
+        }
+    }
+
     if value == 0 {
         buffer.buffer[buffer.length++] = '0';
     }
     else {
-        if value < 0 {
+        if signed && cast(s64, value) < 0 {
             buffer.buffer[buffer.length++] = '-';
-            value *= -1;
+            value = cast(s64, value) * -1;
         }
         write_integer_to_buffer(buffer, value);
     }
 }
 
-write_float<T>(StringBuffer* buffer, void* data) {
-    value := *cast(T*, data);
-    whole := cast(s64, value);
-
+#import math
+write_float(StringBuffer* buffer, float64 value, int decimal_places = 4) {
     if value < 0 {
         buffer.buffer[buffer.length++] = '-';
         value *= -1;
-        whole *= -1;
     }
 
+    exponent := 0;
+    // For values greater than what a u64 can hold, use scientific notation
+    if value > 0xFFFFFFFFFFFFFFFF {
+        exponent = 19;
+        value /= 10000000000000000000;
+
+        while true {
+            if value < 10     {                                break; }
+            if value < 100    { value /= 10;    exponent += 1; break; }
+            if value < 1000   { value /= 100;   exponent += 2; break; }
+            if value < 10000  { value /= 1000;  exponent += 3; break; }
+            if value < 100000 { value /= 10000; exponent += 4; break; }
+            exponent += 5;
+            value /= 100000;
+        }
+    }
+
+    whole := cast(u64, value);
     if whole == 0 {
         buffer.buffer[buffer.length++] = '0';
     }
@@ -679,11 +697,16 @@ write_float<T>(StringBuffer* buffer, void* data) {
     buffer.buffer[buffer.length++] = '.';
     value -= whole;
 
-    each x in 0..3 {
+    each x in 0..decimal_places - 1 {
         value *= 10;
         digit := cast(u8, value);
         buffer.buffer[buffer.length++] = digit + '0';
         value -= digit;
+    }
+
+    if exponent {
+        buffer.buffer[buffer.length++] = 'e';
+        write_integer_to_buffer(buffer, exponent);
     }
 }
 
@@ -691,7 +714,7 @@ write_integer_to_buffer(StringBuffer* buffer, u64 value) {
     buffer_length := buffer.length;
     length := 0;
     while value > 0 {
-        digit := value % 10;
+        digit := value % cast(u64, 10);
         buffer.buffer[buffer.length++] = digit + '0';
         value /= 10;
         length++;
