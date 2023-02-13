@@ -24,12 +24,17 @@ public static class ProgramIRBuilder
         return index;
     }
 
-    public static void BuildFunction(FunctionAst function, bool recompile = false)
+    public static void QueueBuildFunction(FunctionAst function)
     {
-        var functionIR = Program.Functions[function.FunctionIndex];
-        if (functionIR.Written && !recompile) return;
+        ThreadPool.QueueWork(ThreadPool.IRQueue, BuildFunction, function);
+    }
 
-        functionIR.Writing = true;
+    public static void BuildFunction(object data)
+    {
+        var function = (FunctionAst)data;
+        var functionIR = Program.Functions[function.FunctionIndex];
+        if (WritingLocked(functionIR)) return;
+
         functionIR.Constants = new InstructionValue[function.ConstantCount];
         functionIR.Allocations = new();
         functionIR.Pointers = new();
@@ -63,20 +68,26 @@ public static class ProgramIRBuilder
         {
             functionIR.Instructions.Add(new Instruction {Type = InstructionType.ReturnVoid, Scope = function.Body});
         }
-        functionIR.Written = true;
 
         if (function.Flags.HasFlag(FunctionFlags.PrintIR))
         {
             PrintFunction(function.Name, functionIR);
         }
+
+        functionIR.Written = true;
     }
 
-    public static void BuildOperatorOverload(OperatorOverloadAst overload, bool recompile = false)
+    public static void QueueBuildOperatorOverload(OperatorOverloadAst overload)
     {
-        var functionIR = Program.Functions[overload.FunctionIndex];
-        if (functionIR.Written && !recompile) return;
+        ThreadPool.QueueWork(ThreadPool.IRQueue, BuildOperatorOverload, overload);
+    }
 
-        functionIR.Writing = true;
+    public static void BuildOperatorOverload(object data)
+    {
+        var overload = (OperatorOverloadAst)data;
+        var functionIR = Program.Functions[overload.FunctionIndex];
+        if (WritingLocked(functionIR)) return;
+
         functionIR.Constants = new InstructionValue[overload.ConstantCount];
         functionIR.Allocations = new();
         functionIR.Pointers = new();
@@ -95,12 +106,20 @@ public static class ProgramIRBuilder
         }
 
         EmitScope(functionIR, overload.Body, overload.ReturnType, null, null);
-        functionIR.Written = true;
 
         if (overload.Flags.HasFlag(FunctionFlags.PrintIR))
         {
             PrintFunction(overload.Name, functionIR);
         }
+
+        functionIR.Written = true;
+    }
+
+    private static bool WritingLocked(FunctionIR function)
+    {
+        if (function.Writing == 1) return true;
+
+        return Interlocked.CompareExchange(ref function.Writing, 1, 0) == 1;
     }
 
     public static FunctionIR CreateRunnableFunction(ScopeAst scope, IFunction source)
