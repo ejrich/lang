@@ -1630,13 +1630,8 @@ public static class TypeChecker
 
         if (queueBuild && !ErrorReporter.Errors.Any() && !function.Flags.HasFlag(FunctionFlags.Inline))
         {
-            ThreadPool.QueueWork(ThreadPool.IRQueue, WriteFunctionJob, function);
+            ProgramIRBuilder.QueueBuildFunction(function);
         }
-    }
-
-    private static void WriteFunctionJob(object function)
-    {
-        ProgramIRBuilder.BuildFunction((FunctionAst)function);
     }
 
     public static void VerifyOperatorOverload(OperatorOverloadAst overload, bool queueBuild = true)
@@ -1677,13 +1672,8 @@ public static class TypeChecker
 
         if (queueBuild && !ErrorReporter.Errors.Any())
         {
-            ThreadPool.QueueWork(ThreadPool.IRQueue, WriteOverloadJob, overload);
+            ProgramIRBuilder.QueueBuildOperatorOverload(overload);
         }
-    }
-
-    private static void WriteOverloadJob(object overload)
-    {
-        ProgramIRBuilder.BuildOperatorOverload((OperatorOverloadAst)overload);
     }
 
     public static void VerifyScope(ScopeAst scope, IFunction function, bool inDefer = false, bool canBreak = false, int? endIndex = null)

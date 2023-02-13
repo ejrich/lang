@@ -17,7 +17,7 @@ public static class Program
 
 public class FunctionIR
 {
-    public bool Writing { get; set; }
+    public int Writing;
     public bool Written { get; set; }
     public uint StackSize { get; set; }
     public int ValueCount { get; set; }

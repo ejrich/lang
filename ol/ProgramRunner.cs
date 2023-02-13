@@ -435,9 +435,20 @@ public static unsafe class ProgramRunner
             if (functionDef.Flags.HasFlag(FunctionFlags.Verified))
             {
                 TypeChecker.VerifyScope(functionDef.Body, functionDef, endIndex: inserted);
-                var functionIR = Program.Functions[functionDef.FunctionIndex];
-                functionIR.Writing = false;
-                functionIR.Written = false;
+                if (!ErrorReporter.Errors.Any())
+                {
+                    var functionIR = Program.Functions[functionDef.FunctionIndex];
+                    functionIR.Writing = 0;
+                    functionIR.Written = false;
+                    if (functionDef is FunctionAst functionAst)
+                    {
+                        ProgramIRBuilder.QueueBuildFunction(functionAst);
+                    }
+                    if (functionDef is OperatorOverloadAst overload)
+                    {
+                        ProgramIRBuilder.QueueBuildOperatorOverload(overload);
+                    }
+                }
             }
         }
         else
@@ -461,7 +472,7 @@ public static unsafe class ProgramRunner
     {
         if (function.Source != null && !function.Written)
         {
-            if (function.Writing)
+            if (function.Writing == 1)
             {
                 while (!function.Written);
             }
