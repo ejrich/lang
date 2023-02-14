@@ -406,7 +406,11 @@ public static unsafe class ProgramRunner
 
         var functionDef = functions[0];
         var handle = GCHandle.Alloc(functionDef);
-        var function = new Function { Name = Allocator.MakeString(functionDef.Name), Source = GCHandle.ToIntPtr(handle) };
+        var function = new Function
+        {
+            File = Marshal.PtrToStructure<String>(BuildSettings.FileNames[functionDef.FileIndex]), Line = functionDef.Line, Column = functionDef.Column,
+            Name = Allocator.MakeString(functionDef.Name), Source = GCHandle.ToIntPtr(handle)
+        };
 
         // TODO Use the pointer from messages
         var pointer = Allocator.Allocate(Function.Size);

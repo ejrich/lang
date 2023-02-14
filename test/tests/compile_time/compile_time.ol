@@ -11,6 +11,13 @@ main() {
 #run {
     add_code("message := \"Hello from codegen\\n\";\nfoo() {\n    print(message);\n}");
 
+    if intercept_compiler_messages() {
+        message: CompilerMessage;
+
+        while get_next_compiler_message(&message) {
+        }
+    }
+
     main();
 
     main_function := get_function("main");
