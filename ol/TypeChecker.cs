@@ -73,11 +73,10 @@ public static class TypeChecker
 
         // 2. Execute any other compiler directives
         var runNode = Parser.RunDirectives.Head;
-        Node<CompilerDirectiveAst> previous = null;
         while (runNode != null)
         {
             var runDirective = runNode.Data;
-            RemoveNode(Parser.RunDirectives, previous, runNode);
+            RemoveNode(Parser.RunDirectives, runNode);
 
             var scope = GetFileScope(runDirective);
             var scopeAst = (ScopeAst)runDirective.Value;
@@ -92,7 +91,10 @@ public static class TypeChecker
                 var function = ProgramIRBuilder.CreateRunnableFunction(scopeAst, runDirectiveFunction);
                 ProgramRunner.Init();
 
-                ProgramRunner.RunProgram(function, scopeAst);
+                if (ThreadPool.ExecuteRunDirective(function, scopeAst))
+                {
+                    ProgramRunner.RunProgram(function, scopeAst);
+                }
             }
 
             runNode = runNode.Next;
@@ -128,24 +130,12 @@ public static class TypeChecker
         _generatedCodeWriter?.Close();
     }
 
-    private static void RemoveNode<T>(SafeLinkedList<T> list, Node<T> previous, Node<T> current)
+    private static void RemoveNode<T>(SafeLinkedList<T> list, Node<T> current)
     {
-        if (previous == null)
+        list.Head = current.Next;
+        if (current.Next == null)
         {
-            list.Head = current.Next;
-            if (current.Next == null)
-            {
-                list.ReplaceEnd(null);
-            }
-        }
-        else if (current.Next == null)
-        {
-            list.ReplaceEnd(previous);
-            previous.Next = null;
-        }
-        else
-        {
-            previous.Next = current.Next;
+            list.ReplaceEnd(null);
         }
     }
 
@@ -155,11 +145,10 @@ public static class TypeChecker
         {
             var parsingAdditional = false;
             var node = Parser.Directives.Head;
-            Node<CompilerDirectiveAst> previous = null;
             while (node != null)
             {
                 var directive = node.Data;
-                RemoveNode(Parser.Directives, previous, node);
+                RemoveNode(Parser.Directives, node);
                 switch (directive.Type)
                 {
                     case DirectiveType.If:

@@ -46,9 +46,12 @@ public struct CompilerMessage
 
 public static class Messages
 {
-    private static bool _intercepting;
+    public static bool Intercepting;
 
-    public static List<IntPtr> Functions { get; } = new();
+    public static void Submit()
+    {
+        // TODO Implement
+    }
 
     public static void AddFunction(IFunction function)
     {
