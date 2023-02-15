@@ -11,14 +11,18 @@ main() {
 #run {
     add_code("message := \"Hello from codegen\\n\";\nfoo() {\n    print(message);\n}");
 
+    main();
+
     if intercept_compiler_messages() {
         message: CompilerMessage;
 
-        while get_next_compiler_message(&message) {
+        foo := 1;
+        while foo++ < 10 {
+        // while get_next_compiler_message(&message) {
+            print("Hello world\n");
+            sleep(10);
         }
     }
-
-    main();
 
     main_function := get_function("main");
     insert_code(main_function, format_string("print(\"Executing function: %\\n\");\nfoo();", main_function.name));

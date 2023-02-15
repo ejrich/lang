@@ -1862,6 +1862,10 @@ public static class TypeChecker
             _generatedCodeLineCount = 1;
             _generatedCodeFileIndex = BuildSettings.AddFile(BuildSettings.GeneratedCodeFile);
         }
+        else if (!_generatedCodeWriter.BaseStream.CanSeek)
+        {
+            _generatedCodeWriter = new StreamWriter(BuildSettings.GeneratedCodeFile, true);
+        }
 
         string header;
         if (function != null && source != null)
