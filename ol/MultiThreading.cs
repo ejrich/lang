@@ -56,14 +56,23 @@ public static class ThreadPool
                 _executingFunction = null;
                 _executingScope = null;
 
-                if (!Messages.Intercepting)
+                if (Messages.Intercepting)
                 {
-                    RunExecutingMutex.Release();
+                    Messages.Intercepting = false;
+                }
+                else
+                {
+                    ReleaseRunExecuting();
                 }
             }
 
             RunMutex.WaitOne();
         }
+    }
+
+    public static void ReleaseRunExecuting()
+    {
+        RunExecutingMutex.Release();
     }
 
     public static bool ExecuteRunDirective(FunctionIR function, ScopeAst scope)

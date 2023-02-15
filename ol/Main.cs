@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -176,7 +176,10 @@ public static class ol
         stopwatch.Stop();
         var linkTime = stopwatch.Elapsed;
 
-        // 6. Log statistics
+        // 6. Wait for intercepting loop to complete
+        while (Messages.Intercepting);
+
+        // 7. Log statistics
         Console.WriteLine($"Front-end time: {frontEndTime.TotalSeconds} seconds");
         Console.WriteLine($"LLVM build time: {buildTime.TotalSeconds} seconds");
         Console.WriteLine($"Linking time: {linkTime.TotalSeconds} seconds");

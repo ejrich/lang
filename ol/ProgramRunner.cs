@@ -485,7 +485,6 @@ public static unsafe class ProgramRunner
                 if (!functionAst.Flags.HasFlag(FunctionFlags.Verified))
                 {
                     TypeChecker.VerifyFunction(functionAst, false);
-                    Init();
                 }
                 ProgramIRBuilder.BuildFunction(functionAst);
             }
@@ -494,10 +493,11 @@ public static unsafe class ProgramRunner
                 if (!overload.Flags.HasFlag(FunctionFlags.Verified))
                 {
                     TypeChecker.VerifyOperatorOverload(overload, false);
-                    Init();
                 }
                 ProgramIRBuilder.BuildOperatorOverload(overload);
             }
+
+            Init();
         }
 
         var instructionPointer = 0;
@@ -1785,8 +1785,15 @@ public static unsafe class ProgramRunner
                 }
                 case "intercept_compiler_messages":
                 {
-                    // TODO Implement me
-                    // returnValue.Bool = true;
+                    if (Messages.Intercepting)
+                    {
+                        returnValue.Bool = false;
+                    }
+                    else
+                    {
+                        Messages.Intercepting = returnValue.Bool = true;
+                        ThreadPool.ReleaseRunExecuting();
+                    }
                     break;
                 }
                 case "get_next_compiler_message":
