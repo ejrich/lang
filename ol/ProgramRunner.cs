@@ -1786,11 +1786,13 @@ public static unsafe class ProgramRunner
                 case "intercept_compiler_messages":
                 {
                     // TODO Implement me
+                    // returnValue.Bool = true;
                     break;
                 }
                 case "get_next_compiler_message":
                 {
                     // TODO Implement me
+                    returnValue.Bool = true;
                     break;
                 }
                 case "get_function":
