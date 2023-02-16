@@ -2433,7 +2433,6 @@ public static class ProgramIRBuilder
     }
 
     private static InstructionValue GetAnyValue(FunctionIR function, InstructionValue argument, IScope scope)
-
     {
         if (argument.Type.TypeKind == TypeKind.Any)
         {

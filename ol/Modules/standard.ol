@@ -538,8 +538,6 @@ write_value_to_buffer(StringBuffer* buffer, TypeInfo* type, void* data) {
         return;
     }
 
-    type_kind := type.type;
-
     switch type.type {
         case TypeKind.Void; add_to_string_buffer(buffer, "void");
         case TypeKind.Boolean; {
@@ -662,7 +660,15 @@ write_value_to_buffer(StringBuffer* buffer, TypeInfo* type, void* data) {
             each field in type_info.fields {
                 add_to_string_buffer(buffer, field.name);
                 add_to_string_buffer(buffer, ": ");
-                write_value_to_buffer(buffer, field.type_info, data);
+                switch field.type_info.type {
+                    case TypeKind.Pointer;
+                    case TypeKind.Interface; {
+                        pointer_value := *cast(void**, data);
+                        write_pointer_to_buffer(buffer, pointer_value);
+                    }
+                    default;
+                        write_value_to_buffer(buffer, field.type_info, data);
+                }
                 add_to_string_buffer(buffer, ", ");
             }
 
@@ -847,7 +853,7 @@ write_struct_to_buffer(StringBuffer* buffer, StructTypeInfo* type_info, void* da
             case TypeKind.Pointer;
             case TypeKind.Interface; {
                 pointer_value := *cast(void**, element_data);
-                write_value_to_buffer(buffer, field.type_info, pointer_value);
+                write_pointer_to_buffer(buffer, pointer_value);
             }
             default;
                 write_value_to_buffer(buffer, field.type_info, element_data);
