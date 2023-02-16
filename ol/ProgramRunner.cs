@@ -1798,8 +1798,8 @@ public static unsafe class ProgramRunner
                 }
                 case "get_next_compiler_message":
                 {
-                    // TODO Implement me
-                    returnValue.Bool = true;
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    returnValue.Bool = Messages.GetNextMessage(value.Pointer);
                     break;
                 }
                 case "get_function":

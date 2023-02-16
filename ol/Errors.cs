@@ -1,5 +1,6 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace ol;
 
@@ -43,12 +44,22 @@ public static class ErrorReporter
 
     public static void Report(string message)
     {
-        Errors.Add(new Error {Message = message});
+        Report(new Error {Message = message});
     }
 
     public static void Report(string message, int fileIndex, uint line, uint column)
     {
-        Errors.Add(new Error {Message = message, FileIndex = fileIndex, Line = line, Column = column});
+        Report(new Error {Message = message, FileIndex = fileIndex, Line = line, Column = column});
+    }
+
+    private static void Report(Error error)
+    {
+        if (!Errors.Any())
+        {
+            Messages.Submit(MessageType.TypeCheckFailed);
+            Messages.Completed = true;
+        }
+        Errors.Add(error);
     }
 
     public static void ListErrorsAndExit(int errorCode)
@@ -68,6 +79,8 @@ public static class ErrorReporter
                     Console.WriteLine(error.Message);
                 }
             }
+
+            while (Messages.Intercepting);
 
             Environment.Exit(errorCode);
         }
