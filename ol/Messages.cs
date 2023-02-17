@@ -48,12 +48,11 @@ public struct CompilerMessage
 public static class Messages
 {
     private static readonly SafeLinkedList<CompilerMessage> _messages = new();
-
-    public static bool Intercepting;
-    public static bool Completed;
-
-    private static readonly Semaphore _messageWaitMutex = new(0, 1);
+    private static readonly Semaphore _messageWaitMutex = new(0, int.MaxValue);
     private static readonly Semaphore _messageReceiveMutex = new(0, 1);
+
+    public static bool _completed;
+    public static bool Intercepting;
 
     public static void Submit(MessageType type)
     {
@@ -62,27 +61,31 @@ public static class Messages
 
         if (Intercepting)
         {
-
+            _messageWaitMutex.Release();
+            _messageReceiveMutex.WaitOne();
         }
+    }
+
+    public static void Completed()
+    {
+        _messageWaitMutex.Release();
+        _completed = true;
     }
 
     public static bool GetNextMessage(IntPtr messagePointer)
     {
-        // Read the head
-        // If null
-        //   Completed, return false
-        //   else, use the wait mutex to wait for the next message
-        // If not null, return true and set the value from the pointer
-        // Remove the head and set the next to the head
-
         var head = _messages.Head;
 
         if (head == null)
         {
-            if (Completed) return false;
+            if (_completed) return false;
 
-            // TODO
-            return true;
+            _messageWaitMutex.WaitOne();
+
+            head = _messages.Head;
+            if (_completed || head == null) return false;
+
+            _messageReceiveMutex.Release();
         }
         else
         {

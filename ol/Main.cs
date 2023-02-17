@@ -177,7 +177,7 @@ public static class ol
         var linkTime = stopwatch.Elapsed;
 
         // 6. Wait for intercepting loop to complete
-        Messages.Completed = true;
+        Messages.Completed();
         while (Messages.Intercepting);
 
         // 7. Log statistics
