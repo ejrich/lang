@@ -30,11 +30,8 @@ main() {
     main();
 }
 
-a_lrgl: CompilerMessageValue;
-// a_lrgl2: StringBuffer;
-
 bar() #print_ir {
-    // message: CompilerMessage;
+    message: CompilerMessage;
     // print("Hello world %\n", message);
 }
 

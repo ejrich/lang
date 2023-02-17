@@ -156,15 +156,19 @@ public static unsafe class LLVMBackend
                     var constArray = LLVMValueRef.CreateConstArray(elementType, values);
                     LLVM.SetInitializer(global, constArray);
                 }
+                else
+                {
+                    var initialValue = GetConstantValue(globalVariable.InitialValue);
+                    LLVM.SetInitializer(global, initialValue);
+                }
             }
             else
             {
                 global = _module.AddGlobal(_types[globalVariable.Type.TypeIndex], globalVariable.Name);
-            }
 
-            if (globalVariable.InitialValue != null)
-            {
-                var initialValue = GetConstantValue(globalVariable.InitialValue);
+                var initialValue = globalVariable.InitialValue != null
+                    ? GetConstantValue(globalVariable.InitialValue)
+                    : GetDefaultValue(globalVariable.Type);
                 LLVM.SetInitializer(global, initialValue);
             }
 
@@ -2181,14 +2185,36 @@ public static unsafe class LLVMBackend
                     fieldValues[i] = GetConstantValue(value.Values[i]);
                 }
                 return LLVMValueRef.CreateConstNamedStruct(_types[value.Type.TypeIndex], fieldValues);
-            case InstructionValueType.ConstantArray when value.Values != null:
+            case InstructionValueType.ConstantArray:
                 var values = new LLVMValueRef[value.ArrayLength];
-                for (var i = 0; i < value.ArrayLength; i++)
+                if (value.Values == null)
                 {
-                    values[i] = GetConstantValue(value.Values[i]);
+                    var defaultValue = GetDefaultValue(value.Type);
+                    for (var i = 0; i < value.ArrayLength; i++)
+                    {
+                        values[i] = defaultValue;
+                    }
+                }
+                else
+                {
+                    for (var i = 0; i < value.ArrayLength; i++)
+                    {
+                        values[i] = GetConstantValue(value.Values[i]);
+                    }
                 }
                 return LLVMValueRef.CreateConstArray(_types[value.Type.TypeIndex], values);
+            case InstructionValueType.ConstantUnion:
+                var unionValues = new LLVMValueRef[value.Type.Size];
+                var zero = LLVMValueRef.CreateConstInt(LLVM.Int8Type(), 0, false);
+                for (var i = 0; i < unionValues.Length; i++)
+                {
+                    unionValues[i] = zero;
+                }
+                var unionBytes = LLVMValueRef.CreateConstArray(LLVM.Int8Type(), unionValues);
+                return LLVMValueRef.CreateConstNamedStruct(_types[value.Type.TypeIndex], new[]{unionBytes});
         }
+
+        Debug.Assert(false, "Unable to get constant value");
         return null;
     }
 
@@ -2247,7 +2273,7 @@ public static unsafe class LLVMBackend
             }
             case TypeKind.Union:
             {
-                var defaultValue = LLVMValueRef.CreateConstInt(LLVM.Int8Type(), 0, false);
+                var defaultValue = LLVMValueRef.CreateConstInt(LLVM.Int8Type(), 0);
                 var values = new LLVMValueRef[type.Size];
                 for (var i = 0; i < values.Length; i++)
                 {

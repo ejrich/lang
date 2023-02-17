@@ -217,5 +217,6 @@ public enum InstructionValueType
     CallArguments,
     ConstantStruct,
     ConstantArray,
+    ConstantUnion,
     FileName
 }

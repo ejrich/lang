@@ -324,10 +324,7 @@ public static class ProgramIRBuilder
                         globalVariable.InitialValue = InitializeGlobalArray(declaration, scope, declaration.ArrayValues);
                         break;
                     case TypeKind.CArray:
-                        if (declaration.ArrayValues != null)
-                        {
-                            globalVariable.InitialValue = InitializeGlobalCArray(declaration, scope, declaration.ArrayValues);
-                        }
+                        globalVariable.InitialValue = InitializeGlobalCArray(declaration, scope, declaration.ArrayValues);
                         break;
                     // Initialize struct field default values
                     case TypeKind.Struct:
@@ -339,8 +336,9 @@ public static class ProgramIRBuilder
                     case TypeKind.Interface:
                         globalVariable.InitialValue = new InstructionValue {ValueType = InstructionValueType.Null, Type = globalVariable.Type};
                         break;
-                    // Don't initialize unions
+                    // Initialize unions to null
                     case TypeKind.Union:
+                        globalVariable.InitialValue = new InstructionValue {ValueType = InstructionValueType.ConstantUnion, Type = globalVariable.Type};
                         break;
                     // Or initialize to default
                     default:
@@ -427,6 +425,9 @@ public static class ProgramIRBuilder
             case TypeKind.Pointer:
             case TypeKind.Interface:
                 return new InstructionValue {ValueType = InstructionValueType.Null, Type = field.Type};
+            // Initialize unions to null
+            case TypeKind.Union:
+                return new InstructionValue {ValueType = InstructionValueType.ConstantUnion, Type = field.Type};
             // Or initialize to default
             default:
                 return field.Value == null ? GetDefaultConstant(field.Type) : EmitConstantIR(field.Value, null, scope);
@@ -645,8 +646,9 @@ public static class ProgramIRBuilder
                 case TypeKind.Interface:
                     EmitStore(function, allocation, new InstructionValue {ValueType = InstructionValueType.Null, Type = declaration.Type}, scope);
                     break;
-                // Don't initialize unions
+                // Initialize unions to null
                 case TypeKind.Union:
+                    // TODO
                     break;
                 // Or initialize to default
                 default:
@@ -787,6 +789,10 @@ public static class ProgramIRBuilder
                     {
                         EmitStore(function, allocation, nullValue, scope);
                     }
+                    break;
+                // Initialize unions to null
+                case TypeKind.Union:
+                    // TODO
                     break;
                 // Or initialize to default
                 default:
@@ -981,8 +987,9 @@ public static class ProgramIRBuilder
             case TypeKind.Interface:
                 EmitStore(function, pointer, new InstructionValue {ValueType = InstructionValueType.Null, Type = field.Type}, scope);
                 break;
-            // Don't initialize unions
+            // Initialize unions to null
             case TypeKind.Union:
+                // TODO
                 break;
             // Or initialize to default
             default:
@@ -1006,6 +1013,9 @@ public static class ProgramIRBuilder
                 break;
             case TypeKind.Float:
                 value.ConstantValue = new Constant {Double = 0};
+                break;
+            default:
+                Debug.Assert(false, $"Unable to get default constant for type {type.Name}");
                 break;
         }
         return value;
