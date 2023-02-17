@@ -71,6 +71,9 @@ public static unsafe class LLVMBackend
     private static LLVMTypeRef _stackRestoreType;
     private static LLVMValueRef _stackRestore;
 
+    private static LLVMTypeRef _memsetType;
+    private static LLVMValueRef _memset;
+
     public static string Build()
     {
         // 1. Initialize the LLVM module and builder
@@ -1448,6 +1451,21 @@ public static unsafe class LLVMBackend
                         var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
                         var value = GetValue(instruction.Value2, values, allocations, functionPointer);
                         _builder.BuildStore(value, pointer);
+                        break;
+                    }
+                    case InstructionType.InitializeUnion:
+                    {
+                        if (_memset == null)
+                        {
+                            _memsetType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), new LLVMTypeRef[]{_pointerType, LLVM.Int8Type(), LLVM.Int32Type(), LLVM.Int1Type()});
+                            _memset = _module.AddFunction("llvm.memset.inline.p0.i32", _memsetType);
+                        }
+
+                        var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
+                        var zero = LLVMValueRef.CreateConstInt(LLVM.Int8Type(), 0, false);
+                        var length = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), (ulong)instruction.Int, false);
+                        var volatileFlag = LLVMValueRef.CreateConstInt(LLVM.Int1Type(), 0, false);
+                        _builder.BuildCall2(_memsetType, _memset, new []{pointer, zero, length, volatileFlag});
                         break;
                     }
                     case InstructionType.GetPointer:

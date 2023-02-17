@@ -6,8 +6,6 @@ main() {
 
     i := 0;
     #insert return macro_with_code("print(\"i = %\\n\", i++)");
-
-    bar();
 }
 
 #run {
@@ -19,7 +17,7 @@ main() {
         message: CompilerMessage;
 
         while get_next_compiler_message(&message) {
-            // print("Hello world %\n", message.value);
+            print("Message %\n", message);
             sleep(10);
         }
     }
@@ -28,11 +26,6 @@ main() {
     insert_code(main_function, format_string("print(\"Executing function: %\\n\");\nfoo();", main_function.name));
 
     main();
-}
-
-bar() #print_ir {
-    message: CompilerMessage;
-    // print("Hello world %\n", message);
 }
 
 string macro_with_code(string code) {

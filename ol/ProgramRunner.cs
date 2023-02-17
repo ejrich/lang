@@ -617,6 +617,7 @@ public static unsafe class ProgramRunner
                         case TypeKind.Array:
                         case TypeKind.CArray:
                         case TypeKind.Struct:
+                        case TypeKind.Union:
                         case TypeKind.Any:
                         case TypeKind.Compound:
                             // For structs, the pointer is kept in its original state, and any loads will copy the bytes if necessary
@@ -683,6 +684,7 @@ public static unsafe class ProgramRunner
                         case TypeKind.Array:
                         case TypeKind.CArray:
                         case TypeKind.Struct:
+                        case TypeKind.Union:
                         case TypeKind.Any:
                         case TypeKind.Compound:
                             var copyBytes = instruction.Value2.Type.Size;
@@ -691,25 +693,33 @@ public static unsafe class ProgramRunner
                     }
                     break;
                 }
+                case InstructionType.InitializeUnion:
+                {
+                    var pointer = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
+                    var bytes = new byte[instruction.Int];
+                    Array.Fill<byte>(bytes, 0);
+                    Marshal.Copy(bytes, 0, pointer.Pointer, instruction.Int);
+                    break;
+                }
                 case InstructionType.GetPointer:
                 {
                     var pointer = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
                     var index = GetValue(instruction.Value2, registers, stackPointer, function, arguments);
-                    var indexedPointer = pointer.Pointer + instruction.Index2 * index.Integer;
+                    var indexedPointer = pointer.Pointer + instruction.Int * index.Integer;
                     registers[instruction.ValueIndex] = new Register {Pointer = indexedPointer};
                     break;
                 }
                 case InstructionType.GetStructPointer:
                 {
                     var pointer = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
-                    var structPointer = pointer.Pointer + instruction.Index2;
+                    var structPointer = pointer.Pointer + instruction.Int;
                     registers[instruction.ValueIndex] = new Register {Pointer = structPointer};
                     break;
                 }
                 case InstructionType.Call:
                 {
                     var callingFunction = Program.Functions[instruction.Index];
-                    registers[instruction.ValueIndex] = MakeCall(callingFunction, instruction.Value1.Values, registers, stackPointer, function, arguments, instruction.Index2, fileIndex, line, column);
+                    registers[instruction.ValueIndex] = MakeCall(callingFunction, instruction.Value1.Values, registers, stackPointer, function, arguments, instruction.Int, fileIndex, line, column);
                     break;
                 }
                 case InstructionType.CallFunctionPointer:
