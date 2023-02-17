@@ -5,7 +5,7 @@ using System.Threading;
 
 namespace ol;
 
-public unsafe static class TypeTable
+public static unsafe class TypeTable
 {
     public static int Count;
 

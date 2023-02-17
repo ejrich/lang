@@ -265,12 +265,28 @@ public static unsafe class ProgramRunner
                     InitializeGlobalVariable(fieldPointer, value.Values[i]);
                 }
                 break;
-            case InstructionValueType.ConstantArray when value.Values != null:
-                for (var i = 0; i < value.ArrayLength; i++)
+            case InstructionValueType.ConstantArray:
+                if (value.Values == null)
                 {
-                    var arrayPointer = pointer + i * (int)value.Type.Size;
-                    InitializeGlobalVariable(arrayPointer, value.Values[i]);
+                    var length = (int)value.Type.Size * (int)value.ArrayLength;
+                    var bytes = new byte[length];
+                    Array.Fill<byte>(bytes, 0);
+                    Marshal.Copy(bytes, 0, pointer, length);
                 }
+                else
+                {
+                    for (var i = 0; i < value.ArrayLength; i++)
+                    {
+                        var arrayPointer = pointer + i * (int)value.Type.Size;
+                        InitializeGlobalVariable(arrayPointer, value.Values[i]);
+                    }
+                }
+                break;
+            case InstructionValueType.ConstantUnion:
+                var unionSize = (int)value.Type.Size;
+                var unionBytes = new byte[unionSize];
+                Array.Fill<byte>(unionBytes, 0);
+                Marshal.Copy(unionBytes, 0, pointer, unionSize);
                 break;
         }
     }
