@@ -197,6 +197,9 @@ public static class ProgramIRBuilder
                     case InstructionType.Store:
                         text += $"{PrintInstructionValue(instruction.Value1)}, {PrintInstructionValue(instruction.Value2)}";
                         break;
+                    case InstructionType.InitializeUnion:
+                        text += $"{PrintInstructionValue(instruction.Value1)}, {instruction.Int}";
+                        break;
                     case InstructionType.GetStructPointer:
                         text += $"{PrintInstructionValue(instruction.Value1)} {instruction.Index} => v{instruction.ValueIndex}";
                         break;
@@ -648,7 +651,7 @@ public static class ProgramIRBuilder
                     break;
                 // Initialize unions to null
                 case TypeKind.Union:
-                    // TODO
+                    EmitInitializeUnion(function, allocation, declaration.Type, scope);
                     break;
                 // Or initialize to default
                 default:
@@ -792,7 +795,10 @@ public static class ProgramIRBuilder
                     break;
                 // Initialize unions to null
                 case TypeKind.Union:
-                    // TODO
+                    foreach (var allocation in allocations)
+                    {
+                        EmitInitializeUnion(function, allocation, declaration.Type, scope);
+                    }
                     break;
                 // Or initialize to default
                 default:
@@ -989,7 +995,7 @@ public static class ProgramIRBuilder
                 break;
             // Initialize unions to null
             case TypeKind.Union:
-                // TODO
+                EmitInitializeUnion(function, pointer, field.Type, scope);
                 break;
             // Or initialize to default
             default:
@@ -3065,7 +3071,7 @@ public static class ProgramIRBuilder
     {
         var instruction = new Instruction
         {
-            Type = InstructionType.GetPointer, Scope = scope, Index2 = (int)type.Size, Value1 = pointer, Value2 = index, LoadType = type
+            Type = InstructionType.GetPointer, Scope = scope, Int = (int)type.Size, Value1 = pointer, Value2 = index, LoadType = type
         };
         return AddInstruction(function, instruction, type);
     }
@@ -3082,7 +3088,7 @@ public static class ProgramIRBuilder
 
     private static InstructionValue EmitGetStructPointer(FunctionIR function, InstructionValue value, IScope scope, int fieldIndex, uint offset, IType structType, IType fieldType)
     {
-        var instruction = new Instruction {Type = InstructionType.GetStructPointer, Scope = scope, Index = fieldIndex, Index2 = (int)offset, LoadType = structType, Value1 = value};
+        var instruction = new Instruction {Type = InstructionType.GetStructPointer, Scope = scope, Index = fieldIndex, Int = (int)offset, LoadType = structType, Value1 = value};
         return AddInstruction(function, instruction, fieldType);
     }
 
@@ -3090,7 +3096,7 @@ public static class ProgramIRBuilder
     {
         var callInstruction = new Instruction
         {
-            Type = InstructionType.Call, Scope = scope, Index = callingFunction.FunctionIndex, Index2 = callIndex,
+            Type = InstructionType.Call, Scope = scope, Index = callingFunction.FunctionIndex, Int = callIndex,
             String = callingFunction.Name, Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Values = arguments}
         };
         return AddInstruction(function, callInstruction, callingFunction.ReturnType);
@@ -3109,6 +3115,12 @@ public static class ProgramIRBuilder
     private static void EmitStore(FunctionIR function, InstructionValue pointer, InstructionValue value, IScope scope)
     {
         var store = new Instruction {Type = InstructionType.Store, Scope = scope, Value1 = pointer, Value2 = value};
+        function.Instructions.Add(store);
+    }
+
+    private static void EmitInitializeUnion(FunctionIR function, InstructionValue pointer, IType unionType, IScope scope)
+    {
+        var store = new Instruction {Type = InstructionType.InitializeUnion, Scope = scope, Value1 = pointer, Int = (int)unionType.Size};
         function.Instructions.Add(store);
     }
 
