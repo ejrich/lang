@@ -30,9 +30,12 @@ main() {
     main();
 }
 
+a_lrgl: CompilerMessageValue;
+// a_lrgl2: StringBuffer;
+
 bar() #print_ir {
-    message: CompilerMessage;
-    print("Hello world %\n", message.value);
+    // message: CompilerMessage;
+    // print("Hello world %\n", message);
 }
 
 string macro_with_code(string code) {
