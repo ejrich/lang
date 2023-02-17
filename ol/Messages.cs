@@ -23,6 +23,7 @@ public enum MessageType
     TypeCheckFailed,
     IRGenerated,
     ReadyForCodeGeneration,
+    CodeGenerationFailed,
     CodeGenerated,
     ExecutableLinked
 }
@@ -56,7 +57,18 @@ public static class Messages
 
     public static void Submit(MessageType type)
     {
-        var message = new CompilerMessage { Type = type, Value = new() { Ast = IntPtr.Zero } };
+        var message = new CompilerMessage { Type = type };
+        Submit(message);
+    }
+
+    public static void Submit(MessageType type, string name)
+    {
+        var message = new CompilerMessage { Type = type, Value = new() { Name = Allocator.MakeString(name) } };
+        Submit(message);
+    }
+
+    private static void Submit(CompilerMessage message)
+    {
         _messages.Add(message);
 
         if (Intercepting)
@@ -64,6 +76,12 @@ public static class Messages
             _messageWaitMutex.Release();
             _messageReceiveMutex.WaitOne();
         }
+    }
+
+    public static void CompleteAndWait()
+    {
+        Completed();
+        while (Messages.Intercepting);
     }
 
     public static void Completed()
@@ -91,6 +109,9 @@ public static class Messages
         {
             Marshal.StructureToPtr(head.Data, messagePointer, false);
         }
+
+        var message = head.Data;
+        Marshal.StructureToPtr(message, messagePointer, false);
 
         Interlocked.CompareExchange(ref _messages.Head, head.Next, head);
         if (_messages.End == head)
