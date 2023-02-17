@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -74,6 +74,8 @@ public static class Linker
             Console.WriteLine("Unable to link executable, please see output");
             Environment.Exit(ErrorCodes.LinkError);
         }
+
+        Messages.Submit(MessageType.ExecutableLinked, executableFile);
     }
 
     private static DirectoryInfo DetermineLibDirectory()

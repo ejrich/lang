@@ -162,6 +162,7 @@ public static class ol
         TypeChecker.CheckTypes();
         ErrorReporter.ListErrorsAndExit(ErrorCodes.CompilationError);
         ThreadPool.CompleteWork(ThreadPool.IRQueue);
+        Messages.Submit(MessageType.ReadyForCodeGeneration);
         var frontEndTime = stopwatch.Elapsed;
 
         // 4. Build program
@@ -177,8 +178,7 @@ public static class ol
         var linkTime = stopwatch.Elapsed;
 
         // 6. Wait for intercepting loop to complete
-        Messages.Completed();
-        while (Messages.Intercepting);
+        Messages.CompleteAndWait();
 
         // 7. Log statistics
         Console.WriteLine($"Front-end time: {frontEndTime.TotalSeconds} seconds");

@@ -2496,9 +2496,14 @@ public static unsafe class LLVMBackend
         if (!targetMachine.TryEmitToFile(_module, objectFile, LLVMCodeGenFileType.LLVMObjectFile, out var errorMessage))
         {
             Console.WriteLine($"LLVM Build error: {errorMessage}");
+
+            Messages.Submit(MessageType.CodeGenerationFailed);
+            Messages.CompleteAndWait();
+
             Environment.Exit(ErrorCodes.BuildError);
         }
 
+        Messages.Submit(MessageType.CodeGenerated, objectFile);
         return objectFile;
     }
 

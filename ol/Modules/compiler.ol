@@ -64,6 +64,7 @@ enum CompilerMessageType {
     TypeCheckFailed;
     IRGenerated;
     ReadyForCodeGeneration;
+    CodeGenerationFailed;
     CodeGenerated;
     ExecutableLinked;
 }
