@@ -29,7 +29,6 @@ public static unsafe class LLVMBackend
 
     private static LLVMTypeRef _structTypeInfoType;
     private static LLVMTypeRef _typeInfoType;
-    private static LLVMTypeRef _typeInfoPointerType;
     private static LLVMTypeRef _typeInfoArrayType;
     private static LLVMTypeRef _integerTypeInfoType;
     private static LLVMTypeRef _pointerTypeInfoType;
@@ -60,7 +59,8 @@ public static unsafe class LLVMBackend
     private static LLVMMetadataRef[] _debugTypes;
     private static LLVMMetadataRef[] _debugFunctions;
 
-    private static LLVMTypeRef _u8PointerType;
+    private static LLVMTypeRef _pointerType;
+    private static LLVMValueRef _null;
     private static readonly LLVMValueRef _zeroInt = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), 0, false);
     private static readonly LLVMValueRef _interfaceTypeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Interface, 0);
     private static readonly LLVMValueRef _functionTypeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Function, 0);
@@ -107,9 +107,8 @@ public static unsafe class LLVMBackend
         _argumentType = CreateStruct("ArgumentType");
         _argumentArrayType = CreateStruct("Array<ArgumentType>");
 
-        _typeInfoPointerType = LLVM.PointerType(_typeInfoType, 0);
-        _defaultAttributes = LLVMValueRef.CreateConstNamedStruct(_stringArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(_stringType, 0))});
-        _defaultFields = LLVMValueRef.CreateConstNamedStruct(_typeFieldArrayType, new LLVMValueRef[]{_zeroInt, LLVM.ConstNull(LLVM.PointerType(_typeFieldType, 0))});
+        _defaultAttributes = LLVMValueRef.CreateConstNamedStruct(_stringArrayType, new LLVMValueRef[]{_zeroInt, _null});
+        _defaultFields = LLVMValueRef.CreateConstNamedStruct(_typeFieldArrayType, new LLVMValueRef[]{_zeroInt, _null});
 
         switch (BuildSettings.OutputTypeTable)
         {
@@ -197,7 +196,7 @@ public static unsafe class LLVMBackend
         }
 
         // 5. Write type table
-        var typeArray = CreateConstantArray(_typeInfoPointerType, _typeInfoArrayType, _typeInfos, "____type_array");
+        var typeArray = CreateConstantArray(_pointerType, _typeInfoArrayType, _typeInfos, "____type_array");
         LLVM.SetInitializer(typeTable, typeArray);
 
         // 6. Compile to object file
@@ -249,7 +248,8 @@ public static unsafe class LLVMBackend
         }
 
         LLVM.ContextSetOpaquePointers(_context, 1); // Can be removed once llvm gets rid of non-opaque pointers
-        _u8PointerType = LLVM.PointerType(LLVM.Int8Type(), 0);
+        _pointerType = LLVM.PointerTypeInContext(_context, 0);
+        _null = LLVM.ConstNull(_pointerType);
     }
 
     private static void AddModuleFlag(string flagName, uint flagValue)
@@ -273,7 +273,6 @@ public static unsafe class LLVMBackend
 
     private static void DeclareAllTypesAndTypeInfos()
     {
-        var pointersToResolve = new List<PointerType>();
         var interfaceQueue = new List<InterfaceAst>();
         var structQueue = new List<StructAst>();
         var unionQueue = new List<UnionAst>();
@@ -312,7 +311,7 @@ public static unsafe class LLVMBackend
                         CreateDebugBasicType(primitive, primitive.Name);
                         break;
                     case PointerType pointerType:
-                        DeclarePointerType(pointerType, pointersToResolve);
+                        DeclarePointerType(pointerType);
                         DeclarePointerTypeInfo(pointerType);
                         CreatePointerDebugType(pointerType);
                         break;
@@ -365,7 +364,7 @@ public static unsafe class LLVMBackend
                         DeclarePrimitiveTypeInfo(primitive);
                         break;
                     case PointerType pointerType:
-                        DeclarePointerType(pointerType, pointersToResolve);
+                        DeclarePointerType(pointerType);
                         DeclarePointerTypeInfo(pointerType);
                         break;
                     case ArrayType arrayType:
@@ -405,17 +404,12 @@ public static unsafe class LLVMBackend
                 argumentValues[arg] = CreateArgumentType(argument, argumentTypeInfo);
             }
 
-            var functionType = _interfaceTypes[interfaceAst.TypeIndex] = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
-            _types[interfaceAst.TypeIndex] = LLVM.PointerType(functionType, 0);
+            _interfaceTypes[interfaceAst.TypeIndex] = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
+            _types[interfaceAst.TypeIndex] = _pointerType;
 
             var returnType = _typeInfos[interfaceAst.ReturnType.TypeIndex];
 
             DeclareInterfaceTypeInfo(interfaceAst, argumentValues, returnType);
-        }
-
-        foreach (var pointerType in pointersToResolve)
-        {
-            _types[pointerType.TypeIndex] = LLVM.PointerType(_types[pointerType.PointedType.TypeIndex], 0);
         }
 
         foreach (var structAst in structQueue)
@@ -442,7 +436,6 @@ public static unsafe class LLVMBackend
 
     private static void DeclareAllTypesAndUsedTypeInfos()
     {
-        var pointersToResolve = new List<PointerType>();
         var interfaceQueue = new List<InterfaceAst>();
         var structQueue = new List<StructAst>();
         var unionQueue = new List<UnionAst>();
@@ -482,7 +475,7 @@ public static unsafe class LLVMBackend
                         CreateDebugBasicType(primitive, primitive.Name);
                         break;
                     case PointerType pointerType:
-                        DeclarePointerType(pointerType, pointersToResolve);
+                        DeclarePointerType(pointerType);
                         CreatePointerDebugType(pointerType);
                         break;
                     case ArrayType arrayType:
@@ -533,7 +526,7 @@ public static unsafe class LLVMBackend
                         DeclarePrimitive(primitive);
                         break;
                     case PointerType pointerType:
-                        DeclarePointerType(pointerType, pointersToResolve);
+                        DeclarePointerType(pointerType);
                         break;
                     case ArrayType arrayType:
                         DeclareArrayType(arrayType);
@@ -560,13 +553,8 @@ public static unsafe class LLVMBackend
                 argumentTypes[arg] = _types[argument.Type.TypeIndex];
             }
 
-            var functionType = _interfaceTypes[interfaceAst.TypeIndex] = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
-            _types[interfaceAst.TypeIndex] = LLVM.PointerType(functionType, 0);
-        }
-
-        foreach (var pointerType in pointersToResolve)
-        {
-            _types[pointerType.TypeIndex] = LLVM.PointerType(_types[pointerType.PointedType.TypeIndex], 0);
+            _interfaceTypes[interfaceAst.TypeIndex] = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
+            _types[interfaceAst.TypeIndex] = _pointerType;
         }
 
         foreach (var structAst in structQueue)
@@ -579,24 +567,21 @@ public static unsafe class LLVMBackend
             DeclareUnionDebugType(union);
         }
 
-        var nullTypeInfo = LLVM.ConstNull(_typeInfoPointerType);
         for (var i = 0; i < _typeInfos.Length; i++)
         {
             if (_typeInfos[i].Handle == IntPtr.Zero)
             {
-                _typeInfos[i] = nullTypeInfo;
+                _typeInfos[i] = _null;
             }
         }
     }
 
     private static void DeclareAllTypes()
     {
-        var nullTypeInfo = LLVM.ConstNull(_typeInfoPointerType);
         for (var i = 0; i < _typeInfos.Length; i++)
         {
-            _typeInfos[i] = nullTypeInfo;
+            _typeInfos[i] = _null;
         }
-        var pointersToResolve = new List<PointerType>();
         var interfaceQueue = new List<InterfaceAst>();
         var structQueue = new List<StructAst>();
         var unionQueue = new List<UnionAst>();
@@ -632,7 +617,7 @@ public static unsafe class LLVMBackend
                         CreateDebugBasicType(primitive, primitive.Name);
                         break;
                     case PointerType pointerType:
-                        DeclarePointerType(pointerType, pointersToResolve);
+                        DeclarePointerType(pointerType);
                         CreatePointerDebugType(pointerType);
                         break;
                     case ArrayType arrayType:
@@ -679,7 +664,7 @@ public static unsafe class LLVMBackend
                         DeclarePrimitive(primitive);
                         break;
                     case PointerType pointerType:
-                        DeclarePointerType(pointerType, pointersToResolve);
+                        DeclarePointerType(pointerType);
                         break;
                     case ArrayType arrayType:
                         DeclareArrayType(arrayType);
@@ -706,13 +691,8 @@ public static unsafe class LLVMBackend
                 argumentTypes[arg] = _types[argument.Type.TypeIndex];
             }
 
-            var functionType = _interfaceTypes[interfaceAst.TypeIndex] = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
-            _types[interfaceAst.TypeIndex] = LLVM.PointerType(functionType, 0);
-        }
-
-        foreach (var pointerType in pointersToResolve)
-        {
-            _types[pointerType.TypeIndex] = LLVM.PointerType(_types[pointerType.PointedType.TypeIndex], 0);
+            _interfaceTypes[interfaceAst.TypeIndex] = LLVMTypeRef.CreateFunction(_types[interfaceAst.ReturnType.TypeIndex], argumentTypes, false);
+            _types[interfaceAst.TypeIndex] = _pointerType;
         }
 
         foreach (var structAst in structQueue)
@@ -921,24 +901,9 @@ public static unsafe class LLVMBackend
         }
     }
 
-    private static void DeclarePointerType(PointerType pointerType, List<PointerType> pointersToResolve)
+    private static void DeclarePointerType(PointerType pointerType)
     {
-        if (pointerType.PointedType.TypeKind == TypeKind.Void)
-        {
-            _types[pointerType.TypeIndex] = LLVM.PointerType(LLVM.Int8Type(), 0);
-        }
-        else
-        {
-            var pointedType = _types[pointerType.PointedType.TypeIndex];
-            if (pointedType.Handle == IntPtr.Zero)
-            {
-                pointersToResolve.Add(pointerType);
-            }
-            else
-            {
-                _types[pointerType.TypeIndex] = LLVM.PointerType(pointedType, 0);
-            }
-        }
+        _types[pointerType.TypeIndex] = _pointerType;
     }
 
     private static void DeclarePointerTypeInfo(PointerType pointerType)
@@ -1381,11 +1346,11 @@ public static unsafe class LLVMBackend
         LLVMValueRef stackPointer = null;
         if (function.SaveStack)
         {
-            stackPointer = _builder.BuildAlloca(_u8PointerType);
+            stackPointer = _builder.BuildAlloca(_pointerType);
 
             if (_stackSave == null)
             {
-                _stackSaveType = LLVMTypeRef.CreateFunction(_u8PointerType, Array.Empty<LLVMTypeRef>());
+                _stackSaveType = LLVMTypeRef.CreateFunction(_pointerType, Array.Empty<LLVMTypeRef>());
                 _stackSave = _module.AddFunction("llvm.stacksave", _stackSaveType);
             }
 
@@ -1497,9 +1462,7 @@ public static unsafe class LLVMBackend
                     }
                     case InstructionType.GetUnionPointer:
                     {
-                        var pointer = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        var targetType = _types[instruction.Value2.Type.TypeIndex];
-                        values[instruction.ValueIndex] = _builder.BuildBitCast(pointer, LLVM.PointerType(targetType, 0));
+                        values[instruction.ValueIndex] = GetValue(instruction.Value1, values, allocations, functionPointer);
                         break;
                     }
                     case InstructionType.Call:
@@ -1653,7 +1616,7 @@ public static unsafe class LLVMBackend
                                 arguments[i] = GetValue(output.Value, values, allocations, functionPointer);
                                 var type = output.Value.Type;
                                 var pointedType = _types[type.TypeIndex];
-                                argumentTypes[i] = LLVM.PointerType(pointedType, 0);
+                                argumentTypes[i] = _pointerType;
                                 argumentElementTypes[i] = LLVM.CreateTypeAttribute(_context, _elementTypeAttributeKind, pointedType);
 
                                 switch (type.TypeKind)
@@ -1757,9 +1720,7 @@ public static unsafe class LLVMBackend
                     }
                     case InstructionType.PointerCast:
                     {
-                        var value = GetValue(instruction.Value1, values, allocations, functionPointer);
-                        var targetType = _types[instruction.Value2.Type.TypeIndex];
-                        values[instruction.ValueIndex] = _builder.BuildBitCast(value, targetType);
+                        values[instruction.ValueIndex] = GetValue(instruction.Value1, values, allocations, functionPointer);
                         break;
                     }
                     case InstructionType.PointerToIntegerCast:
@@ -2185,14 +2146,9 @@ public static unsafe class LLVMBackend
             case InstructionValueType.Constant:
                 return GetConstant(value);
             case InstructionValueType.Null:
-                if (value.Type == null)
-                {
-                    return LLVM.ConstNull(_u8PointerType);
-                }
-                return LLVM.ConstNull(_types[value.Type.TypeIndex]);
+                return _null;
             case InstructionValueType.TypeInfo:
-                var typeInfo = _typeInfos[value.ValueIndex];
-                return _builder.BuildBitCast(typeInfo, _typeInfoPointerType);
+                return _typeInfos[value.ValueIndex];
             case InstructionValueType.Function:
                 return GetOrCreateFunctionDefinition(value.ValueIndex);
             case InstructionValueType.FileName:
@@ -2215,7 +2171,7 @@ public static unsafe class LLVMBackend
             case InstructionValueType.Constant:
                 return GetConstant(value);
             case InstructionValueType.Null:
-                return LLVM.ConstNull(_types[value.Type.TypeIndex]);
+                return _null;
             case InstructionValueType.Function:
                 return GetOrCreateFunctionDefinition(value.ValueIndex);
             case InstructionValueType.ConstantStruct:
@@ -2277,7 +2233,7 @@ public static unsafe class LLVMBackend
                 return LLVMValueRef.CreateConstNamedStruct(_types[structAst.TypeIndex], fields);
             case TypeKind.Pointer:
             case TypeKind.Interface:
-                return LLVMValueRef.CreateConstNull(_types[type.TypeIndex]);
+                return _null;
             case TypeKind.CArray:
             {
                 var arrayType = (ArrayType)type;
@@ -2313,15 +2269,14 @@ public static unsafe class LLVMBackend
             SetPrivateConstant(stringGlobal);
         }
         LLVM.SetInitializer(stringGlobal, stringValue);
-        var stringPointer = LLVMValueRef.CreateConstBitCast(stringGlobal, _u8PointerType);
 
         if (useRawString)
         {
-            return stringPointer;
+            return stringGlobal;
         }
 
         var length = LLVMValueRef.CreateConstInt(LLVM.Int64Type(), (ulong)value.Length);
-        return LLVMValueRef.CreateConstNamedStruct(_stringType, new [] {length, stringPointer});
+        return LLVMValueRef.CreateConstNamedStruct(_stringType, new [] {length, stringGlobal});
     }
 
     private static LLVMValueRef GetString(ConstantString value, bool useRawString)
@@ -2329,9 +2284,8 @@ public static unsafe class LLVMBackend
         if (value.LLVMValue == null)
         {
             var stringValue = _context.GetConstString(value.Value, false);
-            var stringGlobal = _module.AddGlobal(LLVM.TypeOf(stringValue), "str");
+            var stringGlobal = value.LLVMValue =  _module.AddGlobal(LLVM.TypeOf(stringValue), "str");
             LLVM.SetInitializer(stringGlobal, stringValue);
-            value.LLVMValue = LLVMValueRef.CreateConstBitCast(stringGlobal, _u8PointerType);
         }
 
         if (useRawString)
@@ -2347,11 +2301,11 @@ public static unsafe class LLVMBackend
     {
         if (_stackRestore == null)
         {
-            _stackRestoreType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), new [] {_u8PointerType});
+            _stackRestoreType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), new [] {_pointerType});
             _stackRestore = _module.AddFunction("llvm.stackrestore", _stackRestoreType);
         }
 
-        var stackPointerValue = _builder.BuildLoad2(_u8PointerType, stackPointer);
+        var stackPointerValue = _builder.BuildLoad2(_pointerType, stackPointer);
         _builder.BuildCall2(_stackRestoreType, _stackRestore, new []{stackPointerValue});
     }
 
