@@ -18,7 +18,6 @@ main() {
 
         while get_next_compiler_message(&message) {
             print("Message %\n", message);
-            sleep(10);
         }
     }
 

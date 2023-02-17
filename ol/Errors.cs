@@ -57,7 +57,7 @@ public static class ErrorReporter
         if (!Errors.Any())
         {
             Messages.Submit(MessageType.TypeCheckFailed);
-            Messages.Completed = true;
+            Messages.Completed();
         }
         Errors.Add(error);
     }
