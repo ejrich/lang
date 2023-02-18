@@ -17,7 +17,30 @@ main() {
         message: CompilerMessage;
 
         while get_next_compiler_message(&message) {
-            print("Message %\n", message);
+            switch message.type {
+                case CompilerMessageType.ReadyToBeTypeChecked; {
+                    function := cast(Function*, message.value.ast);
+                    print("Ast is ready to be type checked: %\n", function.name);
+                }
+                case CompilerMessageType.TypeCheckSuccessful; {
+                    function := cast(Function*, message.value.ast);
+                    print("Ast was successfully type checked: %\n", function.name);
+                }
+                case CompilerMessageType.TypeCheckFailed;
+                    print("Type checking failed\n");
+                case CompilerMessageType.IRGenerated; {
+                    function := cast(Function*, message.value.ast);
+                    print("IR generated for function: \n", function.name);
+                }
+                case CompilerMessageType.ReadyForCodeGeneration;
+                    print("Ready for code generation\n");
+                case CompilerMessageType.CodeGenerationFailed;
+                    print("Code generation failed\n");
+                case CompilerMessageType.CodeGenerated;
+                    print("Successfully generated code: %\n", message.value.name);
+                case CompilerMessageType.ExecutableLinked;
+                    print("Successfully linked: %\n", message.value.name);
+            }
         }
     }
 

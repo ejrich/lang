@@ -18,6 +18,8 @@ public static class ThreadPool
         public SafeLinkedList<QueueItem> Queue { get; } = new();
     }
 
+    public static int RunThreadId;
+
     public static readonly WorkQueue ParseQueue = new();
     public static readonly WorkQueue IRQueue = new();
 
@@ -39,6 +41,7 @@ public static class ThreadPool
 
         var runDirectiveThread = new Thread(RunDirectiveWorker);
         runDirectiveThread.Start();
+        RunThreadId = runDirectiveThread.ManagedThreadId;
     }
 
     private static bool _executingRun;

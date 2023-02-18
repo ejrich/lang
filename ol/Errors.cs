@@ -66,6 +66,8 @@ public static class ErrorReporter
     {
         if (Errors.Count > 0)
         {
+            while (Messages.Intercepting);
+
             Console.WriteLine($"{Errors.Count} compilation error(s):\n");
 
             foreach (var error in Errors)
@@ -79,8 +81,6 @@ public static class ErrorReporter
                     Console.WriteLine(error.Message);
                 }
             }
-
-            while (Messages.Intercepting);
 
             Environment.Exit(errorCode);
         }

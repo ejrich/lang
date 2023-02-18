@@ -49,7 +49,18 @@ set_output_architecture(OutputArchitecture arch) #compiler
 
 report_error(string error) #compiler
 
+enum AstType {
+    None;
+    Function;
+    OperatorOverload;
+    Enum;
+    Struct;
+    Union;
+    Interface;
+}
+
 struct CompilerAst {
+    type: AstType;
     file: string;
     line: u32;
     column: u32;
@@ -61,6 +72,7 @@ struct Function : CompilerAst {
 
 enum CompilerMessageType {
     ReadyToBeTypeChecked = 0;
+    TypeCheckSuccessful;
     TypeCheckFailed;
     IRGenerated;
     ReadyForCodeGeneration;
