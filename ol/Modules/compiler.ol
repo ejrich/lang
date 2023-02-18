@@ -49,6 +49,7 @@ set_output_architecture(OutputArchitecture arch) #compiler
 
 report_error(string error) #compiler
 
+// Ast definitions
 enum AstType {
     None;
     Function;
@@ -68,8 +69,34 @@ struct CompilerAst {
 
 struct Function : CompilerAst {
     name: string;
+    return_type: TypeInfo*;
+    arguments: Array<ArgumentType>;
+    attributes: Array<string>;
 }
 
+struct EnumAst : CompilerAst {
+    name: string;
+    base_type: TypeInfo*;
+    values: Array<EnumValue>;
+    attributes: Array<string>;
+}
+struct StructAst : CompilerAst {
+    name: string;
+    fields: Array<TypeField>;
+    attributes: Array<string>;
+}
+
+struct UnionAst : CompilerAst {
+    name: string;
+    fields: Array<EnumValue>;
+}
+
+struct InterfaceAst : CompilerAst {
+    return_type: TypeInfo*;
+    arguments: Array<ArgumentType>;
+}
+
+// Compiler messaging infrastructure
 enum CompilerMessageType {
     ReadyToBeTypeChecked = 0;
     TypeCheckSuccessful;
@@ -95,6 +122,7 @@ bool intercept_compiler_messages() #compiler
 
 bool get_next_compiler_message(CompilerMessage* message) #compiler
 
+// Functions for code insertion and modification
 Function* get_function(string name) #compiler
 
 insert_code(Function* function, string code) #compiler

@@ -5,6 +5,13 @@ using System.Threading;
 
 namespace ol;
 
+[StructLayout(LayoutKind.Explicit, Size=16)]
+public struct ArrayStruct
+{
+    [FieldOffset(0)] public long Length;
+    [FieldOffset(8)] public IntPtr Data;
+}
+
 public static unsafe class TypeTable
 {
     public static int Count;
@@ -89,8 +96,8 @@ public static unsafe class TypeTable
         [FieldOffset(16)] public TypeKind Type;
         [FieldOffset(20)] public uint Size;
         [FieldOffset(24)] public IntPtr BaseType;
-        [FieldOffset(32)] public Array Values;
-        [FieldOffset(48)] public Array Attributes;
+        [FieldOffset(32)] public ArrayStruct Values;
+        [FieldOffset(48)] public ArrayStruct Attributes;
     }
 
     private const int StructTypeInfoSize = 56;
@@ -100,8 +107,8 @@ public static unsafe class TypeTable
         [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public TypeKind Type;
         [FieldOffset(20)] public uint Size;
-        [FieldOffset(24)] public Array Fields;
-        [FieldOffset(40)] public Array Attributes;
+        [FieldOffset(24)] public ArrayStruct Fields;
+        [FieldOffset(40)] public ArrayStruct Attributes;
     }
 
     private const int UnionTypeInfoSize = 40;
@@ -111,7 +118,7 @@ public static unsafe class TypeTable
         [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public TypeKind Type;
         [FieldOffset(20)] public uint Size;
-        [FieldOffset(24)] public Array Fields;
+        [FieldOffset(24)] public ArrayStruct Fields;
     }
 
     private const int CompoundTypeInfoSize = 40;
@@ -121,7 +128,7 @@ public static unsafe class TypeTable
         [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public TypeKind Type;
         [FieldOffset(20)] public uint Size;
-        [FieldOffset(24)] public Array Types;
+        [FieldOffset(24)] public ArrayStruct Types;
     }
 
     private const int InterfaceTypeInfoSize = 48;
@@ -132,7 +139,7 @@ public static unsafe class TypeTable
         [FieldOffset(16)] public TypeKind Type;
         [FieldOffset(20)] public uint Size;
         [FieldOffset(24)] public IntPtr ReturnType;
-        [FieldOffset(32)] public Array Arguments;
+        [FieldOffset(32)] public ArrayStruct Arguments;
     }
 
     private const int FunctionTypeInfoSize = 64;
@@ -143,15 +150,8 @@ public static unsafe class TypeTable
         [FieldOffset(16)] public TypeKind Type;
         [FieldOffset(20)] public uint Size;
         [FieldOffset(24)] public IntPtr ReturnType;
-        [FieldOffset(32)] public Array Arguments;
-        [FieldOffset(48)] public Array Attributes;
-    }
-
-    [StructLayout(LayoutKind.Explicit, Size=16)]
-    public struct Array
-    {
-        [FieldOffset(0)] public long Length;
-        [FieldOffset(8)] public IntPtr Data;
+        [FieldOffset(32)] public ArrayStruct Arguments;
+        [FieldOffset(48)] public ArrayStruct Attributes;
     }
 
     private const int TypeFieldSize = 48;
@@ -161,7 +161,7 @@ public static unsafe class TypeTable
         [FieldOffset(0)] public String Name;
         [FieldOffset(16)] public uint Offset;
         [FieldOffset(24)] public IntPtr TypeInfo;
-        [FieldOffset(32)] public Array Attributes;
+        [FieldOffset(32)] public ArrayStruct Attributes;
     }
 
     private const int UnionFieldSize = 24;

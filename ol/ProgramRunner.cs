@@ -205,7 +205,7 @@ public static unsafe class ProgramRunner
                     Buffer.MemoryCopy(pointer, typeTableArrayPointer.ToPointer(), arraySize, arraySize);
                 }
 
-                var typeTableArray = new TypeTable.Array {Length = TypeTable.Count, Data = typeTableArrayPointer};
+                var typeTableArray = new ArrayStruct {Length = TypeTable.Count, Data = typeTableArrayPointer};
                 Marshal.StructureToPtr(typeTableArray, _typeTablePointer, false);
             }
         }
@@ -439,7 +439,7 @@ public static unsafe class ProgramRunner
         }
 
         var codeString = Marshal.PtrToStringAnsi(code.Data, (int)code.Length);
-        var function = Marshal.PtrToStructure<Function>(functionPointer);
+        var function = Marshal.PtrToStructure<Messages.Function>(functionPointer);
 
         var handle = GCHandle.FromIntPtr(function.Source);
         var functionDef = handle.Target as IFunction;
