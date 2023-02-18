@@ -75,6 +75,7 @@ public static class ProgramIRBuilder
         }
 
         functionIR.Written = true;
+        Messages.Submit(MessageType.IRGenerated, function);
     }
 
     public static void QueueBuildOperatorOverload(OperatorOverloadAst overload)
@@ -113,6 +114,7 @@ public static class ProgramIRBuilder
         }
 
         functionIR.Written = true;
+        Messages.Submit(MessageType.IRGenerated, overload);
     }
 
     private static bool WritingLocked(FunctionIR function)

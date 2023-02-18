@@ -30,7 +30,7 @@ main() {
                     print("Type checking failed\n");
                 case CompilerMessageType.IRGenerated; {
                     function := cast(Function*, message.value.ast);
-                    print("IR generated for function: \n", function.name);
+                    print("IR generated for function: %\n", function.name);
                 }
                 case CompilerMessageType.ReadyForCodeGeneration;
                     print("Ready for code generation\n");
