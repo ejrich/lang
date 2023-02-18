@@ -5,30 +5,6 @@ using System.Threading;
 
 namespace ol;
 
-public enum AstType
-{
-    None = 0,
-    Function,
-    OperatorOverload,
-    Enum,
-    Struct,
-    Union,
-    Interface
-}
-
-[StructLayout(LayoutKind.Explicit, Size=Size)]
-public struct Function
-{
-    [FieldOffset(0)] public AstType Type;
-    [FieldOffset(8)] public String File;
-    [FieldOffset(24)] public uint Line;
-    [FieldOffset(28)] public uint Column;
-    [FieldOffset(32)] public String Name;
-    [FieldOffset(48)] public IntPtr Source;
-
-    public const int Size = 56;
-}
-
 public enum MessageType
 {
     ReadyToBeTypeChecked = 0,
@@ -61,6 +37,98 @@ public struct CompilerMessage
 
 public static class Messages
 {
+    public enum AstType
+    {
+        None = 0,
+        Function,
+        OperatorOverload,
+        Enum,
+        Struct,
+        Union,
+        Interface
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size=Size)]
+    public struct Function
+    {
+        [FieldOffset(0)] public AstType Type;
+        [FieldOffset(8)] public String File;
+        [FieldOffset(24)] public uint Line;
+        [FieldOffset(28)] public uint Column;
+        [FieldOffset(32)] public String Name;
+        [FieldOffset(48)] public IntPtr ReturnType;
+        [FieldOffset(56)] public ArrayStruct Arguments;
+        [FieldOffset(72)] public ArrayStruct Attributes;
+        [FieldOffset(88)] public IntPtr Source;
+
+        public const int Size = 96;
+        public const int SizeWithoutSource = 88;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size=Size)]
+    public struct Enum
+    {
+        [FieldOffset(0)] public AstType Type;
+        [FieldOffset(8)] public String File;
+        [FieldOffset(24)] public uint Line;
+        [FieldOffset(28)] public uint Column;
+        [FieldOffset(32)] public String Name;
+        [FieldOffset(48)] public IntPtr BaseType;
+        [FieldOffset(56)] public ArrayStruct Values;
+        [FieldOffset(72)] public ArrayStruct Attributes;
+        [FieldOffset(88)] public IntPtr Source;
+
+        public const int Size = 96;
+        public const int SizeWithoutSource = 88;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size=Size)]
+    public struct Struct
+    {
+        [FieldOffset(0)] public AstType Type;
+        [FieldOffset(8)] public String File;
+        [FieldOffset(24)] public uint Line;
+        [FieldOffset(28)] public uint Column;
+        [FieldOffset(32)] public String Name;
+        [FieldOffset(48)] public ArrayStruct Fields;
+        [FieldOffset(64)] public ArrayStruct Attributes;
+        [FieldOffset(80)] public IntPtr Source;
+
+        public const int Size = 88;
+        public const int SizeWithoutSource = 80;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size=Size)]
+    public struct Union
+    {
+        [FieldOffset(0)] public AstType Type;
+        [FieldOffset(8)] public String File;
+        [FieldOffset(24)] public uint Line;
+        [FieldOffset(28)] public uint Column;
+        [FieldOffset(32)] public String Name;
+        [FieldOffset(48)] public ArrayStruct Fields;
+        [FieldOffset(64)] public IntPtr Source;
+
+        public const int Size = 72;
+        public const int SizeWithoutSource = 64;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size=Size)]
+    public struct Interface
+    {
+        [FieldOffset(0)] public AstType Type;
+        [FieldOffset(8)] public String File;
+        [FieldOffset(24)] public uint Line;
+        [FieldOffset(28)] public uint Column;
+        [FieldOffset(32)] public String Name;
+        [FieldOffset(48)] public IntPtr ReturnType;
+        [FieldOffset(56)] public ArrayStruct Arguments;
+        [FieldOffset(72)] public IntPtr Source;
+
+        public const int Size = 80;
+        public const int SizeWithoutSource = 72;
+    }
+
     private static readonly SafeLinkedList<CompilerMessage> MessageQueue = new();
     private static readonly Semaphore MessageWaitMutex = new(0, int.MaxValue);
 
