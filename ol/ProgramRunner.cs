@@ -151,57 +151,63 @@ public static unsafe class ProgramRunner
             _version++;
         }
 
-        if (_globalVariablesSize < Program.GlobalVariablesSize)
+        lock (Program.GlobalVariables)
         {
-            var i = 0;
-            if (_globals == null)
+            if (_globalVariablesSize < Program.GlobalVariablesSize)
             {
-                _globals = new IntPtr[Program.GlobalVariables.Count];
-            }
-            else
-            {
-                i = _globals.Length;
-                var newGlobals = new IntPtr[Program.GlobalVariables.Count];
-                _globals.CopyTo(newGlobals, 0);
-                _globals = newGlobals;
-            }
-
-            var pointer = Allocator.Allocate(Program.GlobalVariablesSize - _globalVariablesSize);
-            _globalVariablesSize = Program.GlobalVariablesSize;
-
-            for (; i < Program.GlobalVariables.Count; i++)
-            {
-                var variable = Program.GlobalVariables[i];
-
-                if (_typeTablePointer == IntPtr.Zero && variable.Name == "__type_table")
+                var i = 0;
+                if (_globals == null)
                 {
-                    _typeTablePointer = pointer;
+                    _globals = new IntPtr[Program.GlobalVariables.Count];
                 }
-                else if (variable.InitialValue != null)
+                else
                 {
-                    InitializeGlobalVariable(pointer, variable.InitialValue);
+                    i = _globals.Length;
+                    var newGlobals = new IntPtr[Program.GlobalVariables.Count];
+                    _globals.CopyTo(newGlobals, 0);
+                    _globals = newGlobals;
                 }
 
-                _globals[i] = pointer;
-                pointer += (int)variable.Size;
+                var pointer = Allocator.Allocate(Program.GlobalVariablesSize - _globalVariablesSize);
+                _globalVariablesSize = Program.GlobalVariablesSize;
+
+                for (; i < Program.GlobalVariables.Count; i++)
+                {
+                    var variable = Program.GlobalVariables[i];
+
+                    if (_typeTablePointer == IntPtr.Zero && variable.Name == "__type_table")
+                    {
+                        _typeTablePointer = pointer;
+                    }
+                    else if (variable.InitialValue != null)
+                    {
+                        InitializeGlobalVariable(pointer, variable.InitialValue);
+                    }
+
+                    _globals[i] = pointer;
+                    pointer += (int)variable.Size;
+                }
             }
         }
 
-        if (_typeCount != TypeTable.Count && _typeTablePointer != IntPtr.Zero)
+        lock (TypeTable.TypeInfos)
         {
-            _typeCount = TypeTable.Count;
-
-            // Set the data pointer
-            var typeInfosArray = TypeTable.TypeInfos.ToArray();
-            var arraySize = _typeCount * sizeof(IntPtr);
-            var typeTableArrayPointer = Allocator.Allocate(arraySize);
-            fixed (IntPtr* pointer = &typeInfosArray[0])
+            if (_typeCount != TypeTable.Count && _typeTablePointer != IntPtr.Zero)
             {
-                Buffer.MemoryCopy(pointer, typeTableArrayPointer.ToPointer(), arraySize, arraySize);
-            }
+                _typeCount = TypeTable.Count;
 
-            var typeTableArray = new TypeTable.Array {Length = TypeTable.Count, Data = typeTableArrayPointer};
-            Marshal.StructureToPtr(typeTableArray, _typeTablePointer, false);
+                // Set the data pointer
+                var typeInfosArray = TypeTable.TypeInfos.ToArray();
+                var arraySize = _typeCount * sizeof(IntPtr);
+                var typeTableArrayPointer = Allocator.Allocate(arraySize);
+                fixed (IntPtr* pointer = &typeInfosArray[0])
+                {
+                    Buffer.MemoryCopy(pointer, typeTableArrayPointer.ToPointer(), arraySize, arraySize);
+                }
+
+                var typeTableArray = new TypeTable.Array {Length = TypeTable.Count, Data = typeTableArrayPointer};
+                Marshal.StructureToPtr(typeTableArray, _typeTablePointer, false);
+            }
         }
     }
 
@@ -421,18 +427,7 @@ public static unsafe class ProgramRunner
         if (!TypeChecker.GlobalScope.Functions.TryGetValue(functionName, out var functions)) return IntPtr.Zero;
 
         var functionDef = functions[0];
-        var handle = GCHandle.Alloc(functionDef);
-        var function = new Function
-        {
-            File = Marshal.PtrToStructure<String>(BuildSettings.FileNames[functionDef.FileIndex]), Line = functionDef.Line, Column = functionDef.Column,
-            Name = Allocator.MakeString(functionDef.Name), Source = GCHandle.ToIntPtr(handle)
-        };
-
-        // TODO Use the pointer from messages
-        var pointer = Allocator.Allocate(Function.Size);
-        Marshal.StructureToPtr(function, pointer, false);
-
-        return pointer;
+        return functionDef.MessagePointer;
     }
 
     private static void InsertCode(IntPtr functionPointer, String code, int fileIndex, uint line, uint column)

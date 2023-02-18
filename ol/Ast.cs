@@ -21,6 +21,7 @@ public interface IType
     uint Alignment { get; set; }
     bool Used { get; set; }
     bool Private { get; set; }
+    // IntPtr MessagePointer { get; set; }
 }
 
 public interface IInterface : IAst
@@ -39,6 +40,7 @@ public interface IFunction : IInterface
     FunctionFlags Flags { get; set; }
     List<string> Generics { get; }
     ScopeAst Body { get; set; }
+    IntPtr MessagePointer { get; set; }
 }
 
 [Flags]
@@ -144,6 +146,7 @@ public class FunctionAst : IFunction, IType
     public List<Type[]> VarargsCallTypes { get; set; }
     public ScopeAst Body { get; set; }
     public List<string> Attributes { get; set; }
+    public IntPtr MessagePointer { get; set; }
 }
 
 public class StructAst : IAst, IType
@@ -540,6 +543,7 @@ public class RunDirectiveFunction : IFunction
     public List<DeclarationAst> Arguments { get; } = new();
     public int ArgumentCount { get; set; } = 2;
     public ScopeAst Body { get; set; }
+    public IntPtr MessagePointer { get; set; }
 }
 
 public class Import
@@ -601,6 +605,7 @@ public class OperatorOverloadAst : IFunction
     public List<DeclarationAst> Arguments { get; } = new();
     public int ArgumentCount { get; set; } = 2;
     public ScopeAst Body { get; set; }
+    public IntPtr MessagePointer { get; set; }
 }
 
 public class InterfaceAst : IInterface, IType

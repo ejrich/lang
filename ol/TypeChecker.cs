@@ -550,6 +550,8 @@ public static class TypeChecker
             var functions = GlobalScope.Functions.GetOrAdd(function.Name, _ => new List<FunctionAst>());
             functions.Add(function);
         }
+
+        Messages.Submit(MessageType.ReadyToBeTypeChecked, function);
     }
 
     public static void AddOverload(OperatorOverloadAst overload)
@@ -579,6 +581,8 @@ public static class TypeChecker
                 ErrorReporter.Report($"Multiple definitions of overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'", overload);
             }
             overloads[overload.Operator] = overload;
+
+            Messages.Submit(MessageType.ReadyToBeTypeChecked, overload);
         }
     }
 
@@ -1300,10 +1304,12 @@ public static class TypeChecker
                     }
                 }
 
+                Messages.Submit(MessageType.TypeCheckSuccessful, function);
                 function.Flags |= FunctionFlags.Verified;
             }
             else if (function.Flags.HasFlag(FunctionFlags.Compiler) || function.Flags.HasFlag(FunctionFlags.Syscall))
             {
+                Messages.Submit(MessageType.TypeCheckSuccessful, function);
                 function.Flags |= FunctionFlags.Verified;
             }
             else
@@ -1619,6 +1625,7 @@ public static class TypeChecker
 
         if (queueBuild && !ErrorReporter.Errors.Any() && !function.Flags.HasFlag(FunctionFlags.Inline))
         {
+            Messages.Submit(MessageType.TypeCheckSuccessful, function);
             ProgramIRBuilder.QueueBuildFunction(function);
         }
     }
@@ -1661,6 +1668,7 @@ public static class TypeChecker
 
         if (queueBuild && !ErrorReporter.Errors.Any())
         {
+            Messages.Submit(MessageType.TypeCheckSuccessful, overload);
             ProgramIRBuilder.QueueBuildOperatorOverload(overload);
         }
     }
@@ -5300,6 +5308,8 @@ public static class TypeChecker
                     argument.Type = VerifyType(argument.TypeDefinition, scope);
                 }
             }
+
+            Messages.Submit(MessageType.ReadyToBeTypeChecked, polymorphedOverload);
 
             VerifyOperatorOverloadDefinition(polymorphedOverload);
             _astCompleteQueue.Enqueue(polymorphedOverload);

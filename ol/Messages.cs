@@ -1,25 +1,38 @@
 ﻿using System;
-using System.Collections.Generic;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
 
 namespace ol;
 
+public enum AstType
+{
+    None = 0,
+    Function,
+    OperatorOverload,
+    Enum,
+    Struct,
+    Union,
+    Interface
+}
+
 [StructLayout(LayoutKind.Explicit, Size=Size)]
 public struct Function
 {
-    [FieldOffset(0)] public String File;
-    [FieldOffset(16)] public uint Line;
-    [FieldOffset(20)] public uint Column;
-    [FieldOffset(24)] public String Name;
-    [FieldOffset(40)] public IntPtr Source;
+    [FieldOffset(0)] public AstType Type;
+    [FieldOffset(8)] public String File;
+    [FieldOffset(24)] public uint Line;
+    [FieldOffset(28)] public uint Column;
+    [FieldOffset(32)] public String Name;
+    [FieldOffset(48)] public IntPtr Source;
 
-    public const int Size = 48;
+    public const int Size = 56;
 }
 
 public enum MessageType
 {
     ReadyToBeTypeChecked = 0,
+    TypeCheckSuccessful,
     TypeCheckFailed,
     IRGenerated,
     ReadyForCodeGeneration,
@@ -48,11 +61,11 @@ public struct CompilerMessage
 
 public static class Messages
 {
-    private static readonly SafeLinkedList<CompilerMessage> _messages = new();
-    private static readonly Semaphore _messageWaitMutex = new(0, int.MaxValue);
-    private static readonly Semaphore _messageReceiveMutex = new(0, 1);
+    private static readonly SafeLinkedList<CompilerMessage> MessageQueue = new();
+    private static readonly Semaphore MessageWaitMutex = new(0, int.MaxValue);
+    private static readonly Semaphore MessageReceiveMutex = new(0, int.MaxValue);
 
-    public static bool _completed;
+    private static bool _completed;
     public static bool Intercepting;
 
     public static void Submit(MessageType type)
@@ -67,56 +80,73 @@ public static class Messages
         Submit(message);
     }
 
+    public static void Submit(MessageType type, IFunction function)
+    {
+        if (function.MessagePointer == IntPtr.Zero)
+        {
+            var handle = GCHandle.Alloc(function);
+            var functionMessage = new Function
+            {
+                Type = function is FunctionAst ? AstType.Function : AstType.OperatorOverload,
+                File = Marshal.PtrToStructure<String>(BuildSettings.FileNames[function.FileIndex]), Line = function.Line, Column = function.Column,
+                Name = Allocator.MakeString(function.Name), Source = GCHandle.ToIntPtr(handle)
+            };
+
+            var pointer = Allocator.Allocate(Function.Size);
+            Marshal.StructureToPtr(functionMessage, pointer, false);
+            function.MessagePointer = pointer;
+        }
+
+        var message = new CompilerMessage { Type = type, Value = new() { Ast = function.MessagePointer } };
+        Submit(message);
+    }
+
     private static void Submit(CompilerMessage message)
     {
-        _messages.Add(message);
+        if (ErrorReporter.Errors.Any()) return;
 
-        if (Intercepting)
+        MessageQueue.Add(message);
+        MessageWaitMutex.Release();
+
+        if (Intercepting && Environment.CurrentManagedThreadId != ThreadPool.RunThreadId)
         {
-            _messageWaitMutex.Release();
-            _messageReceiveMutex.WaitOne();
+            MessageReceiveMutex.WaitOne();
         }
     }
 
     public static void CompleteAndWait()
     {
         Completed();
-        while (Messages.Intercepting);
+        while (Intercepting);
     }
 
     public static void Completed()
     {
-        _messageWaitMutex.Release();
+        MessageWaitMutex.Release();
         _completed = true;
     }
 
     public static bool GetNextMessage(IntPtr messagePointer)
     {
-        var head = _messages.Head;
+        var head = MessageQueue.Head;
 
         if (head == null)
         {
             if (_completed) return false;
 
-            _messageWaitMutex.WaitOne();
+            MessageWaitMutex.WaitOne();
 
-            head = _messages.Head;
+            head = MessageQueue.Head;
             if (_completed || head == null) return false;
-
-            _messageReceiveMutex.Release();
-        }
-        else
-        {
-            Marshal.StructureToPtr(head.Data, messagePointer, false);
         }
 
-        var message = head.Data;
-        Marshal.StructureToPtr(message, messagePointer, false);
+        MessageReceiveMutex.Release();
+        Marshal.StructureToPtr(head.Data, messagePointer, false);
 
-        Interlocked.CompareExchange(ref _messages.Head, head.Next, head);
-        if (_messages.End == head)
+        Interlocked.CompareExchange(ref MessageQueue.Head, head.Next, head);
+        if (MessageQueue.End == head)
         {
-            Interlocked.CompareExchange(ref _messages.Head, head.Next, head);
+            Interlocked.CompareExchange(ref MessageQueue.Head, head.Next, head);
         }
 
         return true;
