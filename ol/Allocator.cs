@@ -3,14 +3,15 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 
 namespace ol;
 
 public class MemoryBlock
 {
-    public IntPtr Pointer { get; set; }
-    public int Cursor { get; set; }
-    public int Size { get; set; }
+    public IntPtr Pointer;
+    public int Cursor;
+    public int Size;
 }
 
 public static class Allocator
@@ -68,12 +69,16 @@ public static class Allocator
         for (var i = 0; i < blocks.Count; i++)
         {
             var block = blocks[i];
-            if (size <= block.Size - block.Cursor)
+            while (true)
             {
-                var pointer = block.Pointer + block.Cursor;
                 var cursor = block.Cursor;
-                block.Cursor += size;
-                return (pointer, cursor, block);
+                if (size > block.Size - cursor) break;
+
+                if (Interlocked.CompareExchange(ref block.Cursor, cursor + size, cursor) == cursor)
+                {
+                    var pointer = block.Pointer + cursor;
+                    return (pointer, cursor, block);
+                }
             }
         }
 

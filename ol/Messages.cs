@@ -63,7 +63,6 @@ public static class Messages
 {
     private static readonly SafeLinkedList<CompilerMessage> MessageQueue = new();
     private static readonly Semaphore MessageWaitMutex = new(0, int.MaxValue);
-    private static readonly Semaphore MessageReceiveMutex = new(0, int.MaxValue);
 
     private static bool _completed;
     public static bool Intercepting;
@@ -103,15 +102,10 @@ public static class Messages
 
     private static void Submit(CompilerMessage message)
     {
-        if (ErrorReporter.Errors.Any()) return;
+        if (ErrorReporter.Errors.Any() || _completed) return;
 
         MessageQueue.Add(message);
         MessageWaitMutex.Release();
-
-        if (Intercepting && Environment.CurrentManagedThreadId != ThreadPool.RunThreadId)
-        {
-            MessageReceiveMutex.WaitOne();
-        }
     }
 
     public static void CompleteAndWait()
@@ -128,19 +122,14 @@ public static class Messages
 
     public static bool GetNextMessage(IntPtr messagePointer)
     {
-        var head = MessageQueue.Head;
+        MessageWaitMutex.WaitOne();
 
+        var head = MessageQueue.Head;
         if (head == null)
         {
-            if (_completed) return false;
-
-            MessageWaitMutex.WaitOne();
-
-            head = MessageQueue.Head;
-            if (_completed || head == null) return false;
+            return false;
         }
 
-        MessageReceiveMutex.Release();
         Marshal.StructureToPtr(head.Data, messagePointer, false);
 
         Interlocked.CompareExchange(ref MessageQueue.Head, head.Next, head);
