@@ -219,6 +219,104 @@ public static class Messages
         Submit(type, pointer);
     }
 
+    public static void Submit(MessageType type, StructAst structAst)
+    {
+        IntPtr pointer;
+        Struct structMessage;
+        if (structAst.MessagePointer == IntPtr.Zero)
+        {
+            var handle = GCHandle.Alloc(structAst);
+            structMessage = new()
+            {
+                Type = AstType.Enum, File = Marshal.PtrToStructure<String>(BuildSettings.FileNames[structAst.FileIndex]),
+                Line = structAst.Line, Column = structAst.Column, Name = Allocator.MakeString(structAst.Name), Source = GCHandle.ToIntPtr(handle)
+            };
+
+            structAst.MessagePointer = pointer = Allocator.Allocate(Struct.Size);
+        }
+        else
+        {
+            pointer = structAst.MessagePointer;
+            structMessage = Marshal.PtrToStructure<Struct>(pointer);
+        }
+
+        var typeInfoPointer = TypeTable.TypeInfos[structAst.TypeIndex];
+        if (typeInfoPointer != IntPtr.Zero)
+        {
+            var structTypeInfo = Marshal.PtrToStructure<TypeTable.StructTypeInfo>(typeInfoPointer);
+            structMessage.Fields = structTypeInfo.Fields;
+            structMessage.Attributes = structTypeInfo.Attributes;
+        }
+
+        Marshal.StructureToPtr(structMessage, pointer, false);
+        Submit(type, pointer);
+    }
+
+    public static void Submit(MessageType type, UnionAst unionAst)
+    {
+        IntPtr pointer;
+        Union unionMessage;
+        if (unionAst.MessagePointer == IntPtr.Zero)
+        {
+            var handle = GCHandle.Alloc(unionAst);
+            unionMessage = new()
+            {
+                Type = AstType.Enum, File = Marshal.PtrToStructure<String>(BuildSettings.FileNames[unionAst.FileIndex]),
+                Line = unionAst.Line, Column = unionAst.Column, Name = Allocator.MakeString(unionAst.Name), Source = GCHandle.ToIntPtr(handle)
+            };
+
+            unionAst.MessagePointer = pointer = Allocator.Allocate(Union.Size);
+        }
+        else
+        {
+            pointer = unionAst.MessagePointer;
+            unionMessage = Marshal.PtrToStructure<Union>(pointer);
+        }
+
+        var typeInfoPointer = TypeTable.TypeInfos[unionAst.TypeIndex];
+        if (typeInfoPointer != IntPtr.Zero)
+        {
+            var unionTypeInfo = Marshal.PtrToStructure<TypeTable.UnionTypeInfo>(typeInfoPointer);
+            unionMessage.Fields = unionTypeInfo.Fields;
+        }
+
+        Marshal.StructureToPtr(unionMessage, pointer, false);
+        Submit(type, pointer);
+    }
+
+    public static void Submit(MessageType type, InterfaceAst interfaceAst)
+    {
+        IntPtr pointer;
+        Interface interfaceMessage;
+        if (interfaceAst.MessagePointer == IntPtr.Zero)
+        {
+            var handle = GCHandle.Alloc(interfaceAst);
+            interfaceMessage = new()
+            {
+                Type = AstType.Interface, File = Marshal.PtrToStructure<String>(BuildSettings.FileNames[interfaceAst.FileIndex]),
+                Line = interfaceAst.Line, Column = interfaceAst.Column, Name = Allocator.MakeString(interfaceAst.Name), Source = GCHandle.ToIntPtr(handle)
+            };
+
+            interfaceAst.MessagePointer = pointer = Allocator.Allocate(Interface.Size);
+        }
+        else
+        {
+            pointer = interfaceAst.MessagePointer;
+            interfaceMessage = Marshal.PtrToStructure<Interface>(pointer);
+        }
+
+        var typeInfoPointer = TypeTable.TypeInfos[interfaceAst.TypeIndex];
+        if (typeInfoPointer != IntPtr.Zero)
+        {
+            var interfaceTypeInfo = Marshal.PtrToStructure<TypeTable.InterfaceTypeInfo>(typeInfoPointer);
+            interfaceMessage.ReturnType = interfaceTypeInfo.ReturnType;
+            interfaceMessage.Arguments = interfaceTypeInfo.Arguments;
+        }
+
+        Marshal.StructureToPtr(interfaceMessage, pointer, false);
+        Submit(type, pointer);
+    }
+
     private static void Submit(MessageType type, IntPtr ast)
     {
         var message = new CompilerMessage { Type = type, Value = new() { Ast = ast } };

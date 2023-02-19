@@ -39,9 +39,7 @@ public static unsafe class ProgramRunner
 
     private static int _typeCount;
     private static IntPtr _typeTablePointer;
-
-    private static uint _globalVariablesSize;
-    private static IntPtr[] _globals;
+    private static List<IntPtr> _globals = new();
 
     private static int _assemblyDataLength;
     private static IntPtr _assemblyDataPointer;
@@ -151,45 +149,6 @@ public static unsafe class ProgramRunner
             _version++;
         }
 
-        lock (Program.GlobalVariables)
-        {
-            if (_globalVariablesSize < Program.GlobalVariablesSize)
-            {
-                var i = 0;
-                if (_globals == null)
-                {
-                    _globals = new IntPtr[Program.GlobalVariables.Count];
-                }
-                else
-                {
-                    i = _globals.Length;
-                    var newGlobals = new IntPtr[Program.GlobalVariables.Count];
-                    _globals.CopyTo(newGlobals, 0);
-                    _globals = newGlobals;
-                }
-
-                var pointer = Allocator.Allocate(Program.GlobalVariablesSize - _globalVariablesSize);
-                _globalVariablesSize = Program.GlobalVariablesSize;
-
-                for (; i < Program.GlobalVariables.Count; i++)
-                {
-                    var variable = Program.GlobalVariables[i];
-
-                    if (_typeTablePointer == IntPtr.Zero && variable.Name == "__type_table")
-                    {
-                        _typeTablePointer = pointer;
-                    }
-                    else if (variable.InitialValue != null)
-                    {
-                        InitializeGlobalVariable(pointer, variable.InitialValue);
-                    }
-
-                    _globals[i] = pointer;
-                    pointer += (int)variable.Size;
-                }
-            }
-        }
-
         lock (TypeTable.TypeInfos)
         {
             if (_typeCount != TypeTable.Count && _typeTablePointer != IntPtr.Zero)
@@ -208,6 +167,21 @@ public static unsafe class ProgramRunner
                 var typeTableArray = new ArrayStruct {Length = TypeTable.Count, Data = typeTableArrayPointer};
                 Marshal.StructureToPtr(typeTableArray, _typeTablePointer, false);
             }
+        }
+    }
+
+    public static void AddGlobalVariable(GlobalVariable variable)
+    {
+        var pointer = Allocator.Allocate(variable.Size);
+        _globals.Add(pointer);
+
+        if (_typeTablePointer == IntPtr.Zero && variable.Name == "__type_table")
+        {
+            _typeTablePointer = pointer;
+        }
+        else if (variable.InitialValue != null)
+        {
+            InitializeGlobalVariable(pointer, variable.InitialValue);
         }
     }
 

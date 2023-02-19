@@ -616,6 +616,7 @@ public static class TypeChecker
 
     public static bool AddStruct(StructAst structAst)
     {
+        Messages.Submit(MessageType.ReadyToBeTypeChecked, structAst);
         return AddTypeAndIdentifier(structAst.Name, structAst, structAst);
     }
 
@@ -649,11 +650,13 @@ public static class TypeChecker
 
     public static void AddUnion(UnionAst union)
     {
+        Messages.Submit(MessageType.ReadyToBeTypeChecked, union);
         AddTypeAndIdentifier(union.Name, union, union);
     }
 
     public static void AddInterface(InterfaceAst interfaceAst)
     {
+        Messages.Submit(MessageType.ReadyToBeTypeChecked, interfaceAst);
         AddTypeAndIdentifier(interfaceAst.Name, interfaceAst, interfaceAst);
     }
 
@@ -999,6 +1002,7 @@ public static class TypeChecker
         if (!ErrorReporter.Errors.Any())
         {
             TypeTable.CreateTypeInfo(structAst);
+            Messages.Submit(MessageType.TypeCheckSuccessful, structAst);
         }
         structAst.Verified = true;
     }
@@ -1097,7 +1101,11 @@ public static class TypeChecker
             }
         }
 
-        TypeTable.CreateTypeInfo(union);
+        if (!ErrorReporter.Errors.Any())
+        {
+            TypeTable.CreateTypeInfo(union);
+            Messages.Submit(MessageType.TypeCheckSuccessful, union);
+        }
         union.Verified = true;
     }
 
@@ -1546,7 +1554,11 @@ public static class TypeChecker
         interfaceAst.ArgumentCount = interfaceAst.Arguments.Count;
 
         // 3. Load the interface into the type table
-        TypeTable.CreateTypeInfo(interfaceAst);
+        if (!ErrorReporter.Errors.Any())
+        {
+            TypeTable.CreateTypeInfo(interfaceAst);
+            Messages.Submit(MessageType.TypeCheckSuccessful, interfaceAst);
+        }
         interfaceAst.Verified = true;
     }
 
