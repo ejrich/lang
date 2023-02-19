@@ -231,7 +231,7 @@ public static unsafe class Messages
             var handle = GCHandle.Alloc(structAst);
             structMessage = new()
             {
-                Type = AstType.Enum, File = Marshal.PtrToStructure<String>(BuildSettings.FileNames[structAst.FileIndex]),
+                Type = AstType.Struct, File = Marshal.PtrToStructure<String>(BuildSettings.FileNames[structAst.FileIndex]),
                 Line = structAst.Line, Column = structAst.Column, Name = Allocator.MakeString(structAst.Name), Source = GCHandle.ToIntPtr(handle)
             };
 
@@ -264,7 +264,7 @@ public static unsafe class Messages
             var handle = GCHandle.Alloc(unionAst);
             unionMessage = new()
             {
-                Type = AstType.Enum, File = Marshal.PtrToStructure<String>(BuildSettings.FileNames[unionAst.FileIndex]),
+                Type = AstType.Union, File = Marshal.PtrToStructure<String>(BuildSettings.FileNames[unionAst.FileIndex]),
                 Line = unionAst.Line, Column = unionAst.Column, Name = Allocator.MakeString(unionAst.Name), Source = GCHandle.ToIntPtr(handle)
             };
 
