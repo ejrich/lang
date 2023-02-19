@@ -1796,6 +1796,18 @@ public static unsafe class ProgramRunner
                     SetOutputArchitecture(value.Byte);
                     break;
                 }
+                case "add_source_file":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    var file = Marshal.PtrToStructure<String>(value.Pointer);
+                    var fileString = Marshal.PtrToStringAnsi(file.Data, (int)file.Length);
+                    if (Parser.AddFile(fileString, fileIndex, line, column))
+                    {
+                        ThreadPool.CompleteWork(ThreadPool.ParseQueue);
+                        TypeChecker.ClearDirectiveQueue();
+                    }
+                    break;
+                }
                 case "report_error":
                 {
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);

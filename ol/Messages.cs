@@ -62,7 +62,6 @@ public static class Messages
         [FieldOffset(88)] public IntPtr Source;
 
         public const int Size = 96;
-        public const int SizeWithoutSource = 88;
     }
 
     [StructLayout(LayoutKind.Explicit, Size=Size)]
@@ -79,7 +78,6 @@ public static class Messages
         [FieldOffset(88)] public IntPtr Source;
 
         public const int Size = 96;
-        public const int SizeWithoutSource = 88;
     }
 
     [StructLayout(LayoutKind.Explicit, Size=Size)]
@@ -95,7 +93,6 @@ public static class Messages
         [FieldOffset(80)] public IntPtr Source;
 
         public const int Size = 88;
-        public const int SizeWithoutSource = 80;
     }
 
     [StructLayout(LayoutKind.Explicit, Size=Size)]
@@ -110,7 +107,6 @@ public static class Messages
         [FieldOffset(64)] public IntPtr Source;
 
         public const int Size = 72;
-        public const int SizeWithoutSource = 64;
     }
 
     [StructLayout(LayoutKind.Explicit, Size=Size)]
@@ -126,7 +122,6 @@ public static class Messages
         [FieldOffset(72)] public IntPtr Source;
 
         public const int Size = 80;
-        public const int SizeWithoutSource = 72;
     }
 
     private static readonly SafeLinkedList<CompilerMessage> MessageQueue = new();

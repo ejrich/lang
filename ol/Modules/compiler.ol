@@ -47,6 +47,8 @@ set_output_architecture(OutputArchitecture arch) #compiler
 
 ///// Metaprogramming features for code exploration and generation
 
+add_source_file(string file) #compiler
+
 report_error(string error) #compiler
 
 // Ast definitions

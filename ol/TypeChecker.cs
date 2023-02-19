@@ -139,7 +139,7 @@ public static class TypeChecker
         }
     }
 
-    private static void ClearDirectiveQueue()
+    public static void ClearDirectiveQueue()
     {
         do
         {
@@ -200,7 +200,7 @@ public static class TypeChecker
         } while (Parser.Directives.Head != null);
     }
 
-    public static void ClearAstQueue()
+    private static void ClearAstQueue()
     {
         while (_astCompleteQueue.TryDequeue(out var ast))
         {
