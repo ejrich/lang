@@ -128,7 +128,7 @@ public static unsafe class ProgramRunner
         method.SetCustomAttribute(libraryDllImport);
     }
 
-    public static void Init()
+    private static void CreateFunctionDelegatesForExternCalls()
     {
         if (_functionTypeBuilder != null)
         {
@@ -148,7 +148,10 @@ public static unsafe class ProgramRunner
             }
             _version++;
         }
+    }
 
+    private static void UpdateTypeTable()
+    {
         lock (TypeTable.TypeInfos)
         {
             if (_typeCount != TypeTable.Count && _typeTablePointer != IntPtr.Zero)
@@ -170,12 +173,14 @@ public static unsafe class ProgramRunner
         }
     }
 
+    private const string TypeTableVariableName = "__type_table";
+
     public static void AddGlobalVariable(GlobalVariable variable)
     {
         var pointer = Allocator.Allocate(variable.Size);
         _globals.Add(pointer);
 
-        if (_typeTablePointer == IntPtr.Zero && variable.Name == "__type_table")
+        if (_typeTablePointer == IntPtr.Zero && variable.Name == TypeTableVariableName)
         {
             _typeTablePointer = pointer;
         }
@@ -481,8 +486,6 @@ public static unsafe class ProgramRunner
                 }
                 ProgramIRBuilder.BuildOperatorOverload(overload);
             }
-
-            Init();
         }
 
         var instructionPointer = 0;
@@ -1651,6 +1654,11 @@ public static unsafe class ProgramRunner
             case InstructionValueType.Allocation:
                 if (value.Global)
                 {
+                    var globalVariable = Program.GlobalVariables[value.ValueIndex];
+                    if (globalVariable.Name == TypeTableVariableName)
+                    {
+                        UpdateTypeTable();
+                    }
                     var globalPointer = _globals[value.ValueIndex];
                     return new Register {Pointer = globalPointer};
                 }
@@ -1712,6 +1720,7 @@ public static unsafe class ProgramRunner
     {
         if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Extern))
         {
+            CreateFunctionDelegatesForExternCalls();
             var args = GetExternArguments(arguments, registers, stackPointer, function, functionArgs);
 
             var functionDecl = _externFunctions[callingFunction.Source.Name][externIndex];
@@ -2125,6 +2134,7 @@ public static unsafe class ProgramRunner
 
             if (function.Source.Flags.HasFlag(FunctionFlags.Extern))
             {
+                CreateFunctionDelegatesForExternCalls();
                 var methodInfo = _externFunctions[function.Source.Name][0];
 
                 for (var i = 0; i < argumentTypes.Length; i++)

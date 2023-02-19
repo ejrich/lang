@@ -89,7 +89,6 @@ public static class TypeChecker
             if (!ErrorReporter.Errors.Any())
             {
                 var function = ProgramIRBuilder.CreateRunnableFunction(scopeAst, runDirectiveFunction);
-                ProgramRunner.Init();
 
                 if (ThreadPool.ExecuteRunDirective(function, scopeAst))
                 {
@@ -156,7 +155,6 @@ public static class TypeChecker
                         if (VerifyCondition(conditional.Condition, null, GetFileScope(conditional), true))
                         {
                             var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
-                            ProgramRunner.Init();
 
                             if (ProgramRunner.ExecuteCondition(condition, conditional.Condition))
                             {
@@ -181,7 +179,6 @@ public static class TypeChecker
                         if (VerifyCondition(directive.Value, null, GetFileScope(directive), true))
                         {
                             var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
-                            ProgramRunner.Init();
 
                             if (!ProgramRunner.ExecuteCondition(condition, directive.Value))
                             {
@@ -1746,7 +1743,6 @@ public static class TypeChecker
                             if (VerifyCondition(conditional.Condition, null, scope, true))
                             {
                                 var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
-                                ProgramRunner.Init();
 
                                 if (ProgramRunner.ExecuteCondition(condition, conditional.Condition))
                                 {
@@ -1767,7 +1763,6 @@ public static class TypeChecker
                             if (VerifyCondition(directive.Value, null, scope, true))
                             {
                                 var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
-                                ProgramRunner.Init();
 
                                 if (!ProgramRunner.ExecuteCondition(condition, directive.Value))
                                 {
@@ -1805,8 +1800,6 @@ public static class TypeChecker
                                 if (!ErrorReporter.Errors.Any())
                                 {
                                     var insertFunction = ProgramIRBuilder.CreateRunnableFunction(insertScope, insertDirectiveFunction);
-                                    ProgramRunner.Init();
-
                                     var code = ProgramRunner.ExecuteInsert(insertFunction, insertScope);
                                     end += InsertCode(code, function, directive, scope, i);
                                 }
