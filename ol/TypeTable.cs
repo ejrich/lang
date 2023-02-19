@@ -247,21 +247,7 @@ public static unsafe class TypeTable
 
                 if (enumType.Attributes != null)
                 {
-                    enumTypeInfo.Attributes.Length = enumType.Attributes.Count;
-                    var attributes = new String[enumTypeInfo.Attributes.Length];
-
-                    for (var i = 0; i < attributes.Length; i++)
-                    {
-                        attributes[i] = Allocator.MakeString(enumType.Attributes[i]);
-                    }
-
-                    var attributesArraySize = attributes.Length * Allocator.StringLength;
-                    var attributesPointer = Allocator.Allocate(attributesArraySize);
-                    fixed (String* pointer = &attributes[0])
-                    {
-                        Buffer.MemoryCopy(pointer, attributesPointer.ToPointer(), attributesArraySize, attributesArraySize);
-                    }
-                    enumTypeInfo.Attributes.Data = attributesPointer;
+                    enumTypeInfo.Attributes = MakeAttributes(enumType.Attributes);
                 }
 
                 Marshal.StructureToPtr(enumTypeInfo, typeInfoPointer, false);
@@ -286,21 +272,7 @@ public static unsafe class TypeTable
 
                         if (field.Attributes != null)
                         {
-                            typeField.Attributes.Length = field.Attributes.Count;
-                            var attributes = new String[typeField.Attributes.Length];
-
-                            for (var attributeIndex = 0; attributeIndex < attributes.Length; attributeIndex++)
-                            {
-                                attributes[attributeIndex] = Allocator.MakeString(field.Attributes[attributeIndex]);
-                            }
-
-                            var attributesArraySize = attributes.Length * Allocator.StringLength;
-                            var attributesPointer = Allocator.Allocate(attributesArraySize);
-                            fixed (String* pointer = &attributes[0])
-                            {
-                                Buffer.MemoryCopy(pointer, attributesPointer.ToPointer(), attributesArraySize, attributesArraySize);
-                            }
-                            typeField.Attributes.Data = attributesPointer;
+                            typeField.Attributes = MakeAttributes(field.Attributes);
                         }
 
                         typeFields[i] = typeField;
@@ -317,21 +289,7 @@ public static unsafe class TypeTable
 
                 if (structType.Attributes != null)
                 {
-                    structTypeInfo.Attributes.Length = structType.Attributes.Count;
-                    var attributes = new String[structTypeInfo.Attributes.Length];
-
-                    for (var i = 0; i < attributes.Length; i++)
-                    {
-                        attributes[i] = Allocator.MakeString(structType.Attributes[i]);
-                    }
-
-                    var attributesArraySize = attributes.Length * Allocator.StringLength;
-                    var attributesPointer = Allocator.Allocate(attributesArraySize);
-                    fixed (String* pointer = &attributes[0])
-                    {
-                        Buffer.MemoryCopy(pointer, attributesPointer.ToPointer(), attributesArraySize, attributesArraySize);
-                    }
-                    structTypeInfo.Attributes.Data = attributesPointer;
+                    structTypeInfo.Attributes = MakeAttributes(structType.Attributes);
                 }
 
                 Marshal.StructureToPtr(structTypeInfo, typeInfoPointer, false);
@@ -391,23 +349,7 @@ public static unsafe class TypeTable
 
                 if (interfaceAst.Arguments.Count > 0)
                 {
-                    interfaceTypeInfo.Arguments.Length = interfaceAst.Arguments.Count;
-                    var arguments = new ArgumentType[interfaceAst.Arguments.Count];
-
-                    for (var i = 0; i < arguments.Length; i++)
-                    {
-                        var argument = interfaceAst.Arguments[i];
-                        var argumentType = new ArgumentType {Name = Allocator.MakeString(argument.Name), TypeInfo = TypeInfos[argument.Type.TypeIndex]};
-                        arguments[i] = argumentType;
-                    }
-
-                    var argumentTypesArraySize = arguments.Length * ArgumentTypeSize;
-                    var argumentTypesPointer = Allocator.Allocate(argumentTypesArraySize);
-                    fixed (ArgumentType* pointer = &arguments[0])
-                    {
-                        Buffer.MemoryCopy(pointer, argumentTypesPointer.ToPointer(), argumentTypesArraySize, argumentTypesArraySize);
-                    }
-                    interfaceTypeInfo.Arguments.Data = argumentTypesPointer;
+                    interfaceTypeInfo.Arguments = MakeArguments(interfaceAst.Arguments);
                 }
 
                 Marshal.StructureToPtr(interfaceTypeInfo, typeInfoPointer, false);
@@ -421,42 +363,12 @@ public static unsafe class TypeTable
                 var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
                 if (argumentCount > 0)
                 {
-                    functionTypeInfo.Arguments.Length = argumentCount;
-                    var arguments = new ArgumentType[argumentCount];
-
-                    for (var i = 0; i < argumentCount; i++)
-                    {
-                        var argument = function.Arguments[i];
-                        var argumentType = new ArgumentType {Name = Allocator.MakeString(argument.Name), TypeInfo = TypeInfos[argument.Type.TypeIndex]};
-                        arguments[i] = argumentType;
-                    }
-
-                    var argumentTypesArraySize = argumentCount * ArgumentTypeSize;
-                    var argumentTypesPointer = Allocator.Allocate(argumentTypesArraySize);
-                    fixed (ArgumentType* pointer = &arguments[0])
-                    {
-                        Buffer.MemoryCopy(pointer, argumentTypesPointer.ToPointer(), argumentTypesArraySize, argumentTypesArraySize);
-                    }
-                    functionTypeInfo.Arguments.Data = argumentTypesPointer;
+                    functionTypeInfo.Arguments = MakeArguments(function.Arguments);
                 }
 
                 if (function.Attributes != null)
                 {
-                    functionTypeInfo.Attributes.Length = function.Attributes.Count;
-                    var attributes = new String[functionTypeInfo.Attributes.Length];
-
-                    for (var i = 0; i < attributes.Length; i++)
-                    {
-                        attributes[i] = Allocator.MakeString(function.Attributes[i]);
-                    }
-
-                    var attributesArraySize = attributes.Length * Allocator.StringLength;
-                    var attributesPointer = Allocator.Allocate(attributesArraySize);
-                    fixed (String* pointer = &attributes[0])
-                    {
-                        Buffer.MemoryCopy(pointer, attributesPointer.ToPointer(), attributesArraySize, attributesArraySize);
-                    }
-                    functionTypeInfo.Attributes.Data = attributesPointer;
+                    functionTypeInfo.Attributes = MakeAttributes(function.Attributes);
                 }
 
                 Marshal.StructureToPtr(functionTypeInfo, typeInfoPointer, false);
@@ -464,5 +376,44 @@ public static unsafe class TypeTable
         }
 
         TypeInfos[type.TypeIndex] = typeInfoPointer;
+    }
+
+    public static ArrayStruct MakeArguments(List<DeclarationAst> argumentAsts)
+    {
+        var arguments = new ArgumentType[argumentAsts.Count];
+
+        for (var i = 0; i < arguments.Length; i++)
+        {
+            var argument = argumentAsts[i];
+            arguments[i] = new ArgumentType {Name = Allocator.MakeString(argument.Name), TypeInfo = TypeInfos[argument.Type.TypeIndex]};
+        }
+
+        var argumentTypesArraySize = arguments.Length * ArgumentTypeSize;
+        var argumentTypesPointer = Allocator.Allocate(argumentTypesArraySize);
+        fixed (ArgumentType* pointer = &arguments[0])
+        {
+            Buffer.MemoryCopy(pointer, argumentTypesPointer.ToPointer(), argumentTypesArraySize, argumentTypesArraySize);
+        }
+
+        return new ArrayStruct { Length = arguments.Length, Data = argumentTypesPointer };
+    }
+
+    private static ArrayStruct MakeAttributes(List<string> attributesList)
+    {
+        var attributes = new String[attributesList.Count];
+
+        for (var i = 0; i < attributes.Length; i++)
+        {
+            attributes[i] = Allocator.MakeString(attributesList[i]);
+        }
+
+        var attributesArraySize = attributes.Length * Allocator.StringLength;
+        var attributesPointer = Allocator.Allocate(attributesArraySize);
+        fixed (String* pointer = &attributes[0])
+        {
+            Buffer.MemoryCopy(pointer, attributesPointer.ToPointer(), attributesArraySize, attributesArraySize);
+        }
+
+        return new ArrayStruct { Length = attributes.Length, Data = attributesPointer };
     }
 }
