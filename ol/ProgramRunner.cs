@@ -254,9 +254,7 @@ public static unsafe class ProgramRunner
                 if (value.Values == null)
                 {
                     var length = (int)value.Type.Size * (int)value.ArrayLength;
-                    var bytes = new byte[length];
-                    Array.Fill<byte>(bytes, 0);
-                    Marshal.Copy(bytes, 0, pointer, length);
+                    ClearMemory(pointer, length);
                 }
                 else
                 {
@@ -268,10 +266,7 @@ public static unsafe class ProgramRunner
                 }
                 break;
             case InstructionValueType.ConstantUnion:
-                var unionSize = (int)value.Type.Size;
-                var unionBytes = new byte[unionSize];
-                Array.Fill<byte>(unionBytes, 0);
-                Marshal.Copy(unionBytes, 0, pointer, unionSize);
+                ClearMemory(pointer, (int)value.Type.Size);
                 break;
         }
     }
@@ -668,9 +663,7 @@ public static unsafe class ProgramRunner
                 case InstructionType.InitializeUnion:
                 {
                     var pointer = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
-                    var bytes = new byte[instruction.Int];
-                    Array.Fill<byte>(bytes, 0);
-                    Marshal.Copy(bytes, 0, pointer.Pointer, instruction.Int);
+                    ClearMemory(pointer.Pointer, instruction.Int);
                     break;
                 }
                 case InstructionType.GetPointer:
@@ -710,7 +703,7 @@ public static unsafe class ProgramRunner
                 #if _LINUX
                 case InstructionType.SystemCall:
                 {
-                    var args = new long[6];
+                    Span<long> args = stackalloc long[6];
                     for (var i = 0; i < instruction.Value1.Values.Length; i++)
                     {
                         var value = GetValue(instruction.Value1.Values[i], registers, stackPointer, function, arguments);
@@ -1969,6 +1962,16 @@ public static unsafe class ProgramRunner
             var b = value & 0xFF;
             code.Add((byte)b);
             value >>= 8;
+        }
+    }
+
+    private static void ClearMemory(IntPtr pointer, int length)
+    {
+        Span<byte> bytes = stackalloc byte[length];
+        bytes.Fill(0);
+        fixed (byte* bytePointer = &bytes[0])
+        {
+            Buffer.MemoryCopy(bytePointer, pointer.ToPointer(), length, length);
         }
     }
 

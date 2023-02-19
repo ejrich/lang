@@ -2960,9 +2960,10 @@ public static class TypeChecker
             }
             case StructFieldRefAst structFieldRef:
             {
-                structFieldRef.Pointers = new bool[structFieldRef.Children.Count - 1];
-                structFieldRef.Types = new IType[structFieldRef.Children.Count - 1];
-                structFieldRef.ValueIndices = new int[structFieldRef.Children.Count - 1];
+                var childCount = structFieldRef.Children.Count - 1;
+                structFieldRef.Pointers = new bool[childCount];
+                structFieldRef.Types = new IType[childCount];
+                structFieldRef.ValueIndices = new int[childCount];
 
                 IType refType;
                 switch (structFieldRef.Children[0])
@@ -3166,9 +3167,10 @@ public static class TypeChecker
         {
             return null;
         }
-        structField.Pointers = new bool[structField.Children.Count - 1];
-        structField.Types = new IType[structField.Children.Count - 1];
-        structField.ValueIndices = new int[structField.Children.Count - 1];
+        var childCount = structField.Children.Count - 1;
+        structField.Pointers = new bool[childCount];
+        structField.Types = new IType[childCount];
+        structField.ValueIndices = new int[childCount];
 
         for (var i = 1; i < structField.Children.Count; i++)
         {
@@ -5652,12 +5654,12 @@ public static class TypeChecker
                         return null;
                     }
 
-                    var generics = type.Generics.ToArray();
-                    var genericTypes = new IType[generics.Length];
+                    var generics = type.Generics;
+                    var genericTypes = new IType[generics.Count];
                     var error = false;
                     var privateGenericTypes = false;
 
-                    for (var i = 0; i < generics.Length; i++)
+                    for (var i = 0; i < generics.Count; i++)
                     {
                         var genericType = genericTypes[i] = VerifyType(generics[i], scope, out var hasGeneric, out _, out _, depth + 1, allowParams);
                         if (genericType == null && !hasGeneric)
