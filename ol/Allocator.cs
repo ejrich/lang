@@ -19,8 +19,10 @@ public static class Allocator
     private const int BlockSize = 50000;
 
     private static readonly List<MemoryBlock> _memoryBlocks = new();
-    private static readonly List<MemoryBlock> _stackBlocks = new();
     private static readonly List<IntPtr> _openPointers = new();
+
+    private static readonly List<int> _stackRequestingThreadIds = new();
+    private static readonly List<List<MemoryBlock>> _stackBlocks = new();
 
     public static IntPtr Allocate(uint size)
     {
@@ -48,6 +50,24 @@ public static class Allocator
 
     public static (IntPtr, int, MemoryBlock) StackAllocate(int size)
     {
+        var threadId = Environment.CurrentManagedThreadId;
+        for (var i = 0; i < _stackRequestingThreadIds.Count; i++)
+        {
+            if (_stackRequestingThreadIds[i] == threadId)
+            {
+                return StackAllocate(size, _stackBlocks[i]);
+            }
+        }
+
+        var threadStackBlocks = new List<MemoryBlock>();
+        _stackRequestingThreadIds.Add(threadId);
+        _stackBlocks.Add(threadStackBlocks);
+
+        return StackAllocate(size, threadStackBlocks);
+    }
+
+    private static (IntPtr, int, MemoryBlock) StackAllocate(int size, List<MemoryBlock> blocks)
+    {
         // Allocate separate blocks if above the block size
         if (size > BlockSize)
         {
@@ -55,12 +75,12 @@ public static class Allocator
             _openPointers.Add(pointer);
 
             var block = new MemoryBlock {Pointer = pointer, Cursor = size, Size = size};
-            _stackBlocks.Add(block);
+            blocks.Add(block);
 
             return (pointer, 0, block);
         }
 
-        return FindMemoryBlock(size, _stackBlocks);
+        return FindMemoryBlock(size, blocks);
     }
 
     private static (IntPtr, int, MemoryBlock) FindMemoryBlock(int size, List<MemoryBlock> blocks)

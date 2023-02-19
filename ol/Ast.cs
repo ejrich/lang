@@ -21,7 +21,6 @@ public interface IType
     uint Alignment { get; set; }
     bool Used { get; set; }
     bool Private { get; set; }
-    // IntPtr MessagePointer { get; set; }
 }
 
 public interface IInterface : IAst
@@ -170,6 +169,7 @@ public class StructAst : IAst, IType
     public List<string> Generics { get; set; }
     public IType[] GenericTypes { get; set; }
     public List<StructFieldAst> Fields { get; } = new();
+    public IntPtr MessagePointer { get; set; }
 }
 
 public class StructFieldAst : IDeclaration
@@ -224,6 +224,7 @@ public class EnumAst : IAst, IType
     public TypeDefinition BaseTypeDefinition { get; set; }
     public PrimitiveAst BaseType { get; set; }
     public Dictionary<string, EnumValueAst> Values { get; } = new();
+    public IntPtr MessagePointer { get; set; }
 }
 
 public class EnumValueAst : IAst
@@ -294,6 +295,7 @@ public class UnionAst : IAst, IType
     public bool Verified { get; set; }
     public bool Verifying { get; set; }
     public List<UnionFieldAst> Fields { get; } = new();
+    public IntPtr MessagePointer { get; set; }
 }
 
 public class UnionFieldAst : IAst
@@ -626,6 +628,7 @@ public class InterfaceAst : IInterface, IType
     public TypeDefinition ReturnTypeDefinition { get; set; }
     public List<DeclarationAst> Arguments { get; } = new();
     public int ArgumentCount { get; set; }
+    public IntPtr MessagePointer { get; set; }
 }
 
 public class AssemblyAst : IAst

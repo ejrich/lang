@@ -117,17 +117,27 @@ public static class Parser
         }
     }
 
-    private static void AddFile(string file, string directory, int fileIndex, Token token)
+    private static bool AddFile(string file, string directory, int fileIndex, uint line, uint column)
     {
         var filePath = Path.Combine(directory, file);
         if (File.Exists(filePath))
         {
             QueueFileIfNotExists(filePath);
+            return true;
         }
-        else
-        {
-            ErrorReporter.Report($"File '{file}' does not exist", fileIndex, token);
-        }
+
+        ErrorReporter.Report($"File '{file}' does not exist", fileIndex, line, column);
+        return false;
+    }
+
+    private static void AddFile(string file, string directory, int fileIndex, Token token)
+    {
+        AddFile(file, directory, fileIndex, token.Line, token.Column);
+    }
+
+    public static bool AddFile(string file, int fileIndex, uint line, uint column)
+    {
+        return AddFile(file, BuildSettings.Path, fileIndex, line, column);
     }
 
     public static void AddFile(CompilerDirectiveAst import)
