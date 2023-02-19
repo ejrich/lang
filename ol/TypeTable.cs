@@ -229,7 +229,7 @@ public static unsafe class TypeTable
                 var enumTypeInfo = new EnumTypeInfo {Name = name, Type = TypeKind.Enum, Size = type.Size, BaseType = TypeInfos[enumType.BaseType.TypeIndex]};
 
                 enumTypeInfo.Values.Length = enumType.Values.Count;
-                var enumValues = new EnumValue[enumTypeInfo.Values.Length];
+                Span<EnumValue> enumValues = stackalloc EnumValue[enumType.Values.Count];
 
                 foreach (var (valueName, value) in enumType.Values)
                 {
@@ -263,7 +263,7 @@ public static unsafe class TypeTable
                 if (structType.Fields.Count > 0)
                 {
                     structTypeInfo.Fields.Length = structType.Fields.Count;
-                    var typeFields = new TypeField[structTypeInfo.Fields.Length];
+                    Span<TypeField> typeFields = stackalloc TypeField[structType.Fields.Count];
 
                     for (var i = 0; i < structType.Fields.Count; i++)
                     {
@@ -300,7 +300,7 @@ public static unsafe class TypeTable
                 var compoundTypeInfo = new CompoundTypeInfo {Name = name, Type = TypeKind.Compound, Size = type.Size};
 
                 compoundTypeInfo.Types.Length = compoundType.Types.Length;
-                var types = new IntPtr[compoundTypeInfo.Types.Length];
+                Span<IntPtr> types = stackalloc IntPtr[compoundType.Types.Length];
 
                 for (var i = 0; i < types.Length; i++)
                 {
@@ -324,7 +324,7 @@ public static unsafe class TypeTable
                 var unionTypeInfo = new UnionTypeInfo {Name = name, Type = TypeKind.Union, Size = type.Size};
 
                 unionTypeInfo.Fields.Length = union.Fields.Count;
-                var unionFields = new UnionField[unionTypeInfo.Fields.Length];
+                Span<UnionField> unionFields = stackalloc UnionField[union.Fields.Count];
 
                 for (var i = 0; i < unionFields.Length; i++)
                 {
@@ -387,7 +387,7 @@ public static unsafe class TypeTable
 
     public static ArrayStruct MakeArguments(List<DeclarationAst> argumentAsts)
     {
-        var arguments = new ArgumentType[argumentAsts.Count];
+        Span<ArgumentType> arguments = stackalloc ArgumentType[argumentAsts.Count];
 
         for (var i = 0; i < arguments.Length; i++)
         {
@@ -407,7 +407,7 @@ public static unsafe class TypeTable
 
     private static ArrayStruct MakeAttributes(List<string> attributesList)
     {
-        var attributes = new String[attributesList.Count];
+        Span<String> attributes = stackalloc String[attributesList.Count];
 
         for (var i = 0; i < attributes.Length; i++)
         {
