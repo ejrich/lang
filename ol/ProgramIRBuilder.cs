@@ -355,7 +355,7 @@ public static class ProgramIRBuilder
             declaration.PointerIndex = Program.GlobalVariables.Count;
             globalVariable.Pointer = AllocationValue(Program.GlobalVariables.Count, globalVariable.Type, true);
             Program.GlobalVariables.Add(globalVariable);
-            Program.GlobalVariablesSize += globalVariable.Size;
+            ProgramRunner.AddGlobalVariable(globalVariable);
         }
     }
 
@@ -461,7 +461,6 @@ public static class ProgramIRBuilder
             Array = true, ArrayLength = length, Type = elementType
         };
         Program.GlobalVariables.Add(arrayVariable);
-        Program.GlobalVariablesSize += arrayVariable.Size;
 
         if (arrayValues != null)
         {
@@ -471,6 +470,7 @@ public static class ProgramIRBuilder
                 Values = arrayValues.Select(val => EmitConstantIR(val, null, scope)).ToArray(), ArrayLength = length
             };
         }
+        ProgramRunner.AddGlobalVariable(arrayVariable);
 
         return new InstructionValue
         {

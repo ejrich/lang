@@ -13,6 +13,9 @@ main() {
 
     main();
 
+    main_function := get_function("main");
+    insert_code(main_function, format_string("print(\"Executing function: %\\n\");\nfoo();", main_function.name));
+
     if intercept_compiler_messages() {
         message: CompilerMessage;
 
@@ -20,11 +23,11 @@ main() {
             switch message.type {
                 case CompilerMessageType.ReadyToBeTypeChecked; {
                     function := cast(Function*, message.value.ast);
-                    print("Ast is ready to be type checked: %\n", function.name);
+                    print("Ast is ready to be type checked: % - %\n", function.type, function.name);
                 }
                 case CompilerMessageType.TypeCheckSuccessful; {
                     function := cast(Function*, message.value.ast);
-                    print("Ast was successfully type checked: %\n", function.name);
+                    print("Ast was successfully type checked: % - %\n", function.type, function.name);
                 }
                 case CompilerMessageType.TypeCheckFailed;
                     print("Type checking failed\n");
@@ -43,9 +46,6 @@ main() {
             }
         }
     }
-
-    main_function := get_function("main");
-    insert_code(main_function, format_string("print(\"Executing function: %\\n\");\nfoo();", main_function.name));
 
     main();
 }

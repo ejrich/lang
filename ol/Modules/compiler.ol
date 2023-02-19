@@ -82,6 +82,7 @@ struct EnumAst : CompilerAst {
     values: Array<EnumValue>;
     attributes: Array<string>;
 }
+
 struct StructAst : CompilerAst {
     name: string;
     fields: Array<TypeField>;
@@ -94,6 +95,7 @@ struct UnionAst : CompilerAst {
 }
 
 struct InterfaceAst : CompilerAst {
+    name: string;
     return_type: TypeInfo*;
     arguments: Array<ArgumentType>;
 }

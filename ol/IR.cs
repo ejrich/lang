@@ -11,7 +11,6 @@ public static class Program
     public static FunctionIR EntryPoint { get; set; }
     public static List<FunctionIR> Functions { get; } = new();
     public static List<InstructionValue> Constants { get; } = new();
-    public static uint GlobalVariablesSize { get; set; }
     public static List<GlobalVariable> GlobalVariables { get; } = new();
 }
 
