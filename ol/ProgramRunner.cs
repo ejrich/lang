@@ -1807,8 +1807,15 @@ public static unsafe class ProgramRunner
                 }
                 case "get_next_compiler_message":
                 {
-                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                    returnValue.Bool = Messages.GetNextMessage(value.Pointer);
+                    if (Messages.Intercepting)
+                    {
+                        var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                        returnValue.Bool = Messages.GetNextMessage(value.Pointer);
+                    }
+                    else
+                    {
+                        ErrorReporter.Report("Must call intercept_compiler_messages successfully before get_next_compiler_message", fileIndex, line, column);
+                    }
                     break;
                 }
                 case "get_function":
