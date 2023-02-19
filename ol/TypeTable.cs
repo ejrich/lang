@@ -360,11 +360,18 @@ public static unsafe class TypeTable
                 var functionTypeInfo = new FunctionTypeInfo {Name = name, Type = TypeKind.Function};
                 functionTypeInfo.ReturnType = TypeInfos[function.ReturnType.TypeIndex];
 
-                var argumentCount = function.Flags.HasFlag(FunctionFlags.Varargs) ? function.Arguments.Count - 1 : function.Arguments.Count;
-                if (argumentCount > 0)
+                if (function.Flags.HasFlag(FunctionFlags.Varargs))
+                {
+                    if (function.Arguments.Count > 1)
+                    {
+                        functionTypeInfo.Arguments = MakeArguments(function.Arguments.GetRange(0, function.Arguments.Count - 1));
+                    }
+                }
+                else if (function.Arguments.Count > 0)
                 {
                     functionTypeInfo.Arguments = MakeArguments(function.Arguments);
                 }
+
 
                 if (function.Attributes != null)
                 {

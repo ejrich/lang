@@ -112,7 +112,6 @@ public static class Allocator
         return (blockPointer, 0, memoryBlock);
     }
 
-
     public static void Free()
     {
         /* #if DEBUG
