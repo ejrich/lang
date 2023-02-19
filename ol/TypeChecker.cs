@@ -72,12 +72,10 @@ public static class TypeChecker
         ClearDirectiveQueue();
 
         // 2. Execute any other compiler directives
-        var runNode = Parser.RunDirectives.Head;
+        var runNode = Parser.RunDirectives.PopHead();
         while (runNode != null)
         {
             var runDirective = runNode.Data;
-            RemoveNode(Parser.RunDirectives, runNode);
-
             var scope = GetFileScope(runDirective);
             var scopeAst = (ScopeAst)runDirective.Value;
             scopeAst.Parent = scope;
@@ -96,7 +94,7 @@ public static class TypeChecker
                 }
             }
 
-            runNode = runNode.Next;
+            runNode = Parser.RunDirectives.PopHead();
         }
 
         // 3. Verify the rest of the types
@@ -129,25 +127,15 @@ public static class TypeChecker
         _generatedCodeWriter?.Close();
     }
 
-    private static void RemoveNode<T>(SafeLinkedList<T> list, Node<T> current)
-    {
-        list.Head = current.Next;
-        if (current.Next == null)
-        {
-            list.ReplaceEnd(null);
-        }
-    }
-
     public static void ClearDirectiveQueue()
     {
         do
         {
             var parsingAdditional = false;
-            var node = Parser.Directives.Head;
+            var node = Parser.Directives.PopHead();
             while (node != null)
             {
                 var directive = node.Data;
-                RemoveNode(Parser.Directives, node);
                 switch (directive.Type)
                 {
                     case DirectiveType.If:
@@ -188,7 +176,7 @@ public static class TypeChecker
                         }
                         break;
                 }
-                node = node.Next;
+                node = Parser.Directives.PopHead();
             }
             if (parsingAdditional)
             {

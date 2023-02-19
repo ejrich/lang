@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Threading;
 
 namespace ol;
@@ -159,15 +160,18 @@ public class SafeLinkedList<T>
     {
         var node = new Node<T> {Data = data};
 
-        if (Head == null)
+        lock (this)
         {
-            Head = node;
-            End = node;
-        }
-        else
-        {
-            var originalEnd = ReplaceEnd(node);
-            originalEnd.Next = node;
+            if (Head == null)
+            {
+                Head = node;
+                End = node;
+            }
+            else
+            {
+                End.Next = node;
+                End = node;
+            }
         }
     }
 
@@ -181,16 +185,22 @@ public class SafeLinkedList<T>
         }
     }
 
-    public Node<T> ReplaceEnd(Node<T> node)
+    public Node<T> PopHead()
     {
-        var originalEnd = End;
+        var head = Head;
+        if (head == null) return null;
 
-        while (Interlocked.CompareExchange(ref End, node, originalEnd) != originalEnd)
+        lock (this)
         {
-            originalEnd = End;
+            var next = head.Next;
+            Head = next;
+            if (End == head)
+            {
+                End = next;
+            }
         }
 
-        return originalEnd;
+        return head;
     }
 }
 

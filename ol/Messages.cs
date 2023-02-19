@@ -31,11 +31,13 @@ public struct CompilerMessage
 {
     [FieldOffset(0)] public MessageType Type;
     [FieldOffset(8)] public MessageValue Value;
+    [FieldOffset(24)] public bool WaitForNext;
 
-    public const int Size = 24;
+    public const int Size = 32;
+    public const int PublicSize = 24;
 }
 
-public static class Messages
+public static unsafe class Messages
 {
     public enum AstType
     {
@@ -126,6 +128,7 @@ public static class Messages
 
     private static readonly SafeLinkedList<CompilerMessage> MessageQueue = new();
     private static readonly Semaphore MessageWaitMutex = new(0, int.MaxValue);
+    private static readonly Semaphore MessageReceiveMutex = new(0, 1);
 
     private static bool _completed;
     public static bool Intercepting;
@@ -327,8 +330,15 @@ public static class Messages
     {
         if (ErrorReporter.Errors.Any() || _completed) return;
 
+        message.WaitForNext = Intercepting && ThreadPool.RunThreadId != Environment.CurrentManagedThreadId;
+
         MessageQueue.Add(message);
         MessageWaitMutex.Release();
+
+        if (message.WaitForNext)
+        {
+            MessageReceiveMutex.WaitOne();
+        }
     }
 
     public static void CompleteAndWait()
@@ -343,23 +353,26 @@ public static class Messages
         _completed = true;
     }
 
+    private static bool _waitingForNext;
+    private static int _m;
     public static bool GetNextMessage(IntPtr messagePointer)
     {
+        if (_waitingForNext)
+        {
+            MessageReceiveMutex.Release();
+        }
+
         MessageWaitMutex.WaitOne();
 
-        var head = MessageQueue.Head;
+        var head = MessageQueue.PopHead();
         if (head == null)
         {
             return false;
         }
 
-        Marshal.StructureToPtr(head.Data, messagePointer, false);
-
-        Interlocked.CompareExchange(ref MessageQueue.Head, head.Next, head);
-        if (MessageQueue.End == head)
-        {
-            Interlocked.CompareExchange(ref MessageQueue.Head, head.Next, head);
-        }
+        var message = stackalloc [] {head.Data};
+        Buffer.MemoryCopy(message, messagePointer.ToPointer(), CompilerMessage.PublicSize, CompilerMessage.PublicSize);
+        _waitingForNext = (*message).WaitForNext;
 
         return true;
     }
