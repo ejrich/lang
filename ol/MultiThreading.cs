@@ -172,20 +172,20 @@ public class SafeLinkedList<T>
 
     public Node<T> RemoveHead()
     {
-        var head = Head;
-        if (head == null) return null;
-
         lock (this)
         {
+            var head = Head;
+            if (head == null) return null;
+
             var next = head.Next;
             Head = next;
             if (End == head)
             {
                 End = next;
             }
-        }
 
-        return head;
+            return head;
+        }
     }
 }
 
