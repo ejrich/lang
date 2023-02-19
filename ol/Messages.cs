@@ -144,22 +144,84 @@ public static class Messages
 
     public static void Submit(MessageType type, IFunction function)
     {
+        IntPtr pointer;
+        Function functionMessage;
         if (function.MessagePointer == IntPtr.Zero)
         {
             var handle = GCHandle.Alloc(function);
-            var functionMessage = new Function
+            functionMessage = new()
             {
                 Type = function is FunctionAst ? AstType.Function : AstType.OperatorOverload,
                 File = Marshal.PtrToStructure<String>(BuildSettings.FileNames[function.FileIndex]), Line = function.Line, Column = function.Column,
                 Name = Allocator.MakeString(function.Name), Source = GCHandle.ToIntPtr(handle)
             };
 
-            var pointer = Allocator.Allocate(Function.Size);
-            Marshal.StructureToPtr(functionMessage, pointer, false);
-            function.MessagePointer = pointer;
+            function.MessagePointer = pointer = Allocator.Allocate(Function.Size);
+        }
+        else
+        {
+            pointer = function.MessagePointer;
+            functionMessage = Marshal.PtrToStructure<Function>(pointer);
         }
 
-        var message = new CompilerMessage { Type = type, Value = new() { Ast = function.MessagePointer } };
+        if (function is FunctionAst functionAst)
+        {
+            var typeInfoPointer = TypeTable.TypeInfos[functionAst.TypeIndex];
+            if (typeInfoPointer != IntPtr.Zero)
+            {
+                var functionTypeInfo = Marshal.PtrToStructure<TypeTable.FunctionTypeInfo>(typeInfoPointer);
+                functionMessage.ReturnType = functionTypeInfo.ReturnType;
+                functionMessage.Arguments = functionTypeInfo.Arguments;
+                functionMessage.Attributes = functionTypeInfo.Attributes;
+            }
+        }
+        else if (type == MessageType.TypeCheckSuccessful && function is OperatorOverloadAst)
+        {
+            functionMessage.ReturnType = TypeTable.TypeInfos[function.ReturnType.TypeIndex];
+            functionMessage.Arguments = TypeTable.MakeArguments(function.Arguments);
+        }
+
+        Marshal.StructureToPtr(functionMessage, pointer, false);
+        Submit(type, pointer);
+    }
+
+    public static void Submit(MessageType type, EnumAst enumAst)
+    {
+        IntPtr pointer;
+        Enum enumMessage;
+        if (enumAst.MessagePointer == IntPtr.Zero)
+        {
+            var handle = GCHandle.Alloc(enumAst);
+            enumMessage = new()
+            {
+                Type = AstType.Enum, File = Marshal.PtrToStructure<String>(BuildSettings.FileNames[enumAst.FileIndex]),
+                Line = enumAst.Line, Column = enumAst.Column, Name = Allocator.MakeString(enumAst.Name), Source = GCHandle.ToIntPtr(handle)
+            };
+
+            enumAst.MessagePointer = pointer = Allocator.Allocate(Enum.Size);
+        }
+        else
+        {
+            pointer = enumAst.MessagePointer;
+            enumMessage = Marshal.PtrToStructure<Enum>(pointer);
+        }
+
+        var typeInfoPointer = TypeTable.TypeInfos[enumAst.TypeIndex];
+        if (typeInfoPointer != IntPtr.Zero)
+        {
+            var enumTypeInfo = Marshal.PtrToStructure<TypeTable.EnumTypeInfo>(typeInfoPointer);
+            enumMessage.BaseType = enumTypeInfo.BaseType;
+            enumMessage.Values = enumTypeInfo.Values;
+            enumMessage.Attributes = enumTypeInfo.Attributes;
+        }
+
+        Marshal.StructureToPtr(enumMessage, pointer, false);
+        Submit(type, pointer);
+    }
+
+    private static void Submit(MessageType type, IntPtr ast)
+    {
+        var message = new CompilerMessage { Type = type, Value = new() { Ast = ast } };
         Submit(message);
     }
 
