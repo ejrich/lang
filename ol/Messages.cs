@@ -354,7 +354,6 @@ public static unsafe class Messages
     }
 
     private static bool _waitingForNext;
-    private static int _m;
     public static bool GetNextMessage(IntPtr messagePointer)
     {
         if (_waitingForNext)
@@ -364,7 +363,7 @@ public static unsafe class Messages
 
         MessageWaitMutex.WaitOne();
 
-        var head = MessageQueue.PopHead();
+        var head = MessageQueue.RemoveHead();
         if (head == null)
         {
             return false;

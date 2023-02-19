@@ -114,27 +114,22 @@ public static class ThreadPool
 
     private static bool ExecuteQueuedItem(WorkQueue queue)
     {
-        var head = queue.Queue.Head;
+        var head = queue.Queue.RemoveHead();
         if (head == null)
         {
             return true;
         }
 
-        var value = Interlocked.CompareExchange(ref queue.Queue.Head, head.Next, head);
-
-        if (value == head)
-        {
-            var queueItem = head.Data;
-            queueItem.Function(queueItem.Data);
-            Interlocked.Increment(ref queue.Completed);
-        }
+        var queueItem = head.Data;
+        queueItem.Function(queueItem.Data);
+        Interlocked.Increment(ref queue.Completed);
 
         return false;
     }
 
     public static void QueueWork(WorkQueue queue, Action<object> function, object data)
     {
-        queue.Queue.AddToHead(new QueueItem {Function = function, Data = data});
+        queue.Queue.Add(new QueueItem {Function = function, Data = data});
         Interlocked.Increment(ref queue.Count);
         Semaphore.Release();
     }
@@ -175,17 +170,7 @@ public class SafeLinkedList<T>
         }
     }
 
-    public void AddToHead(T data)
-    {
-        var node = new Node<T> {Data = data, Next = Head};
-
-        while (Interlocked.CompareExchange(ref Head, node, node.Next) != node.Next)
-        {
-            node.Next = Head;
-        }
-    }
-
-    public Node<T> PopHead()
+    public Node<T> RemoveHead()
     {
         var head = Head;
         if (head == null) return null;

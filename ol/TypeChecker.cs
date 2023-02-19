@@ -72,7 +72,7 @@ public static class TypeChecker
         ClearDirectiveQueue();
 
         // 2. Execute any other compiler directives
-        var runNode = Parser.RunDirectives.PopHead();
+        var runNode = Parser.RunDirectives.RemoveHead();
         while (runNode != null)
         {
             var runDirective = runNode.Data;
@@ -94,7 +94,7 @@ public static class TypeChecker
                 }
             }
 
-            runNode = Parser.RunDirectives.PopHead();
+            runNode = Parser.RunDirectives.RemoveHead();
         }
 
         // 3. Verify the rest of the types
@@ -132,7 +132,7 @@ public static class TypeChecker
         do
         {
             var parsingAdditional = false;
-            var node = Parser.Directives.PopHead();
+            var node = Parser.Directives.RemoveHead();
             while (node != null)
             {
                 var directive = node.Data;
@@ -176,7 +176,7 @@ public static class TypeChecker
                         }
                         break;
                 }
-                node = Parser.Directives.PopHead();
+                node = Parser.Directives.RemoveHead();
             }
             if (parsingAdditional)
             {
