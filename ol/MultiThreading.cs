@@ -14,9 +14,10 @@ public static class ThreadPool
 
     public class WorkQueue
     {
-        public int Completed;
-        public int Count;
-        public SafeLinkedList<QueueItem> Queue { get; } = new();
+        public volatile int Completed;
+        public volatile int Count;
+        public volatile int NextEntry;
+        public QueueItem[] Entries { get; set; } = new QueueItem[500];
     }
 
     public static int RunThreadId;
@@ -114,23 +115,33 @@ public static class ThreadPool
 
     private static bool ExecuteQueuedItem(WorkQueue queue)
     {
-        var head = queue.Queue.RemoveHead();
-        if (head == null)
+        if (queue.NextEntry >= queue.Count)
         {
             return true;
         }
 
-        var queueItem = head.Data;
-        queueItem.Function(queueItem.Data);
-        Interlocked.Increment(ref queue.Completed);
+        var index = Interlocked.Increment(ref queue.NextEntry) - 1;
+        var queueItem = queue.Entries[index];
+
+        if (queueItem.Data != null)
+        {
+            queueItem.Function(queueItem.Data);
+            Interlocked.Increment(ref queue.Completed);
+        }
+        else
+        {
+            Interlocked.Decrement(ref queue.NextEntry);
+        }
 
         return false;
     }
 
     public static void QueueWork(WorkQueue queue, Action<object> function, object data)
     {
-        queue.Queue.Add(new QueueItem {Function = function, Data = data});
-        Interlocked.Increment(ref queue.Count);
+        var index = Interlocked.Increment(ref queue.Count) - 1;
+        Debug.Assert(index < queue.Entries.Length);
+
+        queue.Entries[index] = new QueueItem {Function = function, Data = data};
         Semaphore.Release();
     }
 
@@ -143,6 +154,7 @@ public static class ThreadPool
 
         queue.Completed = 0;
         queue.Count = 0;
+        queue.NextEntry = 0;
     }
 }
 
