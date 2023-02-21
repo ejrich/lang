@@ -69,7 +69,7 @@ struct CompilerAst {
     column: u32;
 }
 
-struct Function : CompilerAst {
+struct FunctionAst : CompilerAst {
     name: string;
     return_type: TypeInfo*;
     arguments: Array<ArgumentType>;
@@ -127,8 +127,8 @@ bool intercept_compiler_messages() #compiler
 bool get_next_compiler_message(CompilerMessage* message) #compiler
 
 // Functions for code insertion and modification
-Function* get_function(string name) #compiler
+FunctionAst* get_function(string name) #compiler
 
-insert_code(Function* function, string code) #compiler
+insert_code(FunctionAst* function, string code) #compiler
 
 add_code(string code) #compiler
