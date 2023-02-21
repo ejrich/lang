@@ -38,6 +38,7 @@ public static unsafe class ProgramRunner
     private static readonly Dictionary<string, Type> _functionPointerDelegateTypes = new();
 
     private static int _typeCount;
+    private static int _typeTableIndex;
     private static IntPtr _typeTablePointer;
     private static List<IntPtr> _globals = new();
 
@@ -173,16 +174,16 @@ public static unsafe class ProgramRunner
         }
     }
 
-    private const string TypeTableVariableName = "__type_table";
-
     public static void AddGlobalVariable(GlobalVariable variable)
     {
         var pointer = Allocator.Allocate(variable.Size);
+        var index = _globals.Count;
         _globals.Add(pointer);
 
-        if (_typeTablePointer == IntPtr.Zero && variable.Name == TypeTableVariableName)
+        if (_typeTablePointer == IntPtr.Zero && variable.Name == "__type_table")
         {
             _typeTablePointer = pointer;
+            _typeTableIndex = index;
         }
         else if (variable.InitialValue != null)
         {
@@ -1647,8 +1648,7 @@ public static unsafe class ProgramRunner
             case InstructionValueType.Allocation:
                 if (value.Global)
                 {
-                    var globalVariable = Program.GlobalVariables[value.ValueIndex];
-                    if (globalVariable.Name == TypeTableVariableName)
+                    if (value.ValueIndex == _typeTableIndex)
                     {
                         UpdateTypeTable();
                     }
