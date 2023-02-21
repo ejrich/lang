@@ -72,10 +72,8 @@ public static class TypeChecker
         ClearDirectiveQueue();
 
         // 2. Execute any other compiler directives
-        var runNode = Parser.RunDirectives.RemoveHead();
-        while (runNode != null)
+        while (Parser.RunDirectives.TryDequeue(out var runDirective))
         {
-            var runDirective = runNode.Data;
             var scope = GetFileScope(runDirective);
             var scopeAst = (ScopeAst)runDirective.Value;
             scopeAst.Parent = scope;
@@ -93,16 +91,12 @@ public static class TypeChecker
                     ProgramRunner.RunProgram(function, scopeAst);
                 }
             }
-
-            runNode = Parser.RunDirectives.RemoveHead();
         }
 
         // 3. Verify the rest of the types
-        var astNode = Parser.Asts.Head;
-        while (astNode != null)
+        while (Parser.Asts.TryDequeue(out var ast))
         {
-            VerifyAst(astNode.Data);
-            astNode = astNode.Next;
+            VerifyAst(ast);
         }
 
         ClearAstQueue();
@@ -129,13 +123,11 @@ public static class TypeChecker
 
     public static void ClearDirectiveQueue()
     {
-        do
+        while (Parser.Directives.TryDequeue(out var directive))
         {
             var parsingAdditional = false;
-            var node = Parser.Directives.RemoveHead();
-            while (node != null)
+            do
             {
-                var directive = node.Data;
                 switch (directive.Type)
                 {
                     case DirectiveType.If:
@@ -176,13 +168,13 @@ public static class TypeChecker
                         }
                         break;
                 }
-                node = Parser.Directives.RemoveHead();
-            }
+            } while (Parser.Directives.TryDequeue(out directive));
+
             if (parsingAdditional)
             {
                 ThreadPool.CompleteWork(ThreadPool.ParseQueue);
             }
-        } while (Parser.Directives.Head != null);
+        }
     }
 
     private static void ClearAstQueue()
@@ -271,7 +263,7 @@ public static class TypeChecker
                 switch (directive.Type)
                 {
                     case DirectiveType.Run:
-                        Parser.RunDirectives.Add(directive);
+                        Parser.RunDirectives.Enqueue(directive);
                         break;
                     case DirectiveType.ImportModule:
                         Parser.AddModule(directive);
@@ -288,12 +280,12 @@ public static class TypeChecker
                         AddSystemLibrary(directive);
                         break;
                     default:
-                        Parser.Directives.Add(directive);
+                        Parser.Directives.Enqueue(directive);
                         break;
                 }
                 return;
         }
-        Parser.Asts.Add(ast);
+        Parser.Asts.Enqueue(ast);
     }
 
     private static IScope GetFileScope(IAst ast)
