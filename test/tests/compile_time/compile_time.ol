@@ -22,17 +22,17 @@ main() {
         while get_next_compiler_message(&message) {
             switch message.type {
                 case CompilerMessageType.ReadyToBeTypeChecked; {
-                    function := cast(Function*, message.value.ast);
+                    function := cast(FunctionAst*, message.value.ast);
                     print("Ast is ready to be type checked: % - %\n", function.type, function.name);
                 }
                 case CompilerMessageType.TypeCheckSuccessful; {
-                    function := cast(Function*, message.value.ast);
+                    function := cast(FunctionAst*, message.value.ast);
                     print("Ast was successfully type checked: % - %\n", function.type, function.name);
                 }
                 case CompilerMessageType.TypeCheckFailed;
                     print("Type checking failed\n");
                 case CompilerMessageType.IRGenerated; {
-                    function := cast(Function*, message.value.ast);
+                    function := cast(FunctionAst*, message.value.ast);
                     print("IR generated for function: %\n", function.name);
                 }
                 case CompilerMessageType.ReadyForCodeGeneration;
