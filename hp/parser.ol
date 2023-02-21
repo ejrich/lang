@@ -213,14 +213,14 @@ struct Argument {
     name: string;
 }
 
-struct Function {
+struct FunctionDefinition {
     return_type: TypeDefinition;
     name: string;
     arguments: Array<Argument>;
 }
 
 Node<Token>* parse_function(Node<Token>* node, File file, string library) {
-    function: Function;
+    function: FunctionDefinition;
     function.return_type, node = parse_type(node);
     function.name = node.data.value;
 
@@ -267,7 +267,7 @@ Node<Token>* parse_function(Node<Token>* node, File file, string library) {
     return node;
 }
 
-Node<Token>* parse_arguments(Node<Token>* node, Function* function, bool internal = false) {
+Node<Token>* parse_arguments(Node<Token>* node, FunctionDefinition* function, bool internal = false) {
     new_arg := true;
     argument: Argument;
 
@@ -617,7 +617,7 @@ Node<Token>* parse_enum(Node<Token>* node, File file) {
 Node<Token>* parse_interface(Node<Token>* node, File file, TypeDefinition return_type, bool internal = false) {
     node = node.next.next;
 
-    function: Function = { return_type = return_type; name = node.data.value; }
+    function: FunctionDefinition = { return_type = return_type; name = node.data.value; }
 
     node = parse_arguments(node.next.next.next, &function, internal);
 
