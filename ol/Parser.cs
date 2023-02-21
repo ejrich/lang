@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -10,9 +11,9 @@ public static class Parser
 {
     private static string _libraryDirectory;
 
-    public static SafeLinkedList<IAst> Asts = new();
-    public static SafeLinkedList<CompilerDirectiveAst> Directives = new();
-    public static SafeLinkedList<CompilerDirectiveAst> RunDirectives = new();
+    public static readonly ConcurrentQueue<IAst> Asts = new();
+    public static readonly ConcurrentQueue<CompilerDirectiveAst> Directives = new();
+    public static readonly ConcurrentQueue<CompilerDirectiveAst> RunDirectives = new();
 
     private class TokenEnumerator
     {
@@ -231,7 +232,7 @@ public static class Parser
                             var variable = ParseDeclaration(enumerator, global: true);
                             if (TypeChecker.AddGlobalVariable(variable))
                             {
-                                Asts.Add(variable);
+                                Asts.Enqueue(variable);
                             }
                         }
                         else
@@ -240,7 +241,7 @@ public static class Parser
                             if (function?.Name != null)
                             {
                                 TypeChecker.AddFunction(function);
-                                Asts.Add(function);
+                                Asts.Enqueue(function);
                             }
                         }
                         break;
@@ -275,7 +276,7 @@ public static class Parser
                             else
                             {
                                 structAst.TypeKind = TypeKind.Struct;
-                                Asts.Add(structAst);
+                                Asts.Enqueue(structAst);
                             }
                         }
                     }
@@ -291,7 +292,7 @@ public static class Parser
                     }
                     var union = ParseUnion(enumerator);
                     TypeChecker.AddUnion(union);
-                    Asts.Add(union);
+                    Asts.Enqueue(union);
                     break;
                 case TokenType.Pound:
                     if (attributes != null)
@@ -310,10 +311,10 @@ public static class Parser
                                 TypeChecker.AddSystemLibrary(directive);
                                 break;
                             case DirectiveType.Run:
-                                RunDirectives.Add(directive);
+                                RunDirectives.Enqueue(directive);
                                 break;
                             default:
-                                Directives.Add(directive);
+                                Directives.Enqueue(directive);
                                 break;
                         }
                     }
@@ -325,7 +326,7 @@ public static class Parser
                     }
                     var overload = ParseOperatorOverload(enumerator);
                     TypeChecker.AddOverload(overload);
-                    Asts.Add(overload);
+                    Asts.Enqueue(overload);
                     break;
                 case TokenType.Interface:
                     if (attributes != null)
@@ -336,7 +337,7 @@ public static class Parser
                     if (interfaceAst?.Name != null)
                     {
                         TypeChecker.AddInterface(interfaceAst);
-                        Asts.Add(interfaceAst);
+                        Asts.Enqueue(interfaceAst);
                     }
                     break;
                 default:

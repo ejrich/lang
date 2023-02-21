@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -126,7 +127,7 @@ public static unsafe class Messages
         public const int Size = 80;
     }
 
-    private static readonly SafeLinkedList<CompilerMessage> MessageQueue = new();
+    private static readonly ConcurrentQueue<CompilerMessage> MessageQueue = new();
     private static readonly Semaphore MessageWaitMutex = new(0, int.MaxValue);
     private static readonly Semaphore MessageReceiveMutex = new(0, 1);
 
@@ -332,7 +333,7 @@ public static unsafe class Messages
 
         message.WaitForNext = Intercepting && ThreadPool.RunThreadId != Environment.CurrentManagedThreadId;
 
-        MessageQueue.Add(message);
+        MessageQueue.Enqueue(message);
         MessageWaitMutex.Release();
 
         if (message.WaitForNext)
@@ -363,15 +364,13 @@ public static unsafe class Messages
 
         MessageWaitMutex.WaitOne();
 
-        var head = MessageQueue.RemoveHead();
-        if (head == null)
+        if (!MessageQueue.TryDequeue(out var message))
         {
             return false;
         }
 
-        var message = stackalloc [] {head.Data};
-        Buffer.MemoryCopy(message, messagePointer.ToPointer(), CompilerMessage.PublicSize, CompilerMessage.PublicSize);
-        _waitingForNext = (*message).WaitForNext;
+        Buffer.MemoryCopy(&message, messagePointer.ToPointer(), CompilerMessage.PublicSize, CompilerMessage.PublicSize);
+        _waitingForNext = message.WaitForNext;
 
         return true;
     }
