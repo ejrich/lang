@@ -57,10 +57,9 @@ public enum FunctionFlags
     ReturnVoidAtEnd = 0x200,
     ReturnTypeHasGenerics = 0x400,
     PrintIR = 0x800,
-    ExternInitted = 0x1000,
-    Queued = 0x2000,
-    PassCallLocation = 0x4000,
-    Inline = 0x8000
+    Queued = 0x1000,
+    PassCallLocation = 0x2000,
+    Inline = 0x4000
 }
 
 public interface IValues : IAst
@@ -142,7 +141,6 @@ public class FunctionAst : IFunction, IType
     public TypeDefinition ReturnTypeDefinition { get; set; }
     public List<string> Generics { get; } = new();
     public List<DeclarationAst> Arguments { get; } = new();
-    public List<Type[]> VarargsCallTypes { get; set; }
     public ScopeAst Body { get; set; }
     public List<string> Attributes { get; set; }
     public IntPtr MessagePointer { get; set; }
@@ -408,7 +406,6 @@ public class CallAst : IAst
     public string Name { get; set; }
     public FunctionAst Function { get; set; }
     public IInterface Interface { get; set; }
-    public int ExternIndex { get; set; }
     public List<TypeDefinition> Generics { get; set; }
     public Dictionary<string, IAst> SpecifiedArguments { get; set; }
     public List<IAst> Arguments { get; } = new();

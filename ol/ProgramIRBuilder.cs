@@ -2435,19 +2435,17 @@ public static class ProgramIRBuilder
                 function.Constants = constants;
                 return null;
             }
-            else
-            {
-                var returnAllocation = AddAllocation(function, callFunction.ReturnType);
-                EmitScopeInline(function, callFunction.Body, callFunction.ReturnType, returnAllocation, returnBlock, null, null);
-                AddBasicBlock(function, returnBlock);
 
-                function.PointerOffset = pointerOffset;
-                function.Constants = constants;
-                return EmitLoad(function, callFunction.ReturnType, returnAllocation, callFunction.Body);
-            }
+            var returnAllocation = AddAllocation(function, callFunction.ReturnType);
+            EmitScopeInline(function, callFunction.Body, callFunction.ReturnType, returnAllocation, returnBlock, null, null);
+            AddBasicBlock(function, returnBlock);
+
+            function.PointerOffset = pointerOffset;
+            function.Constants = constants;
+            return EmitLoad(function, callFunction.ReturnType, returnAllocation, callFunction.Body);
         }
 
-        return EmitCall(function, callFunction, arguments, scope, call.ExternIndex);
+        return EmitCall(function, callFunction, arguments, scope);
     }
 
     private static InstructionValue GetAnyValue(FunctionIR function, InstructionValue argument, IScope scope)
@@ -3094,11 +3092,11 @@ public static class ProgramIRBuilder
         return AddInstruction(function, instruction, fieldType);
     }
 
-    private static InstructionValue EmitCall(FunctionIR function, IFunction callingFunction, InstructionValue[] arguments, IScope scope, int callIndex = 0)
+    private static InstructionValue EmitCall(FunctionIR function, IFunction callingFunction, InstructionValue[] arguments, IScope scope)
     {
         var callInstruction = new Instruction
         {
-            Type = InstructionType.Call, Scope = scope, Index = callingFunction.FunctionIndex, Int = callIndex,
+            Type = InstructionType.Call, Scope = scope, Index = callingFunction.FunctionIndex,
             String = callingFunction.Name, Value1 = new InstructionValue {ValueType = InstructionValueType.CallArguments, Values = arguments}
         };
         return AddInstruction(function, callInstruction, callingFunction.ReturnType);

@@ -29,18 +29,15 @@ public struct Register
 
 public static unsafe class ProgramRunner
 {
-    private static ModuleBuilder _moduleBuilder;
-    private static TypeBuilder _functionTypeBuilder;
-    private static int _version;
-    private static ConstructorInfo _dllImportConstructor;
-    private static readonly Dictionary<string, CustomAttributeBuilder> _libraries = new();
-    private static readonly Dictionary<string, List<MethodInfo>> _externFunctions = new();
-    private static readonly Dictionary<string, Type> _functionPointerDelegateTypes = new();
+    private static readonly ModuleBuilder ModuleBuilder;
+
+    private static readonly Dictionary<string, IntPtr> LibraryPointers = new();
+    private static readonly Dictionary<string, Dictionary<string, IntPtr>> LibraryFunctionPointers = new();
+    private static readonly List<IntPtr> Globals = new();
 
     private static int _typeCount;
     private static int _typeTableIndex;
     private static IntPtr _typeTablePointer;
-    private static List<IntPtr> _globals = new();
 
     private static int _assemblyDataLength;
     private static IntPtr _assemblyDataPointer;
@@ -49,106 +46,7 @@ public static unsafe class ProgramRunner
     {
         var assemblyName = new AssemblyName("Runner");
         var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
-        _moduleBuilder = assemblyBuilder.DefineDynamicModule("Runner");
-    }
-
-    public static void InitExternFunction(FunctionAst function)
-    {
-        var argumentTypes = new Type[function.Arguments.Count];
-
-        for (var i = 0; i < argumentTypes.Length; i++)
-        {
-            var argument = function.Arguments[i];
-            argumentTypes[i] = GetType(argument.Type);
-        }
-
-        CreateFunction(function, argumentTypes, GetType(function.ReturnType));
-    }
-
-    public static void InitVarargsFunction(FunctionAst function, Type[] types)
-    {
-        CreateFunction(function, types, GetType(function.ReturnType));
-    }
-
-    public static Type GetType(IType type)
-    {
-        switch (type?.TypeKind)
-        {
-            case TypeKind.Void:
-                return typeof(void);
-            case TypeKind.Boolean:
-                return typeof(bool);
-            case TypeKind.Integer:
-            case TypeKind.Enum:
-            case TypeKind.Type:
-                switch (type.Size)
-                {
-                    case 1:
-                        return typeof(byte);
-                    case 2:
-                        return typeof(ushort);
-                    case 8:
-                        return typeof(ulong);
-                    default:
-                        return typeof(uint);
-                }
-            case TypeKind.Float:
-                if (type.Size == 4)
-                {
-                    return typeof(float);
-                }
-                else
-                {
-                    return typeof(double);
-                }
-            default:
-                return typeof(IntPtr);
-        }
-    }
-
-    private static void CreateFunction(FunctionAst function, Type[] argumentTypes, Type returnType)
-    {
-        _functionTypeBuilder ??= _moduleBuilder.DefineType($"Functions{_version}", TypeAttributes.Class | TypeAttributes.Public);
-
-        var method = _functionTypeBuilder.DefineMethod(function.Name, MethodAttributes.Public | MethodAttributes.Static, returnType, argumentTypes);
-
-        var library = function.Library == null ? function.ExternLib : function.Library.FileName == null ?
-        #if _LINUX
-            $"{function.Library.AbsolutePath}.so" :
-        #elif _WINDOWS
-            $"{function.Library.AbsolutePath}.dll" :
-        #endif
-            function.Library.FileName;
-
-        if (!_libraries.TryGetValue(library, out var libraryDllImport))
-        {
-            _dllImportConstructor ??= typeof(DllImportAttribute).GetConstructor(new []{typeof(string)});
-            libraryDllImport = _libraries[library] = new CustomAttributeBuilder(_dllImportConstructor, new []{library});
-        }
-
-        method.SetCustomAttribute(libraryDllImport);
-    }
-
-    private static void CreateFunctionDelegatesForExternCalls()
-    {
-        if (_functionTypeBuilder != null)
-        {
-            var library = _functionTypeBuilder.CreateType();
-            _functionTypeBuilder = null;
-
-            foreach (var function in library.GetMethods(BindingFlags.Public | BindingFlags.Static))
-            {
-                if (!_externFunctions.TryGetValue(function.Name, out var functions))
-                {
-                    _externFunctions[function.Name] = new List<MethodInfo> {function};
-                }
-                else
-                {
-                    functions.Add(function);
-                }
-            }
-            _version++;
-        }
+        ModuleBuilder = assemblyBuilder.DefineDynamicModule("Runner");
     }
 
     private static void UpdateTypeTable()
@@ -177,8 +75,8 @@ public static unsafe class ProgramRunner
     public static void AddGlobalVariable(GlobalVariable variable)
     {
         var pointer = Allocator.Allocate(variable.Size);
-        var index = _globals.Count;
-        _globals.Add(pointer);
+        var index = Globals.Count;
+        Globals.Add(pointer);
 
         if (_typeTablePointer == IntPtr.Zero && variable.Name == "__type_table")
         {
@@ -196,7 +94,7 @@ public static unsafe class ProgramRunner
         switch (value.ValueType)
         {
             case InstructionValueType.Value:
-                var globalPointer = _globals[value.ValueIndex];
+                var globalPointer = Globals[value.ValueIndex];
                 Marshal.StructureToPtr(globalPointer, pointer, false);
                 break;
             case InstructionValueType.Constant:
@@ -486,6 +384,9 @@ public static unsafe class ProgramRunner
 
         var instructionPointer = 0;
         Span<Register> registers = stackalloc Register[function.ValueCount];
+        #if _LINUX
+        Span<long> syscallArgs = stackalloc long[6];
+        #endif
 
         var (stackPointer, stackCursor, stackBlock) = Allocator.StackAllocate((int)function.StackSize);
         var additionalBlocks = new List<(MemoryBlock block, int cursor)>();
@@ -693,25 +594,20 @@ public static unsafe class ProgramRunner
                     var functionPointer = GetValue(instruction.Value1, registers, stackPointer, function, arguments);
 
                     var interfaceAst = (InterfaceAst)instruction.Value1.Type;
-                    var delegateType = CreateDelegateType(interfaceAst);
-                    var functionDelegate = Marshal.GetDelegateForFunctionPointer(functionPointer.Pointer, delegateType);
-
-                    var args = GetExternArguments(instruction.Value2.Values, registers, stackPointer, function, arguments);
-                    var returnValue = functionDelegate.DynamicInvoke(args);
-                    registers[instruction.ValueIndex] = ConvertToRegister(returnValue);
+                    registers[instruction.ValueIndex] = MakeCallToFunctionPointer(functionPointer.Pointer, interfaceAst.ReturnType, instruction.Value2.Values, registers, stackPointer, function, arguments);
                     break;
                 }
                 #if _LINUX
                 case InstructionType.SystemCall:
                 {
-                    Span<long> args = stackalloc long[6];
+                    syscallArgs.Fill(0);
                     for (var i = 0; i < instruction.Value1.Values.Length; i++)
                     {
                         var value = GetValue(instruction.Value1.Values[i], registers, stackPointer, function, arguments);
-                        args[i] = value.Long;
+                        syscallArgs[i] = value.Long;
                     }
 
-                    var returnValue = syscall(instruction.Index, args[0], args[1], args[2], args[3], args[4], args[5]);
+                    var returnValue = syscall(instruction.Index, syscallArgs[0], syscallArgs[1], syscallArgs[2], syscallArgs[3], syscallArgs[4], syscallArgs[5]);
                     registers[instruction.ValueIndex] = new Register {Long = returnValue};
                     break;
                 }
@@ -844,7 +740,7 @@ public static unsafe class ProgramRunner
 
                     Marshal.Copy(assemblyBytes, 0, _assemblyDataPointer, assemblyBytes.Length);
 
-                    var inlineAssembly = Marshal.GetDelegateForFunctionPointer<InlineAssembly>(_assemblyDataPointer);
+                    var inlineAssembly = Marshal.GetDelegateForFunctionPointer<VoidMethod>(_assemblyDataPointer);
                     inlineAssembly();
                     break;
                 }
@@ -1652,7 +1548,7 @@ public static unsafe class ProgramRunner
                     {
                         UpdateTypeTable();
                     }
-                    var globalPointer = _globals[value.ValueIndex];
+                    var globalPointer = Globals[value.ValueIndex];
                     return new Register {Pointer = globalPointer};
                 }
                 var allocation = function.Allocations[value.ValueIndex];
@@ -1713,12 +1609,9 @@ public static unsafe class ProgramRunner
     {
         if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Extern))
         {
-            CreateFunctionDelegatesForExternCalls();
-            var args = GetExternArguments(arguments, registers, stackPointer, function, functionArgs);
-
-            var functionDecl = _externFunctions[callingFunction.Source.Name][externIndex];
-            var returnValue = functionDecl.Invoke(null, args);
-            return ConvertToRegister(returnValue);
+            var functionAst = (FunctionAst)callingFunction.Source;
+            var functionPointer = GetExternFunctionPointer(functionAst);
+            return MakeCallToFunctionPointer(functionPointer, functionAst.ReturnType, arguments, registers, stackPointer, function, functionArgs);
         }
 
         if (callingFunction.Source.Flags.HasFlag(FunctionFlags.Compiler))
@@ -1857,6 +1750,151 @@ public static unsafe class ProgramRunner
             return ExecuteFunction(callingFunction, args);
         }
     }
+
+    private static Register MakeCallToFunctionPointer(IntPtr functionPointer, IType returnedType, InstructionValue[] arguments, ReadOnlySpan<Register> registers, IntPtr stackPointer, FunctionIR function, ReadOnlySpan<Register> functionArgs)
+    {
+        var returnType = GetType(returnedType);
+        var dynamicMethod = new DynamicMethod("FunctionPtrCall", returnType, Array.Empty<Type>());
+        var ilGenerator = dynamicMethod.GetILGenerator();
+
+        var argumentTypes = new Type[arguments.Length];
+        for (var i = 0; i < arguments.Length; i++)
+        {
+            var argument = arguments[i];
+            var value = GetValue(argument, registers, stackPointer, function, functionArgs);
+
+            switch (argument.Type.TypeKind)
+            {
+                case TypeKind.Boolean:
+                    argumentTypes[i] = typeof(bool);
+                    ilGenerator.Emit(value.Bool ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0);
+                    break;
+                case TypeKind.Integer:
+                case TypeKind.Enum:
+                case TypeKind.Type:
+                    switch (argument.Type.Size)
+                    {
+                        case 1:
+                            argumentTypes[i] = typeof(byte);
+                            ilGenerator.Emit(OpCodes.Ldc_I4, value.Byte);
+                            break;
+                        case 2:
+                            argumentTypes[i] = typeof(ushort);
+                            ilGenerator.Emit(OpCodes.Ldc_I4, value.Short);
+                            break;
+                        case 8:
+                            argumentTypes[i] = typeof(ulong);
+                            ilGenerator.Emit(OpCodes.Ldc_I8, value.Long);
+                            break;
+                        default:
+                            argumentTypes[i] = typeof(uint);
+                            ilGenerator.Emit(OpCodes.Ldc_I4, value.Integer);
+                            break;
+                    }
+                    break;
+                case TypeKind.Float:
+                    if (argument.Type.Size == 4)
+                    {
+                        argumentTypes[i] = typeof(float);
+                        ilGenerator.Emit(OpCodes.Ldc_R4, value.Float);
+                    }
+                    else
+                    {
+                        argumentTypes[i] = typeof(double);
+                        ilGenerator.Emit(OpCodes.Ldc_R8, value.Double);
+                    }
+                    break;
+                default:
+                    argumentTypes[i] = typeof(ulong);
+                    ilGenerator.Emit(OpCodes.Ldc_I8, value.Long);
+                    break;
+            }
+        }
+
+        ilGenerator.Emit(OpCodes.Ldc_I8, functionPointer.ToInt64());
+        ilGenerator.EmitCalli(OpCodes.Calli, CallingConvention.Cdecl, returnType, argumentTypes);
+        ilGenerator.Emit(OpCodes.Ret);
+
+        var returnRegister = new Register();
+        switch (returnedType.TypeKind)
+        {
+            case TypeKind.Void:
+            {
+                var func = dynamicMethod.CreateDelegate<VoidMethod>();
+                func();
+                break;
+            }
+            case TypeKind.Boolean:
+            {
+                var func = dynamicMethod.CreateDelegate<BoolMethod>();
+                returnRegister.Bool = func();
+                break;
+            }
+            case TypeKind.Integer:
+            case TypeKind.Enum:
+            case TypeKind.Type:
+                switch (returnedType.Size)
+                {
+                    case 1:
+                    {
+                        var func = dynamicMethod.CreateDelegate<ByteMethod>();
+                        returnRegister.Byte = func();
+                        break;
+                    }
+                    case 2:
+                    {
+                        var func = dynamicMethod.CreateDelegate<ShortMethod>();
+                        returnRegister.UShort = func();
+                        break;
+                    }
+                    case 8:
+                    {
+                        var func = dynamicMethod.CreateDelegate<LongMethod>();
+                        returnRegister.ULong = func();
+                        break;
+                    }
+                    default:
+                    {
+                        var func = dynamicMethod.CreateDelegate<IntMethod>();
+                        returnRegister.UInteger = func();
+                        break;
+                    }
+                }
+                break;
+            case TypeKind.Float:
+            {
+                if (returnedType.Size == 4)
+                {
+                    var func = dynamicMethod.CreateDelegate<FloatMethod>();
+                    returnRegister.Double = func();
+                }
+                else
+                {
+                    var func = dynamicMethod.CreateDelegate<DoubleMethod>();
+                    returnRegister.Double = func();
+                }
+                break;
+            }
+            default:
+            {
+                var func = dynamicMethod.CreateDelegate<PtrMethod>();
+                returnRegister.Pointer = func();
+                break;
+            }
+        }
+
+        return returnRegister;
+    }
+
+    private delegate void VoidMethod();
+    private delegate bool BoolMethod();
+    private delegate byte ByteMethod();
+    private delegate ushort ShortMethod();
+    private delegate uint IntMethod();
+    private delegate ulong LongMethod();
+    private delegate float FloatMethod();
+    private delegate double DoubleMethod();
+    private delegate IntPtr PtrMethod();
 
     private static void WriteAssemblyInstruction(InstructionDefinition definition, RegisterDefinition register1, RegisterDefinition register2, List<byte> code, ulong? value1 = null, ulong? value2 = null)
     {
@@ -2004,8 +2042,6 @@ public static unsafe class ProgramRunner
     private static extern bool VirtualFree(IntPtr lpAddress, long dwSize, int dwFreeType);
     #endif
 
-    private delegate void InlineAssembly();
-
     private static Register ConvertToRegister(object value)
     {
         var register = new Register();
@@ -2091,6 +2127,59 @@ public static unsafe class ProgramRunner
         return args;
     }
 
+    private static IntPtr GetExternFunctionPointer(FunctionAst function)
+    {
+        var library = function.Library == null ? function.ExternLib : function.Library.FileName == null ?
+        #if _LINUX
+            $"{function.Library.AbsolutePath}.so" :
+        #elif _WINDOWS
+            $"{function.Library.AbsolutePath}.dll" :
+        #endif
+            function.Library.FileName;
+
+        var libraryPointer = IntPtr.Zero;
+        if (!LibraryFunctionPointers.TryGetValue(library, out var functionPointers))
+        {
+            if (!LibraryPointers.TryGetValue(library, out libraryPointer))
+            {
+                if (!LoadLibrary(library, function.Library, out libraryPointer))
+                {
+                    return IntPtr.Zero;
+                }
+                LibraryPointers[library] = libraryPointer;
+            }
+            functionPointers = LibraryFunctionPointers[library] = new();
+        }
+
+        if (functionPointers.TryGetValue(function.Name, out var functionPointer))
+        {
+            return functionPointer;
+        }
+
+        if (libraryPointer == IntPtr.Zero)
+        {
+            LibraryPointers.TryGetValue(library, out libraryPointer);
+        }
+
+        if (!NativeLibrary.TryGetExport(libraryPointer, function.Name, out functionPointer))
+        {
+            return IntPtr.Zero;
+        }
+
+        functionPointers[function.Name] = functionPointer;
+        return functionPointer;
+    }
+
+    private static bool LoadLibrary(string library, Library lib, out IntPtr pointer)
+    {
+        if (lib == null || lib.FileName != null)
+        {
+             return NativeLibrary.TryLoad(library, typeof(ProgramRunner).Assembly, null, out pointer);
+        }
+
+        return NativeLibrary.TryLoad(library, out pointer);
+    }
+
     private static Register GetIntegerValue(Constant value, PrimitiveAst integerType)
     {
         var register = new Register();
@@ -2137,50 +2226,65 @@ public static unsafe class ProgramRunner
 
     private static IntPtr CreateFunctionPointer(FunctionIR function)
     {
-        if (function.FunctionPointer == IntPtr.Zero)
+        if (function.FunctionPointer != IntPtr.Zero) return function.FunctionPointer;
+
+        var argumentTypes = new Type[function.Source.Arguments.Count];
+        if (function.Source.Flags.HasFlag(FunctionFlags.Extern))
         {
-            var argumentTypes = new Type[function.Source.Arguments.Count];
-            Delegate functionDelegate;
-
-            if (function.Source.Flags.HasFlag(FunctionFlags.Extern))
+            var functionAst = (FunctionAst)function.Source;
+            function.FunctionPointer = GetExternFunctionPointer(functionAst);
+        }
+        else
+        {
+            var parameters = new ParameterExpression[argumentTypes.Length];
+            var arguments = new Expression[argumentTypes.Length];
+            for (var i = 0; i < parameters.Length; i++)
             {
-                CreateFunctionDelegatesForExternCalls();
-                var methodInfo = _externFunctions[function.Source.Name][0];
-
-                for (var i = 0; i < argumentTypes.Length; i++)
-                {
-                    var argument = function.Source.Arguments[i];
-                    argumentTypes[i] = GetType(argument.Type);
-                }
-
-                var delegateType = CreateDelegateType(function.Source.Name, argumentTypes, GetType(function.Source.ReturnType));
-                functionDelegate = methodInfo.CreateDelegate(delegateType);
-                GCHandle.Alloc(functionDelegate); // Prevent the pointer from being garbage collected
-            }
-            else
-            {
-                var parameters = new ParameterExpression[argumentTypes.Length];
-                var arguments = new Expression[argumentTypes.Length];
-                for (var i = 0; i < parameters.Length; i++)
-                {
-                    var type = argumentTypes[i] = GetType(function.Source.Arguments[i].Type);
-                    parameters[i] = Expression.Parameter(type);
-                    arguments[i] = Expression.Convert(parameters[i], typeof(object));
-                }
-
-                var functionArguments = Expression.NewArrayInit(typeof(object), arguments);
-                var call = Expression.Call(_executeFunction, Expression.Constant(function), functionArguments);
-
-                // Compile the expression to a delegate
-                var delegateType = CreateDelegateType(function.Source.Name, argumentTypes, typeof(Register));
-                functionDelegate = Expression.Lambda(delegateType, call, parameters).Compile();
-                GCHandle.Alloc(functionDelegate); // Prevent the pointer from being garbage collected
+                var type = argumentTypes[i] = GetType(function.Source.Arguments[i].Type);
+                parameters[i] = Expression.Parameter(type);
+                arguments[i] = Expression.Convert(parameters[i], typeof(object));
             }
 
+            var functionArguments = Expression.NewArrayInit(typeof(object), arguments);
+            var call = Expression.Call(_executeFunction, Expression.Constant(function), functionArguments);
+
+            // Compile the expression to a delegate
+            var delegateType = CreateDelegateType(function.Source.Name, argumentTypes, typeof(Register));
+            var functionDelegate = Expression.Lambda(delegateType, call, parameters).Compile();
+            GCHandle.Alloc(functionDelegate); // Prevent the pointer from being garbage collected
             function.FunctionPointer = Marshal.GetFunctionPointerForDelegate(functionDelegate);
         }
 
         return function.FunctionPointer;
+    }
+
+    private static Type GetType(IType type)
+    {
+        switch (type?.TypeKind)
+        {
+            case TypeKind.Void:
+                return typeof(void);
+            case TypeKind.Boolean:
+                return typeof(bool);
+            case TypeKind.Integer:
+            case TypeKind.Enum:
+            case TypeKind.Type:
+                switch (type.Size)
+                {
+                    case 1:
+                        return typeof(byte);
+                    case 2:
+                        return typeof(ushort);
+                    case 8:
+                        return typeof(ulong);
+                    default:
+                        return typeof(uint);
+                }
+            case TypeKind.Float:
+                return type.Size == 4 ? typeof(float) : typeof(double);
+            default:
+                return typeof(IntPtr);
+        }
     }
 
     private static Register ExecuteFunctionFromDelegate(FunctionIR function, object[] arguments)
@@ -2197,27 +2301,10 @@ public static unsafe class ProgramRunner
     private static MethodInfo GetMethodInfo(Delegate d) => d.Method;
     private static readonly MethodInfo _executeFunction = GetMethodInfo(ExecuteFunctionFromDelegate);
 
-    private static Type CreateDelegateType(InterfaceAst interfaceAst)
-    {
-        if (_functionPointerDelegateTypes.TryGetValue(interfaceAst.Name, out var type))
-        {
-            return type;
-        }
-
-        var argumentTypes = new Type[interfaceAst.Arguments.Count];
-        for (var i = 0; i < argumentTypes.Length; i++)
-        {
-            var argument = interfaceAst.Arguments[i];
-            argumentTypes[i] = GetType(argument.Type);
-        }
-
-        return _functionPointerDelegateTypes[interfaceAst.Name] = CreateDelegateType(interfaceAst.Name, argumentTypes, GetType(interfaceAst.ReturnType));
-    }
-
     // Borrowed from https://source.dot.net/#System.Linq.Expressions/System/Linq/Expressions/Compiler/DelegateHelpers.cs,117 so I don't have to load the function with reflection
     private static Type CreateDelegateType(string name, Type[] argumentTypes, Type returnType)
     {
-        var builder = _moduleBuilder.DefineType(name, DelegateTypeAttributes, typeof(MulticastDelegate));
+        var builder = ModuleBuilder.DefineType(name, DelegateTypeAttributes, typeof(MulticastDelegate));
 
         builder.DefineConstructor(CtorAttributes, CallingConventions.Standard, DelegateCtorSignature).SetImplementationFlags(ImplAttributes);
         builder.DefineMethod("Invoke", InvokeAttributes, returnType, argumentTypes).SetImplementationFlags(ImplAttributes);

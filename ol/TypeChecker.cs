@@ -1137,7 +1137,6 @@ public static class TypeChecker
                     ErrorReporter.Report($"Function '{function.Name}' cannot have multiple varargs", argument.TypeDefinition);
                 }
                 function.Flags |= FunctionFlags.Varargs;
-                function.VarargsCallTypes = new List<Type[]>();
             }
             else if (isParams)
             {
@@ -3578,12 +3577,6 @@ public static class TypeChecker
             {
                 VerifyFunctionDefinition(function);
             }
-
-            if (!function.Flags.HasFlag(FunctionFlags.Varargs) && !function.Flags.HasFlag(FunctionFlags.ExternInitted) && (function.ExternLib != null || function.Library != null))
-            {
-                function.Flags |= FunctionFlags.ExternInitted;
-                ProgramRunner.InitExternFunction(function);
-            }
         }
         else if (!function.Flags.HasFlag(FunctionFlags.Verified) && function != currentFunction && !function.Flags.HasFlag(FunctionFlags.Queued))
         {
@@ -4221,55 +4214,6 @@ public static class TypeChecker
                             }
                         }
                     }
-                }
-            }
-            else if (functionAst.Flags.HasFlag(FunctionFlags.Varargs))
-            {
-                var types = new Type[argumentTypes.Length];
-                for (var i = 0; i < argumentTypes.Length; i++)
-                {
-                    var argumentType = argumentTypes[i];
-                    // In the C99 standard, calls to variadic functions with floating point arguments are extended to doubles
-                    // Page 69 of http://www.open-std.org/jtc1/sc22/wg14/www/docs/n1256.pdf
-                    if (argumentType.TypeKind == TypeKind.Float && argumentType.Size == 4)
-                    {
-                        types[i] = typeof(double);
-                    }
-                    else
-                    {
-                        types[i] = ProgramRunner.GetType(argumentType);
-                    }
-                }
-                var found = false;
-                for (var index = 0; index < functionAst.VarargsCallTypes.Count; index++)
-                {
-                    var callTypes = functionAst.VarargsCallTypes[index];
-                    if (callTypes.Length == argumentTypes.Length)
-                    {
-                        var callMatches = true;
-                        for (var i = 0; i < callTypes.Length; i++)
-                        {
-                            if (callTypes[i] != types[i])
-                            {
-                                callMatches = false;
-                                break;
-                            }
-                        }
-
-                        if (callMatches)
-                        {
-                            found = true;
-                            call.ExternIndex = index;
-                            break;
-                        }
-                    }
-                }
-
-                if (!found)
-                {
-                    call.ExternIndex = functionAst.VarargsCallTypes.Count;
-                    ProgramRunner.InitVarargsFunction(functionAst, types);
-                    functionAst.VarargsCallTypes.Add(types);
                 }
             }
         }
