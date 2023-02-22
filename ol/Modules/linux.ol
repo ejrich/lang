@@ -45,7 +45,7 @@ int clock_gettime(ClockId clk_id, Timespec* tp) #syscall 228
 exit_group(int status) #syscall 231
 int getcpu(u32* cpu, u32* node) #syscall 309
 s64 getrandom(void* buf, u64 buflen, RandomFlags flags) #syscall 318
-// TODO Add additional syscalls when necessary
+// @Future Add additional syscalls when necessary
 
 stdin  := 0; #const
 stdout := 1; #const
