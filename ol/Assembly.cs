@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
 namespace ol;
 
@@ -116,7 +116,6 @@ public static class Assembly
         {"fyl2x",  new InstructionDefinition[]{ new() {Opcode = 0xD9, Opcode2 = 0xF1} }},
         {"lock",   new InstructionDefinition[]{ new() {Opcode = 0xF0} }},
         {"mov",    new InstructionDefinition[]{
-            // TODO Better implement REX translation
             new() {Rex = 0x48, Opcode = 0xB8, AddRegisterToOpcode = true, RMFirst = true, Value1 = new(), Value2 = new(constant: true)},
             new() {Rex = 0x48, Opcode = 0x89, RMFirst = true, Value1 = new(true), Value2 = new()}
         }},
