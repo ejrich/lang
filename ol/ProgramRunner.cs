@@ -869,7 +869,7 @@ public static unsafe class ProgramRunner
                                 2 => (byte)value.Short,
                                 4 => (byte)value.Integer,
                                 8 => (byte)value.Long,
-                                _ => (byte)value.Integer,
+                                _ => (byte)value.Integer
                             };
                             break;
                         case 2:
@@ -879,7 +879,7 @@ public static unsafe class ProgramRunner
                                 2 => (ushort)value.Short,
                                 4 => (ushort)value.Integer,
                                 8 => (ushort)value.Long,
-                                _ => (ushort)value.Integer,
+                                _ => (ushort)value.Integer
                             };
                             break;
                         case 4:
@@ -888,7 +888,7 @@ public static unsafe class ProgramRunner
                                 1 => (uint)value.SByte,
                                 2 => (uint)value.Short,
                                 8 => (uint)value.Long,
-                                _ => (uint)value.Integer,
+                                _ => (uint)value.Integer
                             };
                             break;
                         case 8:
@@ -898,7 +898,7 @@ public static unsafe class ProgramRunner
                                 2 => (ulong)value.Short,
                                 4 => (ulong)value.Integer,
                                 8 => (ulong)value.Long,
-                                _ => (ulong)value.Integer,
+                                _ => (ulong)value.Integer
                             };
                             break;
                         default:
@@ -907,7 +907,7 @@ public static unsafe class ProgramRunner
                                 1 => (uint)value.SByte,
                                 2 => (uint)value.Short,
                                 8 => (uint)value.Long,
-                                _ => (uint)value.Integer,
+                                _ => (uint)value.Integer
                             };
                             break;
                     }
@@ -2075,56 +2075,6 @@ public static unsafe class ProgramRunner
                 break;
         }
         return register;
-    }
-
-    private static object[] GetExternArguments(InstructionValue[] arguments, ReadOnlySpan<Register> registers, IntPtr stackPointer, FunctionIR function, ReadOnlySpan<Register> functionArgs)
-    {
-        var args = new object[arguments.Length];
-        for (var i = 0; i < args.Length; i++)
-        {
-            var argument = arguments[i];
-            var value = GetValue(argument, registers, stackPointer, function, functionArgs);
-
-            switch (argument.Type.TypeKind)
-            {
-                case TypeKind.Boolean:
-                    args[i] = value.Bool;
-                    break;
-                case TypeKind.Integer:
-                case TypeKind.Enum:
-                    switch (argument.Type.Size)
-                    {
-                        case 1:
-                            args[i] = value.Byte;
-                            break;
-                        case 2:
-                            args[i] = value.UShort;
-                            break;
-                        case 8:
-                            args[i] = value.ULong;
-                            break;
-                        default:
-                            args[i] = value.UInteger;
-                            break;
-                    }
-                    break;
-                case TypeKind.Float:
-                    if (argument.Type.Size == 4)
-                    {
-                        args[i] = value.Float;
-                    }
-                    else
-                    {
-                        args[i] = value.Double;
-                    }
-                    break;
-                default:
-                    args[i] = value.Pointer;
-                    break;
-            }
-        }
-
-        return args;
     }
 
     private static IntPtr GetExternFunctionPointer(FunctionAst function)

@@ -294,12 +294,12 @@ public static class TypeChecker
         return privateScope == null ? GlobalScope : privateScope;
     }
 
-    public static bool AddType(string name, IType type)
+    private static void AddType(string name, IType type)
     {
-        return AddType(name, type, type.FileIndex);
+        AddType(name, type, type.FileIndex);
     }
 
-    public static bool AddType(string name, IType type, int fileIndex)
+    private static void AddType(string name, IType type, int fileIndex)
     {
         if (type.Private)
         {
@@ -307,26 +307,23 @@ public static class TypeChecker
 
             if (privateScope.Types.ContainsKey(name) || GlobalScope.Types.ContainsKey(name))
             {
-                return false;
+                return;
             }
-            else
-            {
-                privateScope.Types[name] = type;
-            }
+
+            privateScope.Types[name] = type;
         }
         else
         {
             if (!GlobalScope.Types.TryAdd(name, type))
             {
-                return false;
+                return;
             }
         }
 
         TypeTable.Add(type);
-        return true;
     }
 
-    public static bool AddTypeAndIdentifier(string name, IType type, IAst ast)
+    private static bool AddTypeAndIdentifier(string name, IType type, IAst ast)
     {
         if (type.Private)
         {
@@ -337,11 +334,9 @@ public static class TypeChecker
                 ErrorReporter.Report($"Multiple definitions of type '{type.Name}'", ast);
                 return false;
             }
-            else
-            {
-                privateScope.Types[name] = type;
-                privateScope.Identifiers[name] = ast;
-            }
+
+            privateScope.Types[name] = type;
+            privateScope.Identifiers[name] = ast;
         }
         else
         {
@@ -350,10 +345,8 @@ public static class TypeChecker
                 ErrorReporter.Report($"Multiple definitions of type '{type.Name}'", ast);
                 return false;
             }
-            else
-            {
-                GlobalScope.Identifiers[name] = ast;
-            }
+
+            GlobalScope.Identifiers[name] = ast;
         }
 
         TypeTable.Add(type);
@@ -574,10 +567,8 @@ public static class TypeChecker
                 ErrorReporter.Report($"Multiple definitions of polymorphic struct '{structAst.Name}'", structAst);
                 return false;
             }
-            else
-            {
-                privateScope.PolymorphicStructs[structAst.Name] = structAst;
-            }
+
+            privateScope.PolymorphicStructs[structAst.Name] = structAst;
         }
         else
         {
@@ -608,10 +599,8 @@ public static class TypeChecker
                 ErrorReporter.Report($"Identifier '{variable.Name}' already defined", variable);
                 return false;
             }
-            else
-            {
-                privateScope.Identifiers[variable.Name] = variable;
-            }
+
+            privateScope.Identifiers[variable.Name] = variable;
         }
         else
         {
@@ -900,7 +889,7 @@ public static class TypeChecker
             {
                 if (structField.Value != null)
                 {
-                    if (structField.Value is NullAst nullAst)
+                    if (structField.Value is NullAst)
                     {
                         ErrorReporter.Report("Cannot assign null value without declaring a type", structField.Value);
                     }
@@ -1026,7 +1015,7 @@ public static class TypeChecker
                     // Verify the count is a constant
                     var countType = VerifyExpression(field.TypeDefinition.Count, null, scope, out var isConstant, out uint arrayLength);
 
-                    if (countType?.TypeKind != TypeKind.Integer || !isConstant || arrayLength < 0)
+                    if (countType?.TypeKind != TypeKind.Integer || !isConstant)
                     {
                         ErrorReporter.Report($"Expected size of '{union.Name}.{field.Name}' to be a constant, positive integer", field.TypeDefinition.Count);
                     }
@@ -1186,7 +1175,7 @@ public static class TypeChecker
                 }
                 else if (argument.Value is NullAst nullAst && argument.Type != null)
                 {
-                    if (argument.Type.TypeKind == TypeKind.Pointer || argument.Type.TypeKind == TypeKind.Interface)
+                    if (argument.Type.TypeKind is TypeKind.Pointer or TypeKind.Interface)
                     {
                         nullAst.TargetType = argument.Type;
                     }
@@ -1942,7 +1931,7 @@ public static class TypeChecker
                         else
                         {
                             var valueType = VerifyExpression(compoundExpression.Children[i], currentFunction, scope);
-                            if (!TypeEquals(type, type))
+                            if (!TypeEquals(type, valueType))
                             {
                                 error = true;
                                 break;
@@ -2362,7 +2351,7 @@ public static class TypeChecker
 
             if (countType != null)
             {
-                if (countType.TypeKind != TypeKind.Integer || arrayLength < 0)
+                if (countType.TypeKind != TypeKind.Integer)
                 {
                     ErrorReporter.Report($"Expected count of variable '{declaration.Name}' to be a positive integer", declaration.TypeDefinition.Count);
                 }
@@ -2379,8 +2368,8 @@ public static class TypeChecker
             declaration.ConstantIndex = currentFunction.ConstantCount++;
             switch (declaration.Value)
             {
-                case ConstantAst constant:
-                case StructFieldRefAst structField when structField.IsEnum:
+                case ConstantAst:
+                case StructFieldRefAst { IsEnum: true }:
                     break;
                 default:
                     ErrorReporter.Report($"Constant variable '{declaration.Name}' should be assigned a constant value", declaration);
@@ -2410,7 +2399,7 @@ public static class TypeChecker
             declaration.Type = VerifyType(declaration.TypeDefinition, scope, out _, out var isVarargs, out var isParams, initialArrayLength: declaration.ArrayValues?.Count);
             if (isVarargs || isParams)
             {
-                ErrorReporter.Report($"Variable type cannot be varargs or Params", declaration.TypeDefinition);
+                ErrorReporter.Report("Variable type cannot be varargs or Params", declaration.TypeDefinition);
             }
             else if (declaration.Type == null)
             {
@@ -2549,7 +2538,7 @@ public static class TypeChecker
 
             if (countType != null)
             {
-                if (countType.TypeKind != TypeKind.Integer || arrayLength < 0)
+                if (countType.TypeKind != TypeKind.Integer)
                 {
                     ErrorReporter.Report($"Expected count of variables '{string.Join(", ", declaration.Variables.Select(v => v.Name))}' to be a positive integer", declaration.TypeDefinition.Count);
                 }
@@ -2601,7 +2590,8 @@ public static class TypeChecker
                 ErrorReporter.Report("Unable to assign fields for to a compound reference", assignment);
                 return;
             }
-            else if (assignment.ArrayValues != null)
+
+            if (assignment.ArrayValues != null)
             {
                 ErrorReporter.Report("Unable to assign array values to a compound reference", assignment);
                 return;
@@ -2673,9 +2663,8 @@ public static class TypeChecker
                 }
                 else
                 {
-                    for (var i = 0; i < referenceTypes.Length; i++)
+                    foreach (var referenceType in referenceTypes)
                     {
-                        var referenceType = referenceTypes[i];
                         if (referenceType != null)
                         {
                             if (!TypeEquals(referenceType, valueType, true))
@@ -3030,7 +3019,7 @@ public static class TypeChecker
 
                 return refType;
             }
-            case UnaryAst unary when unary.Operator == UnaryOperator.Dereference:
+            case UnaryAst { Operator: UnaryOperator.Dereference } unary:
             {
                 if (fromUnaryReference)
                 {
@@ -3241,13 +3230,10 @@ public static class TypeChecker
                 ErrorReporter.Report($"Struct '{structType.Name}' does not contain field '{fieldName}'", ast);
                 return null;
             }
-            if (call)
+            if (call && field.Type is not InterfaceAst)
             {
-                if (field.Type is not InterfaceAst)
-                {
-                    ErrorReporter.Report($"Expected field to be an interface, but get '{field.Type.Name}'", ast);
-                    return null;
-                }
+                ErrorReporter.Report($"Expected field to be an interface, but get '{field.Type.Name}'", ast);
+                return null;
             }
 
             return field.Type;
@@ -3402,35 +3388,29 @@ public static class TypeChecker
             }
 
             var valid = true;
-            if (instruction.Value1 != null)
+            if (instruction.Value1?.Register != null)
             {
-                if (instruction.Value1.Register != null)
+                if (Assembly.Registers.TryGetValue(instruction.Value1.Register, out var register))
                 {
-                    if (Assembly.Registers.TryGetValue(instruction.Value1.Register, out var register))
-                    {
-                        instruction.Value1.RegisterDefinition = register;
-                    }
-                    else
-                    {
-                        valid = false;
-                        ErrorReporter.Report($"Unknown register '{instruction.Value1.Register}'", instruction.Value1);
-                    }
+                    instruction.Value1.RegisterDefinition = register;
+                }
+                else
+                {
+                    valid = false;
+                    ErrorReporter.Report($"Unknown register '{instruction.Value1.Register}'", instruction.Value1);
                 }
             }
 
-            if (instruction.Value2 != null)
+            if (instruction.Value2?.Register != null)
             {
-                if (instruction.Value2.Register != null)
+                if (Assembly.Registers.TryGetValue(instruction.Value2.Register, out var register))
                 {
-                    if (Assembly.Registers.TryGetValue(instruction.Value2.Register, out var register))
-                    {
-                        instruction.Value2.RegisterDefinition = register;
-                    }
-                    else
-                    {
-                        valid = false;
-                        ErrorReporter.Report($"Unknown register '{instruction.Value2.Register}'", instruction.Value2);
-                    }
+                    instruction.Value2.RegisterDefinition = register;
+                }
+                else
+                {
+                    valid = false;
+                    ErrorReporter.Report($"Unknown register '{instruction.Value2.Register}'", instruction.Value2);
                 }
             }
 
@@ -3508,7 +3488,8 @@ public static class TypeChecker
         {
             return value.Constant != null;
         }
-        else if (value.Constant != null)
+
+        if (value.Constant != null)
         {
             return false;
         }
@@ -3545,7 +3526,7 @@ public static class TypeChecker
                 {
                     if (!TypeEquals(valueType, caseType))
                     {
-                        ErrorReporter.Report($"Expeceted case value to be type '{valueType.Name}', but got '{caseType.Name}'", switchCase);
+                        ErrorReporter.Report($"Expected case value to be type '{valueType.Name}', but got '{caseType.Name}'", switchCase);
                     }
                     else if (!constant)
                     {
@@ -3738,6 +3719,7 @@ public static class TypeChecker
                         return null;
                 }
             case UnaryAst unary:
+            {
                 if (unary.Operator == UnaryOperator.Reference)
                 {
                     var referenceType = GetReference(unary.Value, currentFunction, scope, out var hasPointer, true);
@@ -3773,51 +3755,44 @@ public static class TypeChecker
                     }
                     return unary.Type;
                 }
-                else
+
+                var valueType = VerifyExpression(unary.Value, currentFunction, scope);
+                if (valueType == null)
                 {
-                    var valueType = VerifyExpression(unary.Value, currentFunction, scope);
-                    if (valueType == null)
-                    {
-                        return null;
-                    }
-                    switch (unary.Operator)
-                    {
-                        case UnaryOperator.Not:
-                            if (valueType.TypeKind == TypeKind.Boolean)
-                            {
-                                return valueType;
-                            }
-                            else if (valueType != null)
-                            {
-                                ErrorReporter.Report($"Expected type 'bool', but got type '{valueType.Name}'", unary.Value);
-                            }
-                            return null;
-                        case UnaryOperator.Negate:
-                            if (valueType.TypeKind == TypeKind.Integer || valueType.TypeKind == TypeKind.Float)
-                            {
-                                return valueType;
-                            }
-                            else if (valueType != null)
-                            {
-                                ErrorReporter.Report($"Negation not compatible with type '{valueType.Name}'", unary.Value);
-                            }
-                            return null;
-                        case UnaryOperator.Dereference:
-                            if (valueType.TypeKind == TypeKind.Pointer)
-                            {
-                                var pointerType = (PointerType)valueType;
-                                return unary.Type = pointerType.PointedType;
-                            }
-                            else if (valueType != null)
-                            {
-                                ErrorReporter.Report($"Cannot dereference type '{valueType.Name}'", unary.Value);
-                            }
-                            return null;
-                        default:
-                            ErrorReporter.Report($"Unexpected unary operator '{unary.Operator}'", unary.Value);
-                            return null;
-                    }
+                    return null;
                 }
+                switch (unary.Operator)
+                {
+                    case UnaryOperator.Not:
+                        if (valueType.TypeKind == TypeKind.Boolean)
+                        {
+                            return valueType;
+                        }
+
+                        ErrorReporter.Report($"Expected type 'bool', but got type '{valueType.Name}'", unary.Value);
+                        return null;
+                    case UnaryOperator.Negate:
+                        if (valueType.TypeKind == TypeKind.Integer || valueType.TypeKind == TypeKind.Float)
+                        {
+                            return valueType;
+                        }
+
+                        ErrorReporter.Report($"Negation not compatible with type '{valueType.Name}'", unary.Value);
+                        return null;
+                    case UnaryOperator.Dereference:
+                        if (valueType.TypeKind == TypeKind.Pointer)
+                        {
+                            var pointerType = (PointerType)valueType;
+                            return unary.Type = pointerType.PointedType;
+                        }
+
+                        ErrorReporter.Report($"Cannot dereference type '{valueType.Name}'", unary.Value);
+                        return null;
+                    default:
+                        ErrorReporter.Report($"Unexpected unary operator '{unary.Operator}'", unary.Value);
+                        return null;
+                }
+            }
             case CallAst call:
                 return VerifyCall(call, currentFunction, scope);
             case ExpressionAst expression:
@@ -3991,14 +3966,7 @@ public static class TypeChecker
                     if (constant.Type.TypeKind == TypeKind.Integer)
                     {
                         var currentInt = (PrimitiveAst)constant.Type;
-                        if (currentInt.Signed)
-                        {
-                            constant.Value = new Constant {Double = (double)constant.Value.Integer};
-                        }
-                        else
-                        {
-                            constant.Value = new Constant {Double = (double)constant.Value.UnsignedInteger};
-                        }
+                        constant.Value = currentInt.Signed ? new Constant {Double = constant.Value.Integer} : new Constant {Double = constant.Value.UnsignedInteger};
                     }
                     else if (constant.Type.TypeKind == TypeKind.Float)
                     {
@@ -4021,7 +3989,7 @@ public static class TypeChecker
     private static IType VerifyEnumValue(EnumAst enumAst, StructFieldRefAst structField)
     {
         structField.IsEnum = true;
-        structField.Types = new [] {enumAst};
+        structField.Types = new []{enumAst};
 
         if (structField.Children.Count > 2)
         {
@@ -4669,15 +4637,13 @@ public static class TypeChecker
 
                     return VerifyArgument(call.Arguments[callArgIndex], argument, paramsElementType);
                 }
-                else
+
+                for (; callArgIndex < arguments.Length; callArgIndex++)
                 {
-                    for (; callArgIndex < arguments.Length; callArgIndex++)
+                    if (!VerifyArgument(call.Arguments[callArgIndex], arguments[callArgIndex], paramsElementType))
                     {
-                        if (!VerifyArgument(call.Arguments[callArgIndex], arguments[callArgIndex], paramsElementType))
-                        {
-                            match = false;
-                            break;
-                        }
+                        match = false;
+                        break;
                     }
                 }
             }
@@ -5158,16 +5124,14 @@ public static class TypeChecker
                 _ => TypeTable.S32Type
             };
         }
-        else
+
+        return size switch
         {
-            return size switch
-            {
-                1 => TypeTable.U8Type,
-                2 => TypeTable.U16Type,
-                8 => TypeTable.U64Type,
-                _ => TypeTable.U32Type
-            };
-        }
+            1 => TypeTable.U8Type,
+            2 => TypeTable.U16Type,
+            8 => TypeTable.U64Type,
+            _ => TypeTable.U32Type
+        };
     }
 
     private static IType VerifyIndex(IndexAst index, IType type, IFunction currentFunction, IScope scope, out bool overloaded)
@@ -5249,11 +5213,9 @@ public static class TypeChecker
 
             return polymorphedOverload;
         }
-        else
-        {
-            ErrorReporter.Report($"Type '{type.Name}' does not contain an overload for operator '{PrintOperator(op)}'", ast);
-            return null;
-        }
+
+        ErrorReporter.Report($"Type '{type.Name}' does not contain an overload for operator '{PrintOperator(op)}'", ast);
+        return null;
     }
 
     private static bool TypeEquals(IType target, IType source, bool checkPrimitives = false)
