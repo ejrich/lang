@@ -2,8 +2,6 @@
 #import compiler
 
 main() {
-    command_buffer = default_allocator(1000);
-    defer default_free(command_buffer);
     failed_test_count := 0;
 
     success, files := get_files_in_directory("test/tests");
@@ -49,7 +47,7 @@ bool run_test(string test_dir, string test) {
 
     command := format_string("% %/%.ol", executable, test_dir, test);
     print("Compiling: %", command);
-    compiler_exit_code := run_command(command);
+    compiler_exit_code := execute_command(command, true);
     default_free(command.data);
 
     if compiler_exit_code {
@@ -60,7 +58,7 @@ bool run_test(string test_dir, string test) {
     command = format_string("./%/bin/%", test_dir, test);
 
     print("\nRunning: %", command);
-    run_exit_code := run_command(command);
+    run_exit_code := execute_command(command, true);
     default_free(command.data);
 
     if run_exit_code {
@@ -69,62 +67,6 @@ bool run_test(string test_dir, string test) {
     }
     print("\n");
     return true;
-}
-
-command_buffer: void*;
-
-int run_command(string command) {
-    #if os == OS.Windows {
-        sa: SECURITY_ATTRIBUTES = { nLength = size_of(SECURITY_ATTRIBUTES); bInheritHandle = true; }
-        stdOutRd, stdOutWr: Handle*;
-
-        if !CreatePipe(&stdOutRd, &stdOutWr, &sa, 0) {
-            return -1;
-        }
-        SetHandleInformation(stdOutRd, HandleFlags.HANDLE_FLAG_INHERIT, HandleFlags.None);
-
-        si: STARTUPINFOA = { cb = size_of(STARTUPINFOA); dwFlags = 0x100; hStdInput = GetStdHandle(STD_INPUT_HANDLE); hStdOutput = stdOutWr; }
-        pi: PROCESS_INFORMATION;
-
-        if !CreateProcessA(null, command, null, null, true, 0, null, null, &si, &pi) {
-            CloseHandle(stdOutRd);
-            CloseHandle(stdOutWr);
-            return -1;
-        }
-
-        CloseHandle(si.hStdInput);
-        CloseHandle(stdOutWr);
-
-        buf: CArray<u8>[1000];
-        parentStdOut := GetStdHandle(STD_OUTPUT_HANDLE);
-        while true {
-            read: int;
-            success := ReadFile(stdOutRd, &buf, 1000, &read, null);
-
-            if !success || read == 0 break;
-        }
-
-        status: int;
-        GetExitCodeProcess(pi.hProcess, &status);
-
-        CloseHandle(pi.hThread);
-        CloseHandle(pi.hProcess);
-        CloseHandle(stdOutRd);
-
-        return status;
-    }
-    else {
-        command = format_string("% > /dev/null", command);
-
-        status := system(command);
-        default_free(command.data);
-
-        return status;
-    }
-}
-
-#if os != OS.Windows {
-    int system(string command) #extern "c"
 }
 
 #run {

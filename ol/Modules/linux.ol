@@ -242,3 +242,5 @@ struct sem_t {
 int sem_init(sem_t* sem, int pshared, int value) #extern "c"
 int sem_wait(sem_t* sem) #extern "c"
 int sem_post(sem_t* sem) #extern "c"
+
+int system(string command) #extern "c"

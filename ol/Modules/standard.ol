@@ -1175,3 +1175,66 @@ string get_environment_variable(string name, Allocate allocator = default_alloca
 
     return result;
 }
+
+int execute_command(string command, bool silent = false, bool print = false) {
+    if print print("%\n", command);
+
+    #if os == OS.Windows {
+        sa: SECURITY_ATTRIBUTES = { nLength = size_of(SECURITY_ATTRIBUTES); bInheritHandle = true; }
+        stdOutRd, stdOutWr: Handle*;
+
+        if !CreatePipe(&stdOutRd, &stdOutWr, &sa, 0) {
+            return -1;
+        }
+        SetHandleInformation(stdOutRd, HandleFlags.HANDLE_FLAG_INHERIT, HandleFlags.None);
+
+        si: STARTUPINFOA = { cb = size_of(STARTUPINFOA); dwFlags = 0x100; hStdInput = GetStdHandle(STD_INPUT_HANDLE); hStdOutput = stdOutWr; }
+        pi: PROCESS_INFORMATION;
+
+        if !CreateProcessA(null, command, null, null, true, 0, null, null, &si, &pi) {
+            CloseHandle(stdOutRd);
+            CloseHandle(stdOutWr);
+            return -1;
+        }
+
+        CloseHandle(si.hStdInput);
+        CloseHandle(stdOutWr);
+
+        if silent {
+            buf: CArray<u8>[1000];
+            parentStdOut := GetStdHandle(STD_OUTPUT_HANDLE);
+            while true {
+                read: int;
+                success := ReadFile(stdOutRd, &buf, 1000, &read, null);
+
+                if !success || read == 0 break;
+            }
+        }
+
+        status: int;
+        GetExitCodeProcess(pi.hProcess, &status);
+
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+        CloseHandle(stdOutRd);
+
+        return status;
+    }
+    else {
+        if silent {
+            silent_command := " > /dev/null"; #const
+            length := command.length + silent_command.length;
+
+            string_data: Array<u8>[length + 1];
+            string_data[length] = 0;
+            silenced_command: string = { length = length; data = string_data.data; }
+
+            memory_copy(silenced_command.data, command.data, command.length);
+            memory_copy(silenced_command.data + command.length, silent_command.data, silent_command.length);
+
+            command = silenced_command;
+        }
+
+        return system(command);
+    }
+}
