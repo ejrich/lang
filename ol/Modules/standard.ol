@@ -270,7 +270,7 @@ void* default_allocator(u64 size) {
         default_allocations.length = 10;
         default_allocations.data = allocate_memory(10 * size_of(DefaultAllocation));
         default_allocations[0] = allocation;
-        array_insert(&exit_callbacks, free_default_allocations);
+        add_exit_callback(free_default_allocations);
     }
     else {
         resize := true;
@@ -336,23 +336,6 @@ default_free(void* data) {
     }
 
     assert(false, "Pointer not found in list of allocations\n");
-}
-
-struct DefaultAllocation {
-    size: u64;
-    pointer: void*;
-}
-
-default_allocations: Array<DefaultAllocation>;
-
-free_default_allocations() {
-    each allocation in default_allocations {
-        if allocation.pointer != null {
-            free_memory(allocation.pointer, allocation.size);
-        }
-    }
-
-    free_memory(default_allocations.data, default_allocations.length * size_of(DefaultAllocation));
 }
 
 
@@ -1179,6 +1162,7 @@ string get_environment_variable(string name, Allocate allocator = default_alloca
 int execute_command(string command, bool silent = false, bool print = false) {
     if print print("%\n", command);
 
+    status: int;
     #if os == OS.Windows {
         sa: SECURITY_ATTRIBUTES = { nLength = size_of(SECURITY_ATTRIBUTES); bInheritHandle = true; }
         stdOutRd, stdOutWr: Handle*;
@@ -1211,14 +1195,11 @@ int execute_command(string command, bool silent = false, bool print = false) {
             }
         }
 
-        status: int;
         GetExitCodeProcess(pi.hProcess, &status);
 
         CloseHandle(pi.hThread);
         CloseHandle(pi.hProcess);
         CloseHandle(stdOutRd);
-
-        return status;
     }
     else {
         if silent {
@@ -1235,6 +1216,32 @@ int execute_command(string command, bool silent = false, bool print = false) {
             command = silenced_command;
         }
 
-        return system(command);
+        status = system(command);
     }
+
+    return status;
+}
+
+add_exit_callback(ExitCallback callback) {
+    exit_callbacks := get_exit_callbacks();
+    array_insert(exit_callbacks, callback);
+}
+
+#private
+
+struct DefaultAllocation {
+    size: u64;
+    pointer: void*;
+}
+
+default_allocations: Array<DefaultAllocation>;
+
+free_default_allocations() {
+    each allocation in default_allocations {
+        if allocation.pointer != null {
+            free_memory(allocation.pointer, allocation.size);
+        }
+    }
+
+    free_memory(default_allocations.data, default_allocations.length * size_of(DefaultAllocation));
 }

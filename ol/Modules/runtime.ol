@@ -179,16 +179,24 @@ void __start(int argc, u8** argv) {
         args[i-1] = convert_c_string(argv[i]);
     }
 
-    command_line_arguments = args;
+    __command_line_arguments = args;
 
     #if true main();
 
-    exit_program(exit_code);
+    exit_program(__exit_code);
+}
+
+Array<string> get_command_line_arguments() {
+    return __command_line_arguments;
+}
+
+set_exit_code(int code) {
+    __exit_code = code;
 }
 
 exit_program(int exit_code) {
-    each callback in exit_callbacks {
-        callback();
+    each callback in __exit_callbacks {
+        if callback != null callback();
     }
 
     #if os == OS.Linux {
@@ -200,7 +208,13 @@ exit_program(int exit_code) {
 }
 
 interface ExitCallback()
-exit_callbacks: Array<ExitCallback>;
 
-command_line_arguments: Array<string>;
-exit_code := 0;
+Array<ExitCallback>* get_exit_callbacks() {
+    return &__exit_callbacks;
+}
+
+#private
+
+__exit_code := 0;
+__exit_callbacks: Array<ExitCallback>;
+__command_line_arguments: Array<string>;
