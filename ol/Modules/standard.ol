@@ -1175,6 +1175,12 @@ int execute_command(string command, bool silent = false, bool print = false) {
         si: STARTUPINFOA = { cb = size_of(STARTUPINFOA); dwFlags = 0x100; hStdInput = GetStdHandle(STD_INPUT_HANDLE); hStdOutput = stdOutWr; }
         pi: PROCESS_INFORMATION;
 
+        // Null terminate the command in case it is not
+        null_terminated_data: Array<u8>[command.length + 1];
+        null_terminated_data[command.length] = 0;
+        memory_copy(null_terminated_data.data, command.data, command.length);
+        command.data = null_terminated_data.data;
+
         if !CreateProcessA(null, command, null, null, true, 0, null, null, &si, &pi) {
             CloseHandle(stdOutRd);
             CloseHandle(stdOutWr);
@@ -1214,6 +1220,13 @@ int execute_command(string command, bool silent = false, bool print = false) {
             memory_copy(silenced_command.data + command.length, silent_command.data, silent_command.length);
 
             command = silenced_command;
+        }
+        else {
+            // Null terminate the command in case it is not
+            null_terminated_data: Array<u8>[command.length + 1];
+            null_terminated_data[command.length] = 0;
+            memory_copy(null_terminated_data.data, command.data, command.length);
+            command.data = null_terminated_data.data;
         }
 
         status = system(command);
