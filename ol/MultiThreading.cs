@@ -126,7 +126,7 @@ public static class ThreadPool
 
     public static void QueueWork(WorkQueue queue, Action<object> function, object data)
     {
-        var index = Interlocked.Increment(ref queue.Count) - 1;
+        Interlocked.Increment(ref queue.Count);
         queue.Entries.Enqueue(new QueueItem {Function = function, Data = data});
         Semaphore.Release();
     }
