@@ -8,7 +8,7 @@ main() { //#print_ir {
     /*
         Multi line comment
     */
-    each arg, i in command_line_arguments print("Arg %: \"%\" -- length = %\n", i, arg, arg.length);
+    each arg, i in get_command_line_arguments() print("Arg %: \"%\" -- length = %\n", i, arg, arg.length);
     hello := "This is an \"escaped\" string literal\nWith a new line!";
     a := 4.2;
     a++;
@@ -333,7 +333,6 @@ int SDL_Init(u32 flags) #extern "SDL2"
 SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern "SDL2"
 
 #run {
-    array_insert(&command_line_arguments, "Hello world");
     main();
 
     build();

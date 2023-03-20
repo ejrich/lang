@@ -24,7 +24,7 @@ main() {
 
     if failed_test_count {
         print("\n% Test(s) Failed\n", failed_test_count);
-        exit_code = -1;
+        set_exit_code(-1);
     }
     else {
         print("\nAll Tests Passed\n");
