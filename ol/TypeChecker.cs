@@ -4542,6 +4542,9 @@ public static class TypeChecker
                 }
 
                 AddFunction(uniqueName, fileIndex, polymorphedFunction);
+                TypeTable.Add(polymorphedFunction);
+                TypeTable.CreateTypeInfo(polymorphedFunction);
+
                 polymorphedFunction.Flags |= FunctionFlags.Queued;
                 _astCompleteQueue.Enqueue(polymorphedFunction);
 

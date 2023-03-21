@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 
@@ -144,6 +144,7 @@ public static class Lexer
                 {
                     var literalEscapeToken = false;
                     var error = false;
+                    var literalClosed = false;
                     token = new Token
                     {
                         Type = TokenType.Literal,
@@ -152,55 +153,90 @@ public static class Lexer
                         Column = column
                     };
 
-                    while (i < fileText.Length - 1)
+                    // Handle multi-line literals
+                    if (i + 2 < fileText.Length && fileText[i + 1] == '"' && fileText[i + 2] == '"')
                     {
-                        character = fileText[++i];
-                        column++;
+                        i += 2;
+                        var startIndex = i + 1;
+                        while (i < fileText.Length - 1)
+                        {
+                            character = fileText[++i];
+                            column++;
 
-                        if (character == '\\' && !literalEscapeToken)
-                        {
-                            literalEscapeToken = true;
-                        }
-                        else if (character == '\n')
-                        {
-                            line++;
-                            column = 0;
-                            if (literalEscapeToken)
+                            if (character == '\n')
                             {
-                                error = true;
-                                literalEscapeToken = false;
+                                line++;
+                                column = 0;
                             }
-                        }
-                        else if (literalEscapeToken)
-                        {
-                            if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
-                            {
-                                token.Value += escapedCharacter;
-                            }
-                            else
-                            {
-                                error = true;
-                                token.Value += character;
-                            }
-                            literalEscapeToken = false;
-                        }
-                        else
-                        {
-                            if (character == '"')
-                            {
-                                if (error)
-                                {
-                                    ErrorReporter.Report($"Unexpected token '{token.Value}'", fileIndex, token);
-                                }
 
+                            if (character == '"' && i + 2 < fileText.Length && fileText[i + 1] == '"' && fileText[i + 2] == '"')
+                            {
+                                token.Value = fileText.Substring(startIndex, i - startIndex);
+                                i += 2;
                                 tokens.Add(token);
+                                literalClosed = true;
                                 break;
                             }
+                        }
+                    }
+                    else
+                    {
+
+                        while (i < fileText.Length - 1)
+                        {
+                            character = fileText[++i];
+                            column++;
+
+                            if (character == '\\' && !literalEscapeToken)
+                            {
+                                literalEscapeToken = true;
+                            }
+                            else if (character == '\n')
+                            {
+                                line++;
+                                column = 0;
+                                if (literalEscapeToken)
+                                {
+                                    error = true;
+                                    literalEscapeToken = false;
+                                }
+                            }
+                            else if (literalEscapeToken)
+                            {
+                                if (_escapableCharacters.TryGetValue(character, out var escapedCharacter))
+                                {
+                                    token.Value += escapedCharacter;
+                                }
+                                else
+                                {
+                                    error = true;
+                                    token.Value += character;
+                                }
+                                literalEscapeToken = false;
+                            }
                             else
                             {
-                                token.Value += character;
+                                if (character == '"')
+                                {
+                                    if (error)
+                                    {
+                                        ErrorReporter.Report($"Unexpected token '{token.Value}'", fileIndex, token);
+                                    }
+
+                                    tokens.Add(token);
+                                    literalClosed = true;
+                                    break;
+                                }
+                                else
+                                {
+                                    token.Value += character;
+                                }
                             }
                         }
+                    }
+                    if (!literalClosed)
+                    {
+                        ErrorReporter.Report($"String literal not closed by '\"'", fileIndex, token);
                     }
                     break;
                 }

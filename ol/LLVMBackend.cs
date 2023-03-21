@@ -62,9 +62,9 @@ public static unsafe class LLVMBackend
 
     private static LLVMTypeRef _pointerType;
     private static LLVMValueRef _null;
-    private static readonly LLVMValueRef _zeroInt = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), 0, false);
-    private static readonly LLVMValueRef _interfaceTypeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Interface, 0);
-    private static readonly LLVMValueRef _functionTypeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Function, 0);
+    private static readonly LLVMValueRef ZeroInt = LLVMValueRef.CreateConstInt(LLVM.Int32Type(), 0);
+    private static readonly LLVMValueRef InterfaceTypeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Interface, 0);
+    private static readonly LLVMValueRef FunctionTypeKind = LLVM.ConstInt(LLVM.Int32Type(), (uint)TypeKind.Function, 0);
 
     private static LLVMTypeRef _stackSaveType;
     private static LLVMValueRef _stackSave;
@@ -111,7 +111,7 @@ public static unsafe class LLVMBackend
         _argumentType = CreateStruct("ArgumentType");
         _argumentArrayType = CreateStruct("Array<ArgumentType>");
 
-        Span<LLVMValueRef> defaultArrayValues = stackalloc LLVMValueRef[] {_zeroInt, _null};
+        Span<LLVMValueRef> defaultArrayValues = stackalloc LLVMValueRef[] {ZeroInt, _null};
         _defaultAttributes = LLVMValueRef.CreateConstNamedStruct(_stringArrayType, defaultArrayValues);
         _defaultFields = LLVMValueRef.CreateConstNamedStruct(_typeFieldArrayType, defaultArrayValues);
         _defaultArguments = LLVMValueRef.CreateConstNamedStruct(_argumentArrayType, defaultArrayValues);
@@ -1010,7 +1010,7 @@ public static unsafe class LLVMBackend
     {
         var typeName = GetString(interfaceAst.Name);
         var arguments = argumentValues.Length == 0 ? _defaultArguments : CreateConstantArray(_argumentType, _argumentArrayType, argumentValues, "____arguments");
-        Span<LLVMValueRef> fields = stackalloc LLVMValueRef[]{typeName, _interfaceTypeKind, _zeroInt, returnType, arguments};
+        Span<LLVMValueRef> fields = stackalloc LLVMValueRef[]{typeName, InterfaceTypeKind, ZeroInt, returnType, arguments};
 
         var typeInfoStruct = LLVMValueRef.CreateConstNamedStruct(_interfaceTypeInfoType, fields);
         LLVM.SetInitializer(_typeInfos[interfaceAst.TypeIndex], typeInfoStruct);
@@ -1143,7 +1143,7 @@ public static unsafe class LLVMBackend
         var typeNameString = GetString(function.Name);
         var arguments = argumentValues.Length == 0 ? _defaultArguments : CreateConstantArray(_argumentType, _argumentArrayType, argumentValues, "____arguments");
         var attributes = MakeAttributes(function.Attributes, "____function_attributes");
-        Span<LLVMValueRef> fields = stackalloc LLVMValueRef[]{typeNameString, _functionTypeKind, _zeroInt, returnType, arguments, attributes};
+        Span<LLVMValueRef> fields = stackalloc LLVMValueRef[]{typeNameString, FunctionTypeKind, ZeroInt, returnType, arguments, attributes};
 
         CreateAndSetTypeInfo(_functionTypeInfoType, fields, function.TypeIndex);
     }
@@ -1239,6 +1239,11 @@ public static unsafe class LLVMBackend
         else
         {
             _functionsToWrite.Enqueue((functionPointer, function));
+        }
+
+        if (function.Source is FunctionAst sourceFunction)
+        {
+            _types[sourceFunction.TypeIndex] = _pointerType;
         }
 
         _functions[function.Source.FunctionIndex] = functionPointer;
