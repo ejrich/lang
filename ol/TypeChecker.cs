@@ -521,7 +521,7 @@ public static class TypeChecker
             functions.Add(function);
         }
 
-        Messages.Submit(MessageType.ReadyToBeTypeChecked, function);
+        Messages.Submit(MessageType.ReadyToBeTypeChecked, function, true);
     }
 
     public static void AddOverload(OperatorOverloadAst overload)
@@ -552,7 +552,7 @@ public static class TypeChecker
             }
             overloads[overload.Operator] = overload;
 
-            Messages.Submit(MessageType.ReadyToBeTypeChecked, overload);
+            Messages.Submit(MessageType.ReadyToBeTypeChecked, overload, true);
         }
     }
 
@@ -584,7 +584,7 @@ public static class TypeChecker
 
     public static bool AddStruct(StructAst structAst)
     {
-        Messages.Submit(MessageType.ReadyToBeTypeChecked, structAst);
+        Messages.Submit(MessageType.ReadyToBeTypeChecked, structAst, true);
         return AddTypeAndIdentifier(structAst.Name, structAst, structAst);
     }
 
@@ -616,13 +616,13 @@ public static class TypeChecker
 
     public static void AddUnion(UnionAst union)
     {
-        Messages.Submit(MessageType.ReadyToBeTypeChecked, union);
+        Messages.Submit(MessageType.ReadyToBeTypeChecked, union, true);
         AddTypeAndIdentifier(union.Name, union, union);
     }
 
     public static void AddInterface(InterfaceAst interfaceAst)
     {
-        Messages.Submit(MessageType.ReadyToBeTypeChecked, interfaceAst);
+        Messages.Submit(MessageType.ReadyToBeTypeChecked, interfaceAst, true);
         AddTypeAndIdentifier(interfaceAst.Name, interfaceAst, interfaceAst);
     }
 
