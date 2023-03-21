@@ -146,7 +146,7 @@ public static unsafe class Messages
         Submit(message);
     }
 
-    public static void Submit(MessageType type, IFunction function)
+    public static void Submit(MessageType type, IFunction function, bool noWait = false)
     {
         IntPtr pointer;
         Function functionMessage;
@@ -186,7 +186,7 @@ public static unsafe class Messages
         }
 
         Marshal.StructureToPtr(functionMessage, pointer, false);
-        Submit(type, pointer);
+        Submit(type, pointer, noWait);
     }
 
     public static void Submit(MessageType type, EnumAst enumAst)
@@ -220,10 +220,10 @@ public static unsafe class Messages
         }
 
         Marshal.StructureToPtr(enumMessage, pointer, false);
-        Submit(type, pointer);
+        Submit(type, pointer, true);
     }
 
-    public static void Submit(MessageType type, StructAst structAst)
+    public static void Submit(MessageType type, StructAst structAst, bool noWait = false)
     {
         IntPtr pointer;
         Struct structMessage;
@@ -253,10 +253,10 @@ public static unsafe class Messages
         }
 
         Marshal.StructureToPtr(structMessage, pointer, false);
-        Submit(type, pointer);
+        Submit(type, pointer, noWait);
     }
 
-    public static void Submit(MessageType type, UnionAst unionAst)
+    public static void Submit(MessageType type, UnionAst unionAst, bool noWait = false)
     {
         IntPtr pointer;
         Union unionMessage;
@@ -285,10 +285,10 @@ public static unsafe class Messages
         }
 
         Marshal.StructureToPtr(unionMessage, pointer, false);
-        Submit(type, pointer);
+        Submit(type, pointer, noWait);
     }
 
-    public static void Submit(MessageType type, InterfaceAst interfaceAst)
+    public static void Submit(MessageType type, InterfaceAst interfaceAst, bool noWait = false)
     {
         IntPtr pointer;
         Interface interfaceMessage;
@@ -318,20 +318,20 @@ public static unsafe class Messages
         }
 
         Marshal.StructureToPtr(interfaceMessage, pointer, false);
-        Submit(type, pointer);
+        Submit(type, pointer, noWait);
     }
 
-    private static void Submit(MessageType type, IntPtr ast)
+    private static void Submit(MessageType type, IntPtr ast, bool noWait = false)
     {
         var message = new CompilerMessage { Type = type, Value = new() { Ast = ast } };
-        Submit(message);
+        Submit(message, noWait);
     }
 
-    private static void Submit(CompilerMessage message)
+    private static void Submit(CompilerMessage message, bool noWait = false)
     {
         if (ErrorReporter.Errors.Any() || _completed) return;
 
-        message.WaitForNext = Intercepting && ThreadPool.RunThreadId != Environment.CurrentManagedThreadId;
+        message.WaitForNext = !noWait && Intercepting && ThreadPool.RunThreadId != Environment.CurrentManagedThreadId;
 
         MessageQueue.Enqueue(message);
         MessageWaitMutex.Release();
