@@ -1120,6 +1120,24 @@ write_buffer_to_file(File file, u8* buffer, s64 length) {
     }
 }
 
+u64 file_get_last_modified(string file) {
+    time := u64;
+    #if os == OS.Linux {
+        stat_buf: Stat;
+        stat(file.data, &stat_buf);
+        time = stat_buf.st_mtim.tv_sec;
+    }
+    #if os == OS.Windows {
+        file_handle := open_file(file);
+        time: FILETIME;
+        GetFileTime(file_handle.handle, null, null, &time);
+        time = cast(u64, time.dwHighDateTime) << 32 || time.dwLowDateTime;
+        close_file(file_handle);
+    }
+
+    return time;
+}
+
 
 // System information
 int get_processors() {

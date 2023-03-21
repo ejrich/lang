@@ -1667,13 +1667,20 @@ public static unsafe class ProgramRunner
                 }
                 case "add_source_file":
                 {
-                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
-                    var file = Marshal.PtrToStructure<String>(value.Pointer);
-                    var fileString = Marshal.PtrToStringAnsi(file.Data, (int)file.Length);
-                    if (Parser.AddFile(fileString, fileIndex, line, column))
+                    if (Messages.Intercepting)
                     {
-                        ThreadPool.CompleteWork(ThreadPool.ParseQueue);
-                        TypeChecker.ClearDirectiveQueue();
+                        ErrorReporter.Report("Must call add_source_file before intercept_compiler_messages", fileIndex, line, column);
+                    }
+                    else
+                    {
+                        var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                        var file = Marshal.PtrToStructure<String>(value.Pointer);
+                        var fileString = Marshal.PtrToStringAnsi(file.Data, (int)file.Length);
+                        if (Parser.AddFile(fileString, fileIndex, line, column))
+                        {
+                            ThreadPool.CompleteWork(ThreadPool.ParseQueue);
+                            TypeChecker.ClearDirectiveQueue();
+                        }
                     }
                     break;
                 }
