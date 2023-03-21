@@ -1123,8 +1123,12 @@ write_buffer_to_file(File file, u8* buffer, s64 length) {
 u64 file_get_last_modified(string file) {
     time := u64;
     #if os == OS.Linux {
+        null_terminated_path: Array<u8>[file.length + 1];
+        memory_copy(null_terminated_path.data, file.data, file.length);
+        null_terminated_path[file.length] = 0;
+
         stat_buf: Stat;
-        stat(file.data, &stat_buf);
+        stat(null_terminated_path.data, &stat_buf);
         time = stat_buf.st_mtim.tv_sec;
     }
     #if os == OS.Windows {

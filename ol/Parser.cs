@@ -26,7 +26,7 @@ public static class Parser
             _tokens = tokens;
         }
 
-        public int FileIndex;
+        public readonly int FileIndex;
         public Token Current;
         public bool Remaining = true;
         public bool Private;
@@ -2056,7 +2056,7 @@ public static class Parser
             {
                 return ParseAssignment(enumerator, currentFunction, out _, expression);
             }
-            else if (token.Type == TokenType.Comma)
+            if (token.Type == TokenType.Comma)
             {
                 if (expression.Children.Count == 1)
                 {
@@ -4169,6 +4169,7 @@ public static class Parser
                 return Operator.RotateRight;
             // Handle single character operators
             default:
+                if (token.Value.Length != 1) return Operator.None;
                 var op = (Operator)token.Value[0];
                 return Enum.IsDefined(typeof(Operator), op) ? op : Operator.None;
         }
