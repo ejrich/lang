@@ -25,6 +25,7 @@ bool CloseHandle(Handle* hObject) #extern "kernel32"
 int SetFilePointer(Handle* hFile, u64 lDistanceToMove, u64* lpDistanceToMoveHigh, MoveMethod dwMoveMethod) #extern "kernel32"
 bool ReadFile(Handle* hFile, void* lpBuffer, int nNumberOfBytesToRead, int* nNumberOfBytesRead, void* lpOverlapped) #extern "kernel32"
 bool WriteFile(Handle* hFile, void* lpBuffer, int nNumberOfBytesToWrite, int* nNumberOfBytesWritten, void* lpOverlapped) #extern "kernel32"
+bool GetFileTime(Handle* hFile, FILETIME* lpCreationTime,  FILETIME* lpLastAccessTime,  FILETIME* lpLastWriteTime) #extern "kernel32"
 
 bool CreatePipe(Handle** hReadPipe, Handle** hWritePipe, SECURITY_ATTRIBUTES* lpPipeAttributes, int nSize) #extern "kernel32"
 bool SetHandleInformation(Handle* hObject, HandleFlags dwMask, HandleFlags dwFlags) #extern "kernel32"
@@ -134,6 +135,11 @@ enum MoveMethod {
     FILE_BEGIN;
     FILE_CURRENT;
     FILE_END;
+}
+
+struct FILETIME {
+    dwLowDateTime: u32;
+    dwHighDateTime: u32;
 }
 
 struct SECURITY_ATTRIBUTES {

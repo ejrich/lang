@@ -136,6 +136,7 @@ public static class ol
                             BuildSettings.Name = Path.GetFileNameWithoutExtension(arg);
                             entrypoint = Path.GetFullPath(arg);
                             BuildSettings.Path = Path.GetDirectoryName(entrypoint);
+                            Directory.SetCurrentDirectory(BuildSettings.Path);
                             BuildSettings.ObjectDirectory = Path.Combine(BuildSettings.Path, "obj");
                             BuildSettings.GeneratedCodeFile = Path.Combine(BuildSettings.ObjectDirectory, ".generated_code.ol");
                             if (!Directory.Exists(BuildSettings.ObjectDirectory))
