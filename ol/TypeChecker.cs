@@ -1336,14 +1336,14 @@ public static class TypeChecker
         {
             if (GlobalScope.PolymorphicFunctions.TryGetValue(currentFunction.Name, out var functions))
             {
-                return OverloadExists(currentFunction, functions);
+                return OverloadExists(currentFunction, functions, true);
             }
         }
         else
         {
             if (privateScope.PolymorphicFunctions.TryGetValue(currentFunction.Name, out var functions))
             {
-                if (OverloadExists(currentFunction, functions))
+                if (OverloadExists(currentFunction, functions, true))
                 {
                     return true;
                 }
@@ -1351,14 +1351,14 @@ public static class TypeChecker
 
             if (GlobalScope.PolymorphicFunctions.TryGetValue(currentFunction.Name, out var globalFunctions))
             {
-                return OverloadExists(currentFunction, globalFunctions);
+                return OverloadExists(currentFunction, globalFunctions, true);
             }
         }
 
         return false;
     }
 
-    private static bool OverloadExists(FunctionAst currentFunction, List<FunctionAst> functions)
+    private static bool OverloadExists(FunctionAst currentFunction, List<FunctionAst> functions, bool checkGenerics = false)
     {
         for (var function = 0; function < functions.Count; function++)
         {
@@ -1374,7 +1374,7 @@ public static class TypeChecker
                         break;
                     }
                 }
-                if (match)
+                if (match && (!checkGenerics || currentFunction.Generics.Count == existingFunction.Generics.Count))
                 {
                     return true;
                 }
