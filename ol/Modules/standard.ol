@@ -987,8 +987,12 @@ bool, Array<FileEntry> get_files_in_directory(string path, Allocate allocator = 
     files: Array<FileEntry>;
 
     #if os == OS.Linux {
+        null_terminated_path: Array<u8>[path.length + 1];
+        memory_copy(null_terminated_path.data, path.data, path.length);
+        null_terminated_path[path.length] = 0;
+
         open_flags := OpenFlags.O_RDONLY | OpenFlags.O_NONBLOCK | OpenFlags.O_DIRECTORY | OpenFlags.O_LARGEFILE | OpenFlags.O_CLOEXEC;
-        directory := open(path.data, open_flags, OpenMode.S_RWALL);
+        directory := open(null_terminated_path.data, open_flags, OpenMode.S_RWALL);
 
         if directory < 0 {
             return false, files;
