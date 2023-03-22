@@ -1684,6 +1684,11 @@ public static unsafe class ProgramRunner
                     }
                     break;
                 }
+                case "get_compiler_working_directory":
+                {
+                    returnValue.Pointer = Allocator.MakeString(BuildSettings.Path, false);
+                    break;
+                }
                 case "report_error":
                 {
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);

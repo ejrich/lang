@@ -49,6 +49,8 @@ set_output_architecture(OutputArchitecture arch) #compiler
 
 add_source_file(string file) #compiler
 
+string get_compiler_working_directory() #compiler
+
 report_error(string error) #compiler
 
 // Ast definitions
