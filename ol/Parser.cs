@@ -2132,10 +2132,7 @@ public static class Parser
             return expression.Children.First();
         }
 
-        if (!ErrorReporter.Errors.Any())
-        {
-            SetOperatorPrecedence(expression);
-        }
+        SetOperatorPrecedence(expression);
         return expression;
     }
 
