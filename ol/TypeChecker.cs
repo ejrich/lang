@@ -3079,9 +3079,10 @@ public static class TypeChecker
         }
     }
 
-    private static IType VerifyStructFieldRef(StructFieldRefAst structField, IFunction currentFunction, IScope scope)
+    private static IType VerifyStructFieldRef(StructFieldRefAst structField, IFunction currentFunction, IScope scope, out bool isConstant)
     {
         IType refType;
+        isConstant = false;
         switch (structField.Children[0])
         {
             case IdentifierAst identifier:
@@ -3093,7 +3094,7 @@ public static class TypeChecker
                 switch (value)
                 {
                     case EnumAst enumAst:
-                        return VerifyEnumValue(enumAst, structField);
+                        return VerifyEnumValue(enumAst, structField, out isConstant);
                     case DeclarationAst declaration:
                         if (declaration.Global && !declaration.Verified)
                         {
@@ -3104,7 +3105,7 @@ public static class TypeChecker
                         {
                             structField.GlobalConstant = global;
                             structField.ConstantIndex = declaration.ConstantIndex;
-                            return VerifyConstantStringField(structField);
+                            return VerifyConstantStringField(structField, out isConstant);
                         }
                         break;
                     case VariableAst variable:
@@ -3118,13 +3119,14 @@ public static class TypeChecker
             case ConstantAst constant:
                 if (constant.String == null)
                 {
+                    isConstant = true;
                     refType = constant.Type;
                 }
                 else
                 {
                     constant.Type ??= TypeTable.StringType;
                     structField.String = constant.String;
-                    return VerifyConstantStringField(structField);
+                    return VerifyConstantStringField(structField, out isConstant);
                 }
                 break;
             default:
@@ -3169,8 +3171,9 @@ public static class TypeChecker
         return refType;
     }
 
-    private static IType VerifyConstantStringField(StructFieldRefAst structField)
+    private static IType VerifyConstantStringField(StructFieldRefAst structField, out bool isConstant)
     {
+        isConstant = false;
         if (structField.Children.Count > 2)
         {
             ErrorReporter.Report("Type 'string' does not contain field", structField);
@@ -3182,11 +3185,13 @@ public static class TypeChecker
             case IdentifierAst identifier:
                 if (identifier.Name == "length")
                 {
+                    isConstant = true;
                     structField.ConstantStringLength = true;
                     return TypeTable.S64Type;
                 }
                 if (identifier.Name == "data")
                 {
+                    isConstant = true;
                     structField.RawConstantString = true;
                     return TypeTable.RawStringType;
                 }
@@ -3280,7 +3285,7 @@ public static class TypeChecker
             case TypeKind.Pointer:
             case TypeKind.Enum:
                 // Valid types
-                return !ErrorReporter.Errors.Any();
+                return constant || !ErrorReporter.Errors.Any();
             case null:
                 return false;
             default:
@@ -3613,9 +3618,7 @@ public static class TypeChecker
                 isConstant = true;
                 return null;
             case StructFieldRefAst structField:
-                var structFieldType = VerifyStructFieldRef(structField, currentFunction, scope);
-                isConstant = structFieldType is EnumAst;
-                return structFieldType;
+                return VerifyStructFieldRef(structField, currentFunction, scope, out isConstant);
             case IdentifierAst identifierAst:
                 if (identifierAst.BakedType != null)
                 {
@@ -3986,8 +3989,9 @@ public static class TypeChecker
         }
     }
 
-    private static IType VerifyEnumValue(EnumAst enumAst, StructFieldRefAst structField)
+    private static IType VerifyEnumValue(EnumAst enumAst, StructFieldRefAst structField, out bool isConstant)
     {
+        isConstant = false;
         structField.IsEnum = true;
         structField.Types = new []{enumAst};
 
@@ -4010,6 +4014,7 @@ public static class TypeChecker
         }
 
         structField.ConstantValue = enumValue.Value;
+        isConstant = true;
         return enumAst;
     }
 
