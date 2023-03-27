@@ -60,30 +60,28 @@ LinkedList<Token> get_file_tokens(string file) {
                 current = false;
             }
         }
-        else {
-            if !current {
-                token := get_token(character, i, file);
-                if token.type == TokenType.Identifier {
-                    current_token = token;
-                    current = true;
-                }
-                else {
-                    add(&tokens, token);
-                }
+        else if !current {
+            token := get_token(character, i, file);
+            if token.type == TokenType.Identifier {
+                current_token = token;
+                current = true;
             }
             else {
-                type := get_token_type(character);
-                if type == TokenType.Identifier {
-                    current_token.value.length++;
-                }
-                else {
-                    check_reserved_tokens(&current_token);
-                    add(&tokens, current_token);
-                    current = false;
+                add(&tokens, token);
+            }
+        }
+        else {
+            type := get_token_type(character);
+            if type == TokenType.Identifier {
+                current_token.value.length++;
+            }
+            else {
+                check_reserved_tokens(&current_token);
+                add(&tokens, current_token);
+                current = false;
 
-                    token := get_token(character, i, file);
-                    add(&tokens, token);
-                }
+                token := get_token(character, i, file);
+                add(&tokens, token);
             }
         }
         i++;

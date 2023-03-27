@@ -668,7 +668,7 @@ public static class TypeChecker
     public static void VerifyEnum(EnumAst enumAst)
     {
         Messages.Submit(MessageType.ReadyToBeTypeChecked, enumAst);
-        if (AddTypeAndIdentifier(enumAst.Name, enumAst, enumAst))
+        if (!string.IsNullOrEmpty(enumAst.Name) && AddTypeAndIdentifier(enumAst.Name, enumAst, enumAst))
         {
             TypeTable.CreateTypeInfo(enumAst);
             Messages.Submit(MessageType.TypeCheckSuccessful, enumAst);

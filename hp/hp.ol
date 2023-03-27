@@ -2,24 +2,25 @@
 #import "parser.ol"
 
 main() {
-    if command_line_arguments.length != 3 {
+    args := get_command_line_arguments();
+    if args.length != 3 {
         print("Please provide an input file, library name, and output file\n");
-        exit_code = 1;
+        set_exit_code(1);
         return;
     }
 
-    found, file_contents := read_file(command_line_arguments[0], allocate);
+    found, file_contents := read_file(args[0], allocate);
     if found {
-        print("Parsing file '%', size %\n", command_line_arguments[0], file_contents.length);
+        print("Parsing file '%', size %\n", args[0], file_contents.length);
 
-        parse(file_contents, command_line_arguments[1], command_line_arguments[2]);
+        parse(file_contents, args[1], args[2]);
 
         each arena in arenas
             default_free(arena.pointer);
     }
     else {
-        print("Input file '%' not found\n", command_line_arguments[0]);
-        exit_code = 2;
+        print("Input file '%' not found\n", args[0]);
+        set_exit_code(2);
     }
 }
 

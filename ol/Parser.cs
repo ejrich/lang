@@ -283,7 +283,10 @@ public static class Parser
                     break;
                 case TokenType.Enum:
                     var enumAst = ParseEnum(enumerator, attributes);
-                    TypeChecker.VerifyEnum(enumAst);
+                    if (enumAst != null)
+                    {
+                        TypeChecker.VerifyEnum(enumAst);
+                    }
                     break;
                 case TokenType.Union:
                     if (attributes != null)

@@ -28,7 +28,7 @@ parse(string file_contents, string library, string output_file) {
             }
             else if type == TokenType.Extension node = node.next;
             else if type == TokenType.Attribute {
-                node = move_over(node.next, TokenType.SemiColon);
+                node = move_over_paren(node.next);
             }
             else {
                 node = parse_function(node, lib_file, library);
@@ -52,6 +52,20 @@ Node<Token>* move_until(Node<Token>* node, TokenType type) {
 
 Node<Token>* move_over(Node<Token>* node, TokenType type) {
     node = move_until(node, type);
+
+    return node.next;
+}
+
+Node<Token>* move_over_paren(Node<Token>* node) {
+    node = node.next;
+    while node.data.type != TokenType.CloseParen {
+        if node.data.type == TokenType.OpenParen {
+            node = move_over_paren(node);
+        }
+        else {
+            node = node.next;
+        }
+    }
 
     return node.next;
 }
