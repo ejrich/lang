@@ -148,6 +148,8 @@ public static unsafe class Messages
 
     public static void Submit(MessageType type, IFunction function)
     {
+        if (ErrorReporter.Errors.Any() || _completed) return;
+
         IntPtr pointer;
         Function functionMessage;
         if (function.MessagePointer == IntPtr.Zero)
@@ -191,6 +193,8 @@ public static unsafe class Messages
 
     public static void Submit(MessageType type, EnumAst enumAst)
     {
+        if (ErrorReporter.Errors.Any() || _completed) return;
+
         IntPtr pointer;
         Enum enumMessage;
         if (enumAst.MessagePointer == IntPtr.Zero)
@@ -225,6 +229,8 @@ public static unsafe class Messages
 
     public static void Submit(MessageType type, StructAst structAst)
     {
+        if (ErrorReporter.Errors.Any() || _completed) return;
+
         IntPtr pointer;
         Struct structMessage;
         if (structAst.MessagePointer == IntPtr.Zero)
@@ -258,6 +264,8 @@ public static unsafe class Messages
 
     public static void Submit(MessageType type, UnionAst unionAst)
     {
+        if (ErrorReporter.Errors.Any() || _completed) return;
+
         IntPtr pointer;
         Union unionMessage;
         if (unionAst.MessagePointer == IntPtr.Zero)
@@ -290,6 +298,8 @@ public static unsafe class Messages
 
     public static void Submit(MessageType type, InterfaceAst interfaceAst)
     {
+        if (ErrorReporter.Errors.Any() || _completed) return;
+
         IntPtr pointer;
         Interface interfaceMessage;
         if (interfaceAst.MessagePointer == IntPtr.Zero)
