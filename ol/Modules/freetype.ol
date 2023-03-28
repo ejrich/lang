@@ -209,9 +209,7 @@ struct FT_Library {}
 struct FT_Module {}
 struct FT_Driver {}
 struct FT_Renderer {}
-struct FT_Face {}
 struct FT_Size {}
-struct FT_GlyphSlot {}
 struct FT_CharMap {}
 enum FT_Encoding {
     FT_ENCODING_NONE = 0;
@@ -244,7 +242,7 @@ struct FT_CharMapRec {
 }
 
 struct FT_Face_Internal {}
-struct FT_FaceRec {
+struct FT_Face {
     num_faces: s64;
     face_index: s64;
     face_flags: s64;
@@ -299,7 +297,7 @@ struct FT_SizeRec {
 
 struct FT_SubGlyph {}
 struct FT_Slot_Internal {}
-struct FT_GlyphSlotRec {
+struct FT_GlyphSlot {
     library: FT_Library*;
     face: FT_Face*;
     next: FT_GlyphSlot*;
@@ -384,9 +382,34 @@ s32 FT_Set_Char_Size(FT_Face* face, s64 char_width, s64 char_height, u32 horz_re
 
 s32 FT_Set_Pixel_Sizes(FT_Face* face, u32 pixel_width, u32 pixel_height) #extern "freetype"
 
-s32 FT_Load_Glyph(FT_Face* face, u32 glyph_index, s32 load_flags) #extern "freetype"
+[flags]
+enum FT_LoadFlags {
+    FT_LOAD_DEFAULT                     = 0x0;
+    FT_LOAD_NO_SCALE                    = 0x1;
+    FT_LOAD_NO_HINTING                  = 0x2;
+    FT_LOAD_RENDER                      = 0x4;
+    FT_LOAD_NO_BITMAP                   = 0x8;
+    FT_LOAD_VERTICAL_LAYOUT             = 0x10;
+    FT_LOAD_FORCE_AUTOHINT              = 0x20;
+    FT_LOAD_CROP_BITMAP                 = 0x40;
+    FT_LOAD_PEDANTIC                    = 0x80;
+    FT_LOAD_ADVANCE_ONLY                = 0x100;
+    FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH = 0x200;
+    FT_LOAD_NO_RECURSE                  = 0x400;
+    FT_LOAD_IGNORE_TRANSFORM            = 0x800;
+    FT_LOAD_MONOCHROME                  = 0x1000;
+    FT_LOAD_LINEAR_DESIGN               = 0x2000;
+    FT_LOAD_SBITS_ONLY                  = 0x4000;
+    FT_LOAD_NO_AUTOHINT                 = 0x8000;
+    FT_LOAD_COLOR                       = 0x100000;
+    FT_LOAD_COMPUTE_METRICS             = 0x200000;
+    FT_LOAD_BITMAP_METRICS_ONLY         = 0x400000;
+    FT_LOAD_SVG_ONLY                    = 0x800000;
+}
 
-s32 FT_Load_Char(FT_Face* face, u64 char_code, s32 load_flags) #extern "freetype"
+s32 FT_Load_Glyph(FT_Face* face, u32 glyph_index, FT_LoadFlags load_flags) #extern "freetype"
+
+s32 FT_Load_Char(FT_Face* face, u64 char_code, FT_LoadFlags load_flags) #extern "freetype"
 
 FT_Set_Transform(FT_Face* face, FT_Matrix* matrix, FT_Vector* delta) #extern "freetype"
 
