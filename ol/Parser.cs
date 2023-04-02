@@ -946,7 +946,10 @@ public static class Parser
                 break;
             }
 
-            structAst.Fields.Add(ParseStructField(enumerator));
+            var field = ParseStructField(enumerator, out var closed);
+            if (closed) break;
+
+            structAst.Fields.Add(field);
         }
 
         // 6. Mark field types as generic if necessary
@@ -968,8 +971,9 @@ public static class Parser
         return structAst;
     }
 
-    private static StructFieldAst ParseStructField(TokenEnumerator enumerator)
+    private static StructFieldAst ParseStructField(TokenEnumerator enumerator, out bool closed)
     {
+        closed = false;
         var attributes = ParseAttributes(enumerator);
         var structField = CreateAst<StructFieldAst>(enumerator);
         structField.Attributes = attributes;
@@ -987,14 +991,19 @@ public static class Parser
             var errorToken = enumerator.Current;
             ErrorReporter.Report($"Unexpected token in struct field '{errorToken.Value}'", enumerator.FileIndex, errorToken);
             // Parse to a ; or }
-            while (enumerator.MoveNext())
+            do
             {
                 var tokenType = enumerator.Current.Type;
-                if (tokenType == TokenType.SemiColon || tokenType == TokenType.CloseBrace)
+                if (tokenType == TokenType.SemiColon)
                 {
                     break;
                 }
-            }
+                if (tokenType == TokenType.CloseBrace)
+                {
+                    closed = true;
+                    break;
+                }
+            } while (enumerator.MoveNext());
             return structField;
         }
 
@@ -1033,15 +1042,21 @@ public static class Parser
             default:
                 ErrorReporter.Report($"Unexpected token '{token.Value}' in struct field", enumerator.FileIndex, token);
                 // Parse until there is an equals sign or semicolon
-                while (enumerator.MoveNext())
+                do
                 {
-                    if (enumerator.Current.Type == TokenType.SemiColon) break;
-                    if (enumerator.Current.Type == TokenType.Equals)
+                    var tokenType = enumerator.Current.Type;
+                    if (tokenType == TokenType.SemiColon) break;
+                    if (tokenType == TokenType.CloseBrace)
+                    {
+                        closed = true;
+                        break;
+                    }
+                    if (tokenType == TokenType.Equals)
                     {
                         ParseValue(structField, enumerator, null);
                         break;
                     }
-                }
+                } while (enumerator.MoveNext());
                 break;
         }
 
@@ -1323,14 +1338,18 @@ public static class Parser
                 break;
             }
 
-            union.Fields.Add(ParseUnionField(enumerator));
+            var field = ParseUnionField(enumerator, out var closed);
+            if (closed) break;
+
+            union.Fields.Add(field);
         }
 
         return union;
     }
 
-    private static UnionFieldAst ParseUnionField(TokenEnumerator enumerator)
+    private static UnionFieldAst ParseUnionField(TokenEnumerator enumerator, out bool closed)
     {
+        closed = false;
         var field = CreateAst<UnionFieldAst>(enumerator);
 
         if (enumerator.Current.Type != TokenType.Identifier)
@@ -1346,14 +1365,19 @@ public static class Parser
             var errorToken = enumerator.Current;
             ErrorReporter.Report($"Unexpected token in union field '{errorToken.Value}'", enumerator.FileIndex, errorToken);
             // Parse to a ; or }
-            while (enumerator.MoveNext())
+            do
             {
                 var tokenType = enumerator.Current.Type;
-                if (tokenType == TokenType.SemiColon || tokenType == TokenType.CloseBrace)
+                if (tokenType == TokenType.SemiColon)
                 {
                     break;
                 }
-            }
+                if (tokenType == TokenType.CloseBrace)
+                {
+                    closed = true;
+                    break;
+                }
+            } while (enumerator.MoveNext());
             return field;
         }
 
@@ -1389,14 +1413,20 @@ public static class Parser
             default:
                 ErrorReporter.Report($"Unexpected token '{token.Value}' in declaration", enumerator.FileIndex, token);
                 // Parse until there is a semicolon or closing brace
-                while (enumerator.MoveNext())
+                do
                 {
                     token = enumerator.Current;
-                    if (token.Type == TokenType.SemiColon || token.Type == TokenType.CloseBrace)
+                    if (token.Type == TokenType.SemiColon)
                     {
                         break;
                     }
+                    if (token.Type == TokenType.CloseBrace)
+                    {
+                        closed = true;
+                        break;
+                    }
                 }
+                while (enumerator.MoveNext());
                 break;
         }
 
