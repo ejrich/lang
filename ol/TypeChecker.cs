@@ -5403,18 +5403,21 @@ public static class TypeChecker
                 if (hasGenerics)
                 {
                     ErrorReporter.Report("Type 'bool' cannot have generics", type);
+                    return null;
                 }
                 return TypeTable.BoolType;
             case "string":
                 if (hasGenerics)
                 {
                     ErrorReporter.Report("Type 'string' cannot have generics", type);
+                    return null;
                 }
                 return TypeTable.StringType;
             case "Array":
                 if (type.Generics.Count != 1)
                 {
                     ErrorReporter.Report($"Type 'Array' should have 1 generic type, but got {type.Generics.Count}", type);
+                    return null;
                 }
                 return VerifyArray(type, scope, depth, out isGeneric);
             case "CArray":
@@ -5460,6 +5463,7 @@ public static class TypeChecker
                 if (hasGenerics)
                 {
                     ErrorReporter.Report("Type 'void' cannot have generics", type);
+                    return null;
                 }
                 return TypeTable.VoidType;
             case "*":
@@ -5528,12 +5532,14 @@ public static class TypeChecker
                 if (hasGenerics)
                 {
                     ErrorReporter.Report("Type 'Type' cannot have generics", type);
+                    return null;
                 }
                 return TypeTable.TypeType;
             case "Any":
                 if (hasGenerics)
                 {
                     ErrorReporter.Report("Type 'Any' cannot have generics", type);
+                    return null;
                 }
                 return TypeTable.AnyType;
             default:
