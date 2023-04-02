@@ -4777,26 +4777,29 @@ public static class TypeChecker
             }
             else if (functionArg.Type.TypeKind != TypeKind.Any)
             {
-                var argument = argumentTypes[i];
-                if (argument != null)
+                if (i < argumentTypes.Length)
                 {
-                    if (functionArg.Type.TypeKind == TypeKind.Type)
+                    var argument = argumentTypes[i];
+                    if (argument != null)
                     {
-                        if (argument.TypeKind != TypeKind.Type)
+                        if (functionArg.Type.TypeKind == TypeKind.Type)
                         {
-                            argument.Used = true;
-                            var typeIndex = new ConstantAst {Type = TypeTable.S32Type, Value = new Constant {Integer = argument.TypeIndex}};
-                            call.Arguments[i] = typeIndex;
-                            argumentTypes[i] = typeIndex.Type;
+                            if (argument.TypeKind != TypeKind.Type)
+                            {
+                                argument.Used = true;
+                                var typeIndex = new ConstantAst {Type = TypeTable.S32Type, Value = new Constant {Integer = argument.TypeIndex}};
+                                call.Arguments[i] = typeIndex;
+                                argumentTypes[i] = typeIndex.Type;
+                            }
                         }
-                    }
-                    else if (!TypeEquals(functionArg.Type, argument) && functionArg.Value != null)
-                    {
-                        call.Arguments.Insert(i, functionArg.Value);
-                    }
-                    else
-                    {
-                        VerifyConstantIfNecessary(call.Arguments[i], functionArg.Type);
+                        else if (!TypeEquals(functionArg.Type, argument) && functionArg.Value != null)
+                        {
+                            call.Arguments.Insert(i, functionArg.Value);
+                        }
+                        else
+                        {
+                            VerifyConstantIfNecessary(call.Arguments[i], functionArg.Type);
+                        }
                     }
                 }
             }

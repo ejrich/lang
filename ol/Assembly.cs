@@ -145,6 +145,10 @@ public static class Assembly
         }},
         {"int3", new InstructionDefinition[]{
             new() {Opcode = 0xCC}
+        }},
+        {"popcnt", new InstructionDefinition[]{
+            new() {Prefix = 0xF3, OF = true, Opcode = 0xB8, Value1 = new(size: 4), Value2 = new(size: 4)},
+            new() {Prefix = 0xF3, Rex = 0x48, OF = true, Opcode = 0xB8, Value1 = new(), Value2 = new()}
         }}
         // TODO Add more
     };

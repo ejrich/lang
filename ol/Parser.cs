@@ -3020,9 +3020,9 @@ public static class Parser
             return false;
         }
 
-        input.Ast = ParseNextExpressionUnit(enumerator, null, out _);
+        input.Ast = ParseExpression(enumerator, null);
 
-        if (!enumerator.MoveNext())
+        if (!enumerator.Remaining)
         {
             ErrorReporter.Report("Expected semicolon in instruction", enumerator.FileIndex, enumerator.Last);
             return false;
