@@ -108,6 +108,17 @@ int integer_length(s64 value) {
     return count;
 }
 
+int popcnt(int value) {
+    result: int;
+    asm {
+        in eax, value;
+        popcnt eax, eax;
+        out result, eax;
+    }
+
+    return result;
+}
+
 
 // Data structures
 struct Vector2 {
