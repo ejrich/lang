@@ -1769,7 +1769,7 @@ public static class TypeChecker
                                 {
                                     var insertFunction = ProgramIRBuilder.CreateRunnableFunction(insertScope, insertDirectiveFunction);
                                     var code = ProgramRunner.ExecuteInsert(insertFunction, insertScope);
-                                    end += InsertCode(code, function, directive, scope, i);
+                                    end += InsertCode(code, function, scope, directive.FileIndex, directive.Line, directive.Column, i);
                                 }
                             }
                             i--;
@@ -1824,20 +1824,20 @@ public static class TypeChecker
         }
     }
 
-    public static void AddCode(string code)
+    public static void AddCode(string code, int fileIndex, uint line, uint column)
     {
-        var line = AddCodeString(code, null, null);
-        Parser.ParseCode(code, _generatedCodeFileIndex, line);
+        var starting_line = AddCodeString(code, null, fileIndex, line, column);
+        Parser.ParseCode(code, _generatedCodeFileIndex, starting_line);
         ClearDirectiveQueue();
     }
 
-    public static int InsertCode(string code, IFunction function, IAst source, ScopeAst scope, int index = 0)
+    public static int InsertCode(string code, IFunction function, ScopeAst scope, int fileIndex, uint line, uint column, int index = 0)
     {
-        var line = AddCodeString(code, function, source);
-        return Parser.ParseInsertedCode(code, scope, _generatedCodeFileIndex, line, index);
+        var starting_line = AddCodeString(code, function, fileIndex, line, column);
+        return Parser.ParseInsertedCode(code, scope, _generatedCodeFileIndex, starting_line, index);
     }
 
-    private static uint AddCodeString(string code, IFunction function, IAst source)
+    private static uint AddCodeString(string code, IFunction function, int fileIndex, uint line, uint column)
     {
         if (_generatedCodeWriter == null)
         {
@@ -1851,21 +1851,13 @@ public static class TypeChecker
         }
 
         string header;
-        if (function != null && source != null)
+        if (function != null)
         {
-            header = $"\n// Generated code for {function.Name} in {BuildSettings.FileName(source.FileIndex)} at line {source.Line}:{source.Column}\n\n";
-        }
-        else if (function != null)
-        {
-            header = $"\n// Generated code in {function.Name}\n\n";
-        }
-        else if (source != null)
-        {
-            header = $"\n// Generated code from {BuildSettings.FileName(source.FileIndex)} at line {source.Line}:{source.Column}\n\n";
+            header = $"\n// Generated code for {function.Name} in {BuildSettings.FileName(fileIndex)} at line {line}:{column}\n\n";
         }
         else
         {
-            header = $"\n// Generated code from call to add_code\n\n";
+            header = $"\n// Generated code from call to add_code in {BuildSettings.FileName(fileIndex)} at line {line}:{column}\n\n";
         }
 
         _generatedCodeWriter.Write(header);

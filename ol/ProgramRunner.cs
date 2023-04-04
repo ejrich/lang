@@ -319,7 +319,7 @@ public static unsafe class ProgramRunner
 
         if (functionDef?.Body != null)
         {
-            var inserted = TypeChecker.InsertCode(codeString, functionDef, null, functionDef.Body);
+            var inserted = TypeChecker.InsertCode(codeString, functionDef, functionDef.Body, fileIndex, line, column);
             if (functionDef.Flags.HasFlag(FunctionFlags.Verified))
             {
                 TypeChecker.VerifyScope(functionDef.Body, functionDef, endIndex: inserted);
@@ -345,10 +345,10 @@ public static unsafe class ProgramRunner
         }
     }
 
-    private static void AddCode(String code)
+    private static void AddCode(String code, int fileIndex, uint line, uint column)
     {
         var codeString = Marshal.PtrToStringAnsi(code.Data, (int)code.Length);
-        TypeChecker.AddCode(codeString);
+        TypeChecker.AddCode(codeString, fileIndex, line, column);
     }
 
     public static Register ExecuteFunction(FunctionIR function)
@@ -1742,7 +1742,7 @@ public static unsafe class ProgramRunner
                 {
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
                     var code = Marshal.PtrToStructure<String>(value.Pointer);
-                    AddCode(code);
+                    AddCode(code, fileIndex, line, column);
                     break;
                 }
                 default:
