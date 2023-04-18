@@ -1,5 +1,7 @@
 // General math module
 
+PI: float64 = 3.14159265359; #const
+
 float abs(float value) {
     if value < 0 return -value;
     return value;
