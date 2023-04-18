@@ -11,12 +11,15 @@
 * Built in runtime type information
 * Simple polymorphism for structs, functions, and operator overloading
 * Concise standard library
-* Modules and packages
-* API to define the program within the program, not makefiles
+* API to define the program _with_ the program, not makefiles
 
 ### How to build this project
 
-* First install the [.Net 6 SDK](https://dotnet.microsoft.com/download)
+* Download [NASM](https://www.nasm.us/) to build the runtime binary
+* Build the runtime object file, this contains the program entrypoint `_start`
+    * Linux - run `./build_runtime.sh`
+    * Windows - run `.\build_runtime.bat`
+* Install the [.Net 6 SDK](https://dotnet.microsoft.com/download)
 * Run `dotnet restore`
 * Once the dependencies are installed, run `dotnet build --no-restore`
     * If using vim, this can be run using `<leader><F8>`
@@ -34,4 +37,4 @@ The tests should always be run when making changes to the compiler for regressio
 
 ### Support
 
-This is a personal project, so no guarantees. Supporting Linux only for now, Windows eventually since it's not my main OS.
+This is a personal project, so no guarantees. Supporting Linux/Windows for now, Mac eventually since it's not my main OS.
