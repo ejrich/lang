@@ -940,15 +940,18 @@ public static class TypeChecker
                     }
                 }
 
-                if (structField.Type.Alignment > structAst.Alignment)
+                if (structField.Type.Alignment > 0)
                 {
-                    structAst.Alignment = structField.Type.Alignment;
-                }
+                    if (structField.Type.Alignment > structAst.Alignment)
+                    {
+                        structAst.Alignment = structField.Type.Alignment;
+                    }
 
-                var alignmentOffset = structAst.Size % structField.Type.Alignment;
-                if (alignmentOffset > 0)
-                {
-                    structAst.Size += structField.Type.Alignment - alignmentOffset;
+                    var alignmentOffset = structAst.Size % structField.Type.Alignment;
+                    if (alignmentOffset > 0)
+                    {
+                        structAst.Size += structField.Type.Alignment - alignmentOffset;
+                    }
                 }
 
                 structField.Offset = structAst.Size;

@@ -375,8 +375,7 @@ struct FT_Size_RequestRec {
     vertResolution: u32;
 }
 
-struct FT_Size_Request {}
-s32 FT_Request_Size(FT_Face* face, FT_Size_Request* req) #extern "freetype"
+s32 FT_Request_Size(FT_Face* face, FT_Size_RequestRec* req) #extern "freetype"
 
 s32 FT_Set_Char_Size(FT_Face* face, s64 char_width, s64 char_height, u32 horz_resolution, u32 vert_resolution) #extern "freetype"
 

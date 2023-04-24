@@ -2153,13 +2153,13 @@ public static class Parser
         if (!expression.Children.Any())
         {
             ErrorReporter.Report("Expression should contain elements", enumerator.FileIndex, enumerator.Current);
+            return null;
         }
-        else if (!operatorRequired && expression.Children.Any())
+        if (!operatorRequired && expression.Children.Any())
         {
             ErrorReporter.Report("Value required after operator", enumerator.FileIndex, enumerator.Current);
             return expression;
         }
-
         if (expression.Children.Count == 1)
         {
             return expression.Children.First();
