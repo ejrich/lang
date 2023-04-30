@@ -2373,14 +2373,8 @@ public static unsafe class LLVMBackend
         {
             switch (RuntimeInformation.ProcessArchitecture)
             {
-                case Architecture.X86:
-                    BuildSettings.OutputArchitecture = OutputArchitecture.X86;
-                    break;
                 case Architecture.X64:
                     BuildSettings.OutputArchitecture = OutputArchitecture.X64;
-                    break;
-                case Architecture.Arm:
-                    BuildSettings.OutputArchitecture = OutputArchitecture.Arm;
                     break;
                 case Architecture.Arm64:
                     BuildSettings.OutputArchitecture = OutputArchitecture.Arm64;
@@ -2395,20 +2389,10 @@ public static unsafe class LLVMBackend
         string targetName = null, arch = null;
         switch (BuildSettings.OutputArchitecture)
         {
-            case OutputArchitecture.X86:
-                InitializeX86LLVM();
-                targetName = "x86";
-                arch = "i386";
-                break;
             case OutputArchitecture.X64:
                 InitializeX86LLVM();
                 targetName = "x86-64";
                 arch = "x86_64";
-                break;
-            case OutputArchitecture.Arm:
-                InitializeArmLLVM();
-                targetName = "arm";
-                arch = "arm";
                 break;
             case OutputArchitecture.Arm64:
                 InitializeArm64LLVM();

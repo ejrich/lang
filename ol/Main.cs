@@ -60,9 +60,7 @@ public enum OutputTypeTableConfiguration : byte
 public enum OutputArchitecture : byte
 {
     None,
-    X86,
     X64,
-    Arm,
     Arm64
 }
 

@@ -157,17 +157,9 @@ public static class Linker
         string linkerPattern = null, lib = null;
         switch (BuildSettings.OutputArchitecture)
         {
-            case OutputArchitecture.X86:
-                linkerPattern = "ld-linux.so*";
-                lib = "x86";
-                break;
             case OutputArchitecture.X64:
                 linkerPattern = "ld-linux-x86-64.so*";
                 lib = "x86_64";
-                break;
-            case OutputArchitecture.Arm:
-                linkerPattern = "ld-linux.so*";
-                lib = "arm"; // @Cleanup Find example for this
                 break;
             case OutputArchitecture.Arm64:
                 linkerPattern = "ld-linux-aarch64.so*";
