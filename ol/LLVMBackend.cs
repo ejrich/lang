@@ -2471,15 +2471,6 @@ public static unsafe class LLVMBackend
         LLVM.InitializeX86AsmPrinter();
     }
 
-    private static void InitializeArmLLVM()
-    {
-        LLVM.InitializeARMTargetInfo();
-        LLVM.InitializeARMTarget();
-        LLVM.InitializeARMTargetMC();
-        LLVM.InitializeARMAsmParser();
-        LLVM.InitializeARMAsmPrinter();
-    }
-
     private static void InitializeArm64LLVM()
     {
         LLVM.InitializeAArch64TargetInfo();
