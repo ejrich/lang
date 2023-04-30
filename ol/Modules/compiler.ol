@@ -36,9 +36,7 @@ copy_to_output_directory(string file) #compiler
 
 enum OutputArchitecture : u8 {
     None;
-    X86;
     X64;
-    Arm;
     Arm64;
 }
 
