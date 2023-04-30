@@ -1624,20 +1624,8 @@ update_uniform_buffer(u32 current_image) {
     vkUnmapMemory(device, uniform_buffers_memory[current_image]);
 }
 
-pi := 3.14159265359; #const
-
 float radians(float degrees) {
-    return degrees * pi / 180;
-}
-
-Matrix4 mat4_ident() {
-    matrix: Matrix4 = {
-        a = { x = 1.0; }
-        b = { y = 1.0; }
-        c = { z = 1.0; }
-        d = { w = 1.0; }
-    }
-    return matrix;
+    return degrees * PI / 180;
 }
 
 // rotate, look_at, and perspective borrowed from https://github.com/g-truc/glm
@@ -1645,11 +1633,12 @@ Matrix4 mat4_rotate_z(float angle) {
     sin := sine(angle);
     cos := cosine(angle);
 
-    matrix := mat4_ident();
-    matrix.a.x = cos;
-    matrix.a.y = sin;
-    matrix.b.x = -sin;
-    matrix.b.y = cos;
+    matrix: Matrix4 = {
+        a = { x = cos;  y = sin; }
+        b = { x = -sin; y = cos; }
+        c = { z = 1.0; }
+        d = { w = 1.0; }
+    }
 
     return matrix;
 }
@@ -1661,23 +1650,12 @@ Matrix4 look_at(Vector3 eye, Vector3 center, Vector3 up) {
     s := normalize(cross);
     u := cross(s, f);
 
-    result := mat4_ident();
-
-    result.a.x = s.x;
-    result.b.x = s.y;
-    result.c.x = s.z;
-
-    result.a.y = u.x;
-    result.b.y = u.y;
-    result.c.y = u.z;
-
-    result.a.z = -f.x;
-    result.b.z = -f.y;
-    result.c.z = -f.z;
-
-    result.d.x = -dot(s, eye);
-    result.d.y = -dot(u, eye);
-    result.d.z = dot(f, eye);
+    result: Matrix4 = {
+        a = { x = s.x; y = u.x; z = -f.x; }
+        b = { x = s.y; y = u.y; z = -f.y; }
+        c = { x = s.z; y = u.z; z = -f.z; }
+        d = { x = -dot(s, eye); y = -dot(u, eye); z = dot(f, eye); w = 1.0; }
+    }
 
     return result;
 }
@@ -1685,13 +1663,12 @@ Matrix4 look_at(Vector3 eye, Vector3 center, Vector3 up) {
 Matrix4 perspective(float fovy, float aspect, float z_near, float z_far) {
     tan_half_fovy := tangent(fovy / 2.0);
 
-    result: Matrix4;
-
-    result.a.x = 1 / (aspect * tan_half_fovy);
-    result.b.y = -1 / tan_half_fovy;
-    result.c.z = -z_far / (z_far - z_near);
-    result.c.w = -1.0;
-    result.d.z = - (z_far * z_near) / (z_far - z_near);
+    result: Matrix4 = {
+        a = { x = 1 / (aspect * tan_half_fovy); }
+        b = { y = -1 / tan_half_fovy; }
+        c = { z = -z_far / (z_far - z_near); w = -1.0; }
+        d = { z = - (z_far * z_near) / (z_far - z_near); }
+    }
 
     return result;
 }
