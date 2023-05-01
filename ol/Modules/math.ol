@@ -128,10 +128,20 @@ struct Vector2 {
     y: float;
 }
 
+Vector2 vec2(float x = 0.0, float y = 0.0) {
+    vector: Vector2 = { x = x; y = y; }
+    return vector;
+}
+
 struct Vector3 {
     x: float;
     y: float;
     z: float;
+}
+
+Vector3 vec3(float x = 0.0, float y = 0.0, float z = 0.0) {
+    vector: Vector3 = { x = x; y = y; z = z; }
+    return vector;
 }
 
 struct Vector4 {
@@ -139,6 +149,11 @@ struct Vector4 {
     y: float;
     z: float;
     w: float;
+}
+
+Vector4 vec4(float x = 0.0, float y = 0.0, float z = 0.0, float w = 0.0) {
+    vector: Vector4 = { x = x; y = y; z = z; w = w; }
+    return vector;
 }
 
 struct Matrix4 {

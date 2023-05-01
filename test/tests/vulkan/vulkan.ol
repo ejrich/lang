@@ -1644,7 +1644,7 @@ Matrix4 mat4_rotate_z(float angle) {
 }
 
 Matrix4 look_at(Vector3 eye, Vector3 center, Vector3 up) {
-    sub := sub(center, eye);
+    sub := center - eye;
     f := normalize(sub);
     cross := cross(f, up);
     s := normalize(cross);
@@ -1671,20 +1671,6 @@ Matrix4 perspective(float fovy, float aspect, float z_near, float z_far) {
     }
 
     return result;
-}
-
-Vector3 sub(Vector3 a, Vector3 b) {
-    result: Vector3 = {
-        x = a.x - b.x;
-        y = a.y - b.y;
-        z = a.z - b.z;
-    }
-    return result;
-}
-
-Vector3 vec3(float x = 0.0, float y = 0.0, float z = 0.0) {
-    vector: Vector3 = { x = x; y = y; z = z; }
-    return vector;
 }
 
 
