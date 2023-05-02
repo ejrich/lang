@@ -815,7 +815,7 @@ public static unsafe class LLVMBackend
         foreach (var (name, value) in enumAst.Values)
         {
             var enumValueNameString = GetString(name);
-            var enumValue = LLVM.ConstInt(LLVM.Int32Type(), (uint)value.Value, 0);
+            var enumValue = LLVM.ConstInt(LLVM.Int64Type(), (ulong)value.Value, 0);
 
             Span<LLVMValueRef> enumValueFields = stackalloc LLVMValueRef[] {enumValueNameString, enumValue};
             enumValueRefs[value.Index] = LLVMValueRef.CreateConstNamedStruct(_enumValueType, enumValueFields);
@@ -2535,7 +2535,7 @@ public static unsafe class LLVMBackend
 
         fixed (LLVMMetadataRef* enumValuesPointer = enumValues)
         {
-            _debugTypes[enumAst.TypeIndex] = LLVM.DIBuilderCreateEnumerationType(_debugBuilder, null, enumName.Value, (UIntPtr)enumName.Length, file, enumAst.Line, (uint)enumAst.Size * 8, 0, (LLVMOpaqueMetadata**)enumValuesPointer, (uint)enumValues.Length, _debugTypes[enumAst.BaseType.TypeIndex]);
+            _debugTypes[enumAst.TypeIndex] = LLVM.DIBuilderCreateEnumerationType(_debugBuilder, null, enumName.Value, (UIntPtr)enumName.Length, file, enumAst.Line, enumAst.Size * 8, 0, (LLVMOpaqueMetadata**)enumValuesPointer, (uint)enumValues.Length, _debugTypes[enumAst.BaseType.TypeIndex]);
         }
     }
 
