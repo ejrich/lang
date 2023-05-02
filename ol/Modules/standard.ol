@@ -582,7 +582,7 @@ write_value_to_buffer(StringBuffer* buffer, TypeInfo* type, void* data) {
         }
         case TypeKind.Enum; {
             type_info := cast(EnumTypeInfo*, type);
-            value: s32;
+            value: s64;
             switch type_info.size {
                 case 1;  value = *cast(s8*, data);
                 case 2;  value = *cast(s16*, data);
