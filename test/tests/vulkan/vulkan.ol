@@ -1763,14 +1763,14 @@ stbi_image_free(void* image) #extern stb_image
 
 int create_texture_image(string file, VkImage** texture_image, VkDeviceMemory** texture_image_memory) {
     width, height, max, channels: int;
-    pixels := stbi_load(file, &width, &height, &channels, 4);
+    pixels := stbi_load(file, &width, &height, &channels, 0);
 
     if pixels == null {
         print("Failed to load texture image\n");
         exit_program(1);
     }
 
-    image_size := width * height * 4;
+    image_size := width * height * channels;
 
     if width > height max = width;
     else max = height;
@@ -1790,16 +1790,16 @@ int create_texture_image(string file, VkImage** texture_image, VkDeviceMemory** 
 
     stbi_image_free(pixels);
 
-    create_image(width, height, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageTiling.VK_IMAGE_TILING_OPTIMAL, VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits.VK_IMAGE_USAGE_SAMPLED_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, texture_image, texture_image_memory, mip_levels);
+    create_image(width, height, VkFormat.VK_FORMAT_R8G8B8_SRGB, VkImageTiling.VK_IMAGE_TILING_OPTIMAL, VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VkImageUsageFlagBits.VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits.VK_IMAGE_USAGE_SAMPLED_BIT, VkMemoryPropertyFlagBits.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, texture_image, texture_image_memory, mip_levels);
 
-    transition_image_layout(*texture_image, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mip_levels);
+    transition_image_layout(*texture_image, VkFormat.VK_FORMAT_R8G8B8_SRGB, VkImageLayout.VK_IMAGE_LAYOUT_UNDEFINED, VkImageLayout.VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mip_levels);
 
     copy_buffer_to_image(staging_buffer, *texture_image, width, height);
 
     vkDestroyBuffer(device, staging_buffer, null);
     vkFreeMemory(device, staging_buffer_memory, null);
 
-    generate_mipmaps(*texture_image, VkFormat.VK_FORMAT_R8G8B8A8_SRGB, width, height, mip_levels);
+    generate_mipmaps(*texture_image, VkFormat.VK_FORMAT_R8G8B8_SRGB, width, height, mip_levels);
 
     return mip_levels;
 }
@@ -1969,7 +1969,7 @@ create_texture_image_view(VkImage* texture_image, VkImageView** texture_image_vi
     view_info: VkImageViewCreateInfo = {
         image = texture_image;
         viewType = VkImageViewType.VK_IMAGE_VIEW_TYPE_2D;
-        format = VkFormat.VK_FORMAT_R8G8B8A8_SRGB;
+        format = VkFormat.VK_FORMAT_R8G8B8_SRGB;
         subresourceRange = {
             aspectMask = VkImageAspectFlagBits.VK_IMAGE_ASPECT_COLOR_BIT;
             baseMipLevel = 0;
