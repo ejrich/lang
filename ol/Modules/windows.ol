@@ -53,6 +53,8 @@ bool TranslateMessage(MSG* lpMsg) #extern "user32"
 s64 DispatchMessageA(MSG* lpMsg) #extern "user32"
 bool GetWindowRect(Handle* hWnd, RECT* lpRect) #extern "user32"
 s16 GetKeyState(int nVirtKey) #extern "user32"
+bool GetKeyboardState(u8* lpKeyState) #extern "user32"
+int ToAscii(u32 uVirtKey, u32 uScanCode, u8* lpKeyState, u8* lpChar, u32 uFlags) #extern "user32"
 
 NtStatus BCryptOpenAlgorithmProvider(Handle** phAlgorithm, u16* pszAlgId, u16* pszImplementation, u64 dwFlags) #extern "bcrypt"
 NtStatus BCryptCloseAlgorithmProvider(Handle* phAlgorithm, u64 dwFlags) #extern "bcrypt"
