@@ -1118,7 +1118,9 @@ public static class ProgramIRBuilder
             if (assignment.Operator != Operator.None)
             {
                 var previousValue = EmitLoad(function, type, pointer, scope);
-                value = EmitExpression(function, previousValue, value, assignment.Operator, type, scope);
+                value = assignment.OperatorOverload != null ?
+                    EmitCall(function, assignment.OperatorOverload, new []{previousValue, value}, scope) :
+                    EmitExpression(function, previousValue, value, assignment.Operator, type, scope);
             }
 
             EmitStore(function, pointer, value, scope);

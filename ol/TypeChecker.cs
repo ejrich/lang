@@ -2719,71 +2719,95 @@ public static class TypeChecker
 
                     var lhs = type.TypeKind;
                     var rhs = valueType.TypeKind;
-                    switch (assignment.Operator)
+                    if ((lhs == TypeKind.Struct && rhs == TypeKind.Struct) ||
+                        (lhs == TypeKind.String && rhs == TypeKind.String))
                     {
-                        // Both need to be bool and returns bool
-                        case Operator.And:
-                        case Operator.Or:
-                            if (lhs != TypeKind.Boolean || rhs != TypeKind.Boolean)
+                        if (TypeEquals(type, valueType, true))
+                        {
+                            var overload = VerifyOperatorOverloadType((StructAst)type, assignment.Operator, currentFunction, assignment.Value, scope);
+                            if (overload != null)
                             {
-                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
+                                if (overload.ReturnType != type)
+                                {
+                                    ErrorReporter.Report($"Overload for operator {PrintOperator(assignment.Operator)} of type '{type.Name}' returned '{overload.ReturnType}', when assignment expected the same type", assignment.Value);
+                                    return;
+                                }
+                                assignment.OperatorOverload = overload;
                             }
-                            break;
-                            // Invalid assignment operators
-                        case Operator.Equality:
-                        case Operator.GreaterThan:
-                        case Operator.LessThan:
-                        case Operator.GreaterThanEqual:
-                        case Operator.LessThanEqual:
-                            ErrorReporter.Report($"Invalid operator '{PrintOperator(assignment.Operator)}' in assignment", assignment);
-                            break;
-                            // Requires same types and returns more precise type
-                        case Operator.Add:
-                        case Operator.Subtract:
-                        case Operator.Multiply:
-                        case Operator.Divide:
-                            if (!(lhs == TypeKind.Integer && rhs == TypeKind.Integer) &&
-                                    !(lhs == TypeKind.Float && (rhs == TypeKind.Float || rhs == TypeKind.Integer)))
-                            {
-                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
-                            }
-                            break;
-                        case Operator.Modulus:
-                            if (lhs != TypeKind.Integer || rhs != TypeKind.Integer)
-                            {
-                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
-                            }
-                            break;
-                            // Requires both integer or bool types and returns more same type
-                        case Operator.BitwiseAnd:
-                        case Operator.BitwiseOr:
-                        case Operator.Xor:
-                            if (lhs == TypeKind.Enum && rhs == TypeKind.Enum)
-                            {
-                                if (type != valueType)
+                        }
+                        else
+                        {
+                            ErrorReporter.Report($"Operator {PrintOperator(assignment.Operator)} not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
+                        }
+                    }
+                    else
+                    {
+                        switch (assignment.Operator)
+                        {
+                            // Both need to be bool and returns bool
+                            case Operator.And:
+                            case Operator.Or:
+                                if (lhs != TypeKind.Boolean || rhs != TypeKind.Boolean)
                                 {
                                     ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
                                 }
-                            }
-                            else if (!(lhs == TypeKind.Boolean && rhs == TypeKind.Boolean) && !(lhs == TypeKind.Integer && rhs == TypeKind.Integer))
-                            {
-                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
-                            }
-                            break;
-                            // Requires both to be integers
-                        case Operator.ShiftLeft:
-                        case Operator.ShiftRight:
-                        case Operator.RotateLeft:
-                        case Operator.RotateRight:
-                            if (lhs != TypeKind.Integer || rhs != TypeKind.Integer)
-                            {
-                                ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
-                            }
-                            else if (assignment.Value is ConstantAst constantAst)
-                            {
-                                constantAst.Type = type;
-                            }
-                            break;
+                                break;
+                                // Invalid assignment operators
+                            case Operator.Equality:
+                            case Operator.GreaterThan:
+                            case Operator.LessThan:
+                            case Operator.GreaterThanEqual:
+                            case Operator.LessThanEqual:
+                                ErrorReporter.Report($"Invalid operator '{PrintOperator(assignment.Operator)}' in assignment", assignment);
+                                break;
+                                // Requires same types and returns more precise type
+                            case Operator.Add:
+                            case Operator.Subtract:
+                            case Operator.Multiply:
+                            case Operator.Divide:
+                                if (!(lhs == TypeKind.Integer && rhs == TypeKind.Integer) &&
+                                    !(lhs == TypeKind.Float && (rhs == TypeKind.Float || rhs == TypeKind.Integer)))
+                                {
+                                    ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
+                                }
+                                break;
+                            case Operator.Modulus:
+                                if (lhs != TypeKind.Integer || rhs != TypeKind.Integer)
+                                {
+                                    ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
+                                }
+                                break;
+                                // Requires both integer or bool types and returns more same type
+                            case Operator.BitwiseAnd:
+                            case Operator.BitwiseOr:
+                            case Operator.Xor:
+                                if (lhs == TypeKind.Enum && rhs == TypeKind.Enum)
+                                {
+                                    if (type != valueType)
+                                    {
+                                        ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
+                                    }
+                                }
+                                else if (!(lhs == TypeKind.Boolean && rhs == TypeKind.Boolean) && !(lhs == TypeKind.Integer && rhs == TypeKind.Integer))
+                                {
+                                    ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
+                                }
+                                break;
+                                // Requires both to be integers
+                            case Operator.ShiftLeft:
+                            case Operator.ShiftRight:
+                            case Operator.RotateLeft:
+                            case Operator.RotateRight:
+                                if (lhs != TypeKind.Integer || rhs != TypeKind.Integer)
+                                {
+                                    ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
+                                }
+                                else if (assignment.Value is ConstantAst constantAst)
+                                {
+                                    constantAst.Type = type;
+                                }
+                                break;
+                        }
                     }
                 }
                 else if (!TypeEquals(type, valueType))

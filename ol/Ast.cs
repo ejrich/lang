@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 
@@ -457,6 +457,7 @@ public class AssignmentAst : IValues
     public uint Column { get; init; }
     public IAst Reference { get; set; }
     public Operator Operator { get; set; }
+    public OperatorOverloadAst OperatorOverload { get; set; }
     public IAst Value { get; set; }
     public Dictionary<string, AssignmentAst> Assignments { get; set; }
     public List<IAst> ArrayValues { get; set; }
