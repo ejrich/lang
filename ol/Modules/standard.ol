@@ -420,19 +420,27 @@ print(string format, Params args) {
         return;
     }
 
-    buffer: StringBuffer;
-    format_string_arguments(&buffer, format, args);
-    write_buffer_to_standard_out(&buffer.buffer, buffer.length);
+    buffer: Array<u8>[STRING_BUFFER_MAX_LENGTH];
+    string_buffer: StringBuffer = { buffer = buffer; }
+    format_string_arguments(&string_buffer, format, args);
+    write_buffer_to_standard_out(buffer.data, string_buffer.length);
 }
 
 string format_string(string format, Allocate allocator = default_allocator, Params args) {
-    buffer: StringBuffer;
-    format_string_arguments(&buffer, format, args);
+    buffer: Array<u8>[STRING_BUFFER_MAX_LENGTH];
+    string_buffer: StringBuffer = { buffer = buffer; }
 
-    value: string = { length = buffer.length; data = allocator(buffer.length + 1); }
-    memory_copy(value.data, &buffer.buffer, buffer.length);
-    value[buffer.length] = 0; // @Cleanup Make this just length
+    format_string_arguments(&string_buffer, format, args);
+
+    value: string = { length = string_buffer.length; data = allocator(string_buffer.length + 1); }
+    memory_copy(value.data, buffer.data, string_buffer.length);
+    value[string_buffer.length] = 0; // @Cleanup Make this just length
     return value;
+}
+
+struct StringBuffer {
+    length: s64;
+    buffer: Array<u8>;
 }
 
 union IntFormatValue {
@@ -481,13 +489,6 @@ format_string_arguments(StringBuffer* buffer, string format, Array<Any> args) {
             buffer.buffer[buffer.length++] = char;
         }
     }
-}
-
-string_buffer_max_length := 1024; #const
-
-struct StringBuffer {
-    length: s64;
-    buffer: CArray<u8>[string_buffer_max_length];
 }
 
 write_buffer_to_standard_out(u8* buffer, s64 length) {
@@ -1104,9 +1105,10 @@ write_to_file(File file, string format, Params args) {
         return;
     }
 
-    buffer: StringBuffer;
-    format_string_arguments(&buffer, format, args);
-    write_buffer_to_file(file, &buffer.buffer, buffer.length);
+    buffer: Array<u8>[STRING_BUFFER_MAX_LENGTH];
+    string_buffer: StringBuffer = { buffer = buffer; }
+    format_string_arguments(&string_buffer, format, args);
+    write_buffer_to_file(file, buffer.data, string_buffer.length);
 }
 
 write_to_file(File file, u8 char) {
@@ -1267,6 +1269,8 @@ add_exit_callback(ExitCallback callback) {
 }
 
 #private
+
+STRING_BUFFER_MAX_LENGTH := 1024; #const
 
 struct DefaultAllocation {
     size: u64;
