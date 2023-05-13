@@ -59,12 +59,13 @@ public static unsafe class Messages
         [FieldOffset(24)] public uint Line;
         [FieldOffset(28)] public uint Column;
         [FieldOffset(32)] public String Name;
-        [FieldOffset(48)] public IntPtr ReturnType;
-        [FieldOffset(56)] public ArrayStruct Arguments;
-        [FieldOffset(72)] public ArrayStruct Attributes;
-        [FieldOffset(88)] public IntPtr Source;
+        [FieldOffset(48)] public FunctionFlags Flags;
+        [FieldOffset(56)] public IntPtr ReturnType;
+        [FieldOffset(64)] public ArrayStruct Arguments;
+        [FieldOffset(80)] public ArrayStruct Attributes;
+        [FieldOffset(96)] public IntPtr Source;
 
-        public const int Size = 96;
+        public const int Size = 104;
     }
 
     [StructLayout(LayoutKind.Explicit, Size=Size)]
@@ -176,6 +177,7 @@ public static unsafe class Messages
             if (typeInfoPointer != IntPtr.Zero)
             {
                 var functionTypeInfo = Marshal.PtrToStructure<TypeTable.FunctionTypeInfo>(typeInfoPointer);
+                functionMessage.Flags = functionAst.Flags & FunctionFlags.PublicFlagsMask;
                 functionMessage.ReturnType = functionTypeInfo.ReturnType;
                 functionMessage.Arguments = functionTypeInfo.Arguments;
                 functionMessage.Attributes = functionTypeInfo.Attributes;
@@ -183,6 +185,7 @@ public static unsafe class Messages
         }
         else if (type == MessageType.TypeCheckSuccessful && function is OperatorOverloadAst)
         {
+            functionMessage.Flags = function.Flags & FunctionFlags.PublicFlagsMask;
             functionMessage.ReturnType = TypeTable.TypeInfos[function.ReturnType.TypeIndex];
             functionMessage.Arguments = TypeTable.MakeArguments(function.Arguments);
         }
