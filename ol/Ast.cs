@@ -59,7 +59,8 @@ public enum FunctionFlags
     PrintIR = 0x800,
     Queued = 0x1000,
     PassCallLocation = 0x2000,
-    Inline = 0x4000
+    Inline = 0x4000,
+    PublicFlagsMask = 0x400F
 }
 
 public interface IValues : IAst

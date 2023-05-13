@@ -71,9 +71,20 @@ struct CompilerAst {
 
 struct FunctionAst : CompilerAst {
     name: string;
+    flags: FunctionFlags;
     return_type: TypeInfo*;
     arguments: Array<ArgumentType>;
     attributes: Array<string>;
+}
+
+[flags]
+enum FunctionFlags {
+    None     = 0x0;
+    Extern   = 0x1;
+    Compiler = 0x2;
+    Syscall  = 0x4;
+    Varargs  = 0x8;
+    Inline   = 0x4000;
 }
 
 struct EnumAst : CompilerAst {

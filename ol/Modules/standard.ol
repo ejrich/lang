@@ -602,7 +602,7 @@ write_value_to_buffer(StringBuffer* buffer, TypeInfo* type, void* data) {
             found := false;
             if flags {
                 each enum_value in type_info.values {
-                    if enum_value.value & value {
+                    if (enum_value.value == 0 && value == 0) || (enum_value.value != 0 && (enum_value.value & value) == enum_value.value) {
                         if found add_to_string_buffer(buffer, " | ");
                         else found = true;
 
