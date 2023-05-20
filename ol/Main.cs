@@ -85,6 +85,21 @@ public static class ol
         {
             switch (arg)
             {
+                case "-h":
+                case "--help":
+                    Console.WriteLine(@"Usage: ol [options] file
+
+Options:
+  -h, --help        Display this help text
+  -R, --release     Build the program in release mode
+  --noDebug         Disable debug information in the resulting executable
+  -S                Output the resulting .ll and .s files
+  -V                Begin to parse values for global variables, e.g.: foo=1 bar=true
+                    Can only be used after the entrypoint file is declared
+  --noThreads       Runs the compiler in single-threaded mode, can be used to avoid compiler race conditions
+
+Looking for more options? Command-line options in this compiler are only used to modify how the compiler executes and not the program definition. To modify the program definition, include the functions in the compiler module by using '#import compiler' and call the functions in a #run directive. These functions cannot be used in the main function of the program and will result in a compilation error if done so.");
+                    return;
                 case "-R":
                 case "--release":
                     BuildSettings.Release = true;
