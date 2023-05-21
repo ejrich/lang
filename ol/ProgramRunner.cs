@@ -382,6 +382,8 @@ public static unsafe class ProgramRunner
             }
         }
 
+        function.Executing = true;
+
         var instructionPointer = 0;
         Span<Register> registers = stackalloc Register[function.ValueCount];
         #if _LINUX
@@ -394,6 +396,7 @@ public static unsafe class ProgramRunner
 
         while (true)
         {
+            Debug.Assert(instructionPointer < function.Instructions.Count);
             var instruction = function.Instructions[instructionPointer++];
 
             switch (instruction.Type)
@@ -423,6 +426,7 @@ public static unsafe class ProgramRunner
                             block.Cursor = cursor;
                         }
                     }
+                    function.Executing = false;
                     return value;
                 }
                 case InstructionType.ReturnVoid:
@@ -435,6 +439,7 @@ public static unsafe class ProgramRunner
                             block.Cursor = cursor;
                         }
                     }
+                    function.Executing = false;
                     return new Register();
                 }
                 case InstructionType.Load:
