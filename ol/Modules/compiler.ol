@@ -60,6 +60,7 @@ enum AstType {
     Struct;
     Union;
     Interface;
+    GlobalVariable;
 }
 
 struct CompilerAst {
@@ -109,6 +110,11 @@ struct InterfaceAst : CompilerAst {
     name: string;
     return_type: TypeInfo*;
     arguments: Array<ArgumentType>;
+}
+
+struct GlobalVariableAst : CompilerAst {
+    name: string;
+    variable_type: TypeInfo*;
 }
 
 // Compiler messaging infrastructure

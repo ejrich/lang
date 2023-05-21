@@ -48,7 +48,8 @@ public static unsafe class Messages
         Enum,
         Struct,
         Union,
-        Interface
+        Interface,
+        GlobalVariable
     }
 
     [StructLayout(LayoutKind.Explicit, Size=Size)]
@@ -126,6 +127,20 @@ public static unsafe class Messages
         [FieldOffset(72)] public IntPtr Source;
 
         public const int Size = 80;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size=Size)]
+    public struct GlobalVariable
+    {
+        [FieldOffset(0)] public AstType Type;
+        [FieldOffset(8)] public String File;
+        [FieldOffset(24)] public uint Line;
+        [FieldOffset(28)] public uint Column;
+        [FieldOffset(32)] public String Name;
+        [FieldOffset(48)] public IntPtr VariableType;
+        [FieldOffset(56)] public IntPtr Source;
+
+        public const int Size = 64;
     }
 
     private static readonly ConcurrentQueue<CompilerMessage> MessageQueue = new();
@@ -331,6 +346,38 @@ public static unsafe class Messages
         }
 
         Marshal.StructureToPtr(interfaceMessage, pointer, false);
+        Submit(type, pointer);
+    }
+
+    public static void Submit(MessageType type, DeclarationAst variable)
+    {
+        if (ErrorReporter.Errors.Any() || _completed) return;
+
+        IntPtr pointer;
+        GlobalVariable globalMessage;
+        if (variable.MessagePointer == IntPtr.Zero)
+        {
+            var handle = GCHandle.Alloc(variable);
+            globalMessage = new()
+            {
+                Type = AstType.GlobalVariable, File = Marshal.PtrToStructure<String>(BuildSettings.FileNames[variable.FileIndex]),
+                Line = variable.Line, Column = variable.Column, Name = Allocator.MakeString(variable.Name), Source = GCHandle.ToIntPtr(handle)
+            };
+
+            variable.MessagePointer = pointer = Allocator.Allocate(GlobalVariable.Size);
+        }
+        else
+        {
+            pointer = variable.MessagePointer;
+            globalMessage = Marshal.PtrToStructure<GlobalVariable>(pointer);
+        }
+
+        if (variable.Type != null)
+        {
+            globalMessage.VariableType = TypeTable.TypeInfos[variable.Type.TypeIndex];
+        }
+
+        Marshal.StructureToPtr(globalMessage, pointer, false);
         Submit(type, pointer);
     }
 
