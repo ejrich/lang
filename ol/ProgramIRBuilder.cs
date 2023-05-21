@@ -31,8 +31,12 @@ public static class ProgramIRBuilder
 
     public static void BuildFunction(object data)
     {
+        if (ErrorReporter.Errors.Any()) return;
+
         var function = (FunctionAst)data;
         var functionIR = Program.Functions[function.FunctionIndex];
+
+        while (functionIR.Executing);
         if (WritingLocked(functionIR)) return;
 
         functionIR.Constants = new InstructionValue[function.ConstantCount];
@@ -85,8 +89,12 @@ public static class ProgramIRBuilder
 
     public static void BuildOperatorOverload(object data)
     {
+        if (ErrorReporter.Errors.Any()) return;
+
         var overload = (OperatorOverloadAst)data;
         var functionIR = Program.Functions[overload.FunctionIndex];
+
+        while (functionIR.Executing);
         if (WritingLocked(functionIR)) return;
 
         functionIR.Constants = new InstructionValue[overload.ConstantCount];

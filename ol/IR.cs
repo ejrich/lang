@@ -18,6 +18,7 @@ public class FunctionIR
 {
     public int Writing;
     public bool Written { get; set; }
+    public bool Executing { get; set; }
     public uint StackSize { get; set; }
     public int ValueCount { get; set; }
     public int PointerOffset { get; set; }
