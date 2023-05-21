@@ -434,6 +434,7 @@ public class DeclarationAst : IDeclaration
     public IAst Value { get; set; }
     public Dictionary<string, AssignmentAst> Assignments { get; set; }
     public List<IAst> ArrayValues { get; set; }
+    public IntPtr MessagePointer { get; set; }
 }
 
 public class CompoundDeclarationAst : IDeclaration

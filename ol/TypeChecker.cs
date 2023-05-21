@@ -611,6 +611,7 @@ public static class TypeChecker
             }
         }
 
+        Messages.Submit(MessageType.ReadyToBeTypeChecked, variable);
         return true;
     }
 
@@ -2150,6 +2151,7 @@ public static class TypeChecker
         if (!ErrorReporter.Errors.Any())
         {
             ProgramIRBuilder.EmitGlobalVariable(declaration, scope);
+            Messages.Submit(MessageType.TypeCheckSuccessful, declaration);
         }
     }
 
