@@ -1830,18 +1830,34 @@ public static class TypeChecker
 
     public static void AddCode(string code, int fileIndex, uint line, uint column)
     {
-        var starting_line = AddCodeString(code, null, fileIndex, line, column);
-        Parser.ParseCode(code, _generatedCodeFileIndex, starting_line);
+        var startingLine = AddCodeString(code, null, "add_code", fileIndex, line, column);
+        Parser.ParseCode(code, _generatedCodeFileIndex, startingLine);
         ClearDirectiveQueue();
     }
 
     public static int InsertCode(string code, IFunction function, ScopeAst scope, int fileIndex, uint line, uint column, int index = 0)
     {
-        var starting_line = AddCodeString(code, function, fileIndex, line, column);
-        return Parser.ParseInsertedCode(code, scope, _generatedCodeFileIndex, starting_line, index);
+        var startingLine = AddCodeString(code, function, null, fileIndex, line, column);
+        return Parser.ParseInsertedCode(code, scope, _generatedCodeFileIndex, startingLine, index);
     }
 
-    private static uint AddCodeString(string code, IFunction function, int fileIndex, uint line, uint column)
+    public static void SetGlobalVariableValue(DeclarationAst variable, string code, int fileIndex, uint line, uint column)
+    {
+        variable.Value = null;
+        variable.Assignments = null;
+        variable.ArrayValues = null;
+
+        var startingLine = AddCodeString(code, null, "set_global_variable_value", fileIndex, line, column);
+        Parser.ParseAssignmentValue(variable, code, _generatedCodeFileIndex, startingLine);
+
+        if (variable.Type != null)
+        {
+            var scope = GetFileScope(variable);
+            VerifyGlobalVariableInitialValue(variable, scope);
+        }
+    }
+
+    private static uint AddCodeString(string code, IFunction function, string source, int fileIndex, uint line, uint column)
     {
         if (_generatedCodeWriter == null)
         {
@@ -1857,11 +1873,11 @@ public static class TypeChecker
         string header;
         if (function != null)
         {
-            header = $"\n// Generated code for {function.Name} in {BuildSettings.FileName(fileIndex)} at line {line}:{column}\n\n";
+            header = $"\n// Generated code for {function.Name} from {BuildSettings.FileName(fileIndex)} at line {line}:{column}\n\n";
         }
         else
         {
-            header = $"\n// Generated code from call to add_code in {BuildSettings.FileName(fileIndex)} at line {line}:{column}\n\n";
+            header = $"\n// Generated code from call to {source} in {BuildSettings.FileName(fileIndex)} at line {line}:{column}\n\n";
         }
 
         _generatedCodeWriter.Write(header);
@@ -1997,108 +2013,9 @@ public static class TypeChecker
             }
         }
 
-        // 2. Verify the null values
-        if (declaration.Value is NullAst nullAst)
-        {
-            // 2a. Verify null can be assigned
-            if (declaration.TypeDefinition == null)
-            {
-                ErrorReporter.Report("Cannot assign null value without declaring a type", declaration.Value);
-            }
-            else
-            {
-                if (declaration.Type != null && declaration.Type.TypeKind != TypeKind.Pointer && declaration.Type.TypeKind != TypeKind.Interface)
-                {
-                    ErrorReporter.Report($"Cannot assign null to non-pointer type '{declaration.Type.Name}'", declaration.Value);
-                }
+        VerifyGlobalVariableInitialValue(declaration, scope);
 
-                nullAst.TargetType = declaration.Type;
-            }
-        }
-        // 3. Verify declaration values
-        else if (declaration.Value != null)
-        {
-            VerifyGlobalVariableValue(declaration);
-        }
-        // 4. Verify object initializers
-        else if (declaration.Assignments != null)
-        {
-            if (declaration.TypeDefinition == null)
-            {
-                ErrorReporter.Report("Struct literals are not yet supported", declaration);
-            }
-            else
-            {
-                if (declaration.Type == null || (declaration.Type.TypeKind != TypeKind.Struct && declaration.Type.TypeKind != TypeKind.String))
-                {
-                    ErrorReporter.Report($"Can only use object initializer with struct type, got '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
-                }
-                else
-                {
-                    var structDef = declaration.Type as StructAst;
-                    foreach (var (name, assignment) in declaration.Assignments)
-                    {
-                        VerifyFieldAssignment(structDef, name, assignment, null, scope, true);
-                    }
-                }
-            }
-        }
-        // 5. Verify array initializer
-        else if (declaration.ArrayValues != null)
-        {
-            if (declaration.TypeDefinition == null)
-            {
-                ErrorReporter.Report($"Declaration for variable '{declaration.Name}' with array initializer must have the type declared", declaration);
-            }
-            else
-            {
-                if (declaration.Type == null || (declaration.Type.TypeKind != TypeKind.Array && declaration.Type.TypeKind != TypeKind.CArray))
-                {
-                    ErrorReporter.Report($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
-                }
-                else
-                {
-                    declaration.TypeDefinition.ConstCount = (uint)declaration.ArrayValues.Count;
-                    var elementType = declaration.ArrayElementType;
-                    foreach (var value in declaration.ArrayValues)
-                    {
-                        var valueType = VerifyExpression(value, null, scope, out var isConstant);
-                        if (valueType != null)
-                        {
-                            if (!TypeEquals(elementType, valueType))
-                            {
-                                ErrorReporter.Report($"Expected array value to be type '{elementType.Name}', but got '{valueType.Name}'", value);
-                            }
-                            else if (!isConstant)
-                            {
-                                ErrorReporter.Report($"Global variables can only be initialized with constant values", value);
-                            }
-                            else
-                            {
-                                VerifyConstantIfNecessary(value, elementType);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        // 6. Verify compiler constants
-        else
-        {
-            switch (declaration.Name)
-            {
-                case "os":
-                    declaration.Value = GetOSVersion();
-                    VerifyGlobalVariableValue(declaration);
-                    break;
-                case "build_env":
-                    declaration.Value = GetBuildEnv();
-                    VerifyGlobalVariableValue(declaration);
-                    break;
-            }
-        }
-
-        // 7. Verify the type definition count if necessary
+        // Verify the type definition count if necessary
         if (declaration.Type?.TypeKind == TypeKind.Array && declaration.TypeDefinition.Count != null)
         {
             var countType = VerifyExpression(declaration.TypeDefinition.Count, null, scope, out var isConstant, out uint arrayLength);
@@ -2152,6 +2069,110 @@ public static class TypeChecker
         {
             ProgramIRBuilder.EmitGlobalVariable(declaration, scope);
             Messages.Submit(MessageType.TypeCheckSuccessful, declaration);
+        }
+    }
+
+    private static void VerifyGlobalVariableInitialValue(DeclarationAst declaration, IScope scope)
+    {
+        // Verify null values
+        if (declaration.Value is NullAst nullAst)
+        {
+            // 2a. Verify null can be assigned
+            if (declaration.TypeDefinition == null)
+            {
+                ErrorReporter.Report("Cannot assign null value without declaring a type", declaration.Value);
+            }
+            else
+            {
+                if (declaration.Type != null && declaration.Type.TypeKind != TypeKind.Pointer && declaration.Type.TypeKind != TypeKind.Interface)
+                {
+                    ErrorReporter.Report($"Cannot assign null to non-pointer type '{declaration.Type.Name}'", declaration.Value);
+                }
+
+                nullAst.TargetType = declaration.Type;
+            }
+        }
+        // Verify declaration values
+        else if (declaration.Value != null)
+        {
+            VerifyGlobalVariableValue(declaration);
+        }
+        // Verify object initializers
+        else if (declaration.Assignments != null)
+        {
+            if (declaration.TypeDefinition == null)
+            {
+                ErrorReporter.Report("Struct literals are not yet supported", declaration);
+            }
+            else
+            {
+                if (declaration.Type == null || (declaration.Type.TypeKind != TypeKind.Struct && declaration.Type.TypeKind != TypeKind.String))
+                {
+                    ErrorReporter.Report($"Can only use object initializer with struct type, got '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                }
+                else
+                {
+                    var structDef = declaration.Type as StructAst;
+                    foreach (var (name, assignment) in declaration.Assignments)
+                    {
+                        VerifyFieldAssignment(structDef, name, assignment, null, scope, true);
+                    }
+                }
+            }
+        }
+        // Verify array initializer
+        else if (declaration.ArrayValues != null)
+        {
+            if (declaration.TypeDefinition == null)
+            {
+                ErrorReporter.Report($"Declaration for variable '{declaration.Name}' with array initializer must have the type declared", declaration);
+            }
+            else
+            {
+                if (declaration.Type == null || (declaration.Type.TypeKind != TypeKind.Array && declaration.Type.TypeKind != TypeKind.CArray))
+                {
+                    ErrorReporter.Report($"Cannot use array initializer to declare non-array type '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
+                }
+                else
+                {
+                    declaration.TypeDefinition.ConstCount = (uint)declaration.ArrayValues.Count;
+                    var elementType = declaration.ArrayElementType;
+                    foreach (var value in declaration.ArrayValues)
+                    {
+                        var valueType = VerifyExpression(value, null, scope, out var isConstant);
+                        if (valueType != null)
+                        {
+                            if (!TypeEquals(elementType, valueType))
+                            {
+                                ErrorReporter.Report($"Expected array value to be type '{elementType.Name}', but got '{valueType.Name}'", value);
+                            }
+                            else if (!isConstant)
+                            {
+                                ErrorReporter.Report($"Global variables can only be initialized with constant values", value);
+                            }
+                            else
+                            {
+                                VerifyConstantIfNecessary(value, elementType);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Verify compiler constants
+        else
+        {
+            switch (declaration.Name)
+            {
+                case "os":
+                    declaration.Value = GetOSVersion();
+                    VerifyGlobalVariableValue(declaration);
+                    break;
+                case "build_env":
+                    declaration.Value = GetBuildEnv();
+                    VerifyGlobalVariableValue(declaration);
+                    break;
+            }
         }
     }
 

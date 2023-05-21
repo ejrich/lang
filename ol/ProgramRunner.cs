@@ -351,6 +351,26 @@ public static unsafe class ProgramRunner
         TypeChecker.AddCode(codeString, fileIndex, line, column);
     }
 
+    private static void SetGlobalVariableValue(IntPtr variablePointer, String code, int fileIndex, uint line, uint column)
+    {
+        if (variablePointer == IntPtr.Zero)
+        {
+            ErrorReporter.Report("Attempted to set value of global variable that does not exist", fileIndex, line, column);
+            return;
+        }
+
+        var codeString = Marshal.PtrToStringAnsi(code.Data, (int)code.Length);
+        var globalVariable = Marshal.PtrToStructure<Messages.GlobalVariable>(variablePointer);
+
+        var handle = GCHandle.FromIntPtr(globalVariable.Source);
+        var variable = handle.Target as DeclarationAst;
+
+        if (variable != null)
+        {
+            TypeChecker.SetGlobalVariableValue(variable, codeString, fileIndex, line, column);
+        }
+    }
+
     public static Register ExecuteFunction(FunctionIR function)
     {
         return ExecuteFunction(function, ReadOnlySpan<Register>.Empty);
@@ -1748,6 +1768,14 @@ public static unsafe class ProgramRunner
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
                     var code = Marshal.PtrToStructure<String>(value.Pointer);
                     AddCode(code, fileIndex, line, column);
+                    break;
+                }
+                case "set_global_variable_value":
+                {
+                    var variablePointer = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    var codeValue = GetValue(arguments[1], registers, stackPointer, function, functionArgs);
+                    var code = Marshal.PtrToStructure<String>(codeValue.Pointer);
+                    SetGlobalVariableValue(variablePointer.Pointer, code, fileIndex, line, column);
                     break;
                 }
                 default:

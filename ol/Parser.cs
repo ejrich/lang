@@ -1906,6 +1906,20 @@ public static class Parser
         return declaration;
     }
 
+    public static void ParseAssignmentValue(DeclarationAst variable, string code, int fileIndex, uint line)
+    {
+        var tokens = new List<Token>(code.Length / 5);
+        Lexer.ParseTokens(code, fileIndex, tokens, line);
+
+        var enumerator = new TokenEnumerator(fileIndex, tokens);
+        ParseValue(variable, enumerator, null);
+
+        if (enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected inserted global assignment value without any following expressions", fileIndex, enumerator.Current);
+        }
+    }
+
     private static bool ParseValue(IValues values, TokenEnumerator enumerator, IFunction currentFunction)
     {
         // 1. Step over '=' sign

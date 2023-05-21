@@ -149,3 +149,5 @@ FunctionAst* get_function(string name) #compiler
 insert_code(FunctionAst* function, string code) #compiler
 
 add_code(string code) #compiler
+
+set_global_variable_value(GlobalVariableAst* global, string value) #compiler
