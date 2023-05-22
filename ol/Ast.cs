@@ -67,7 +67,17 @@ public interface IValues : IAst
 {
     IAst Value { get; set; }
     Dictionary<string, AssignmentAst> Assignments { get; set; }
-    List<IAst> ArrayValues { get; set; }
+    List<Values> ArrayValues { get; set; }
+}
+
+public class Values : IValues
+{
+    public int FileIndex { get; set; }
+    public uint Line { get; init; }
+    public uint Column { get; init; }
+    public IAst Value { get; set; }
+    public Dictionary<string, AssignmentAst> Assignments { get; set; }
+    public List<Values> ArrayValues { get; set; }
 }
 
 public interface IDeclaration : IValues
@@ -184,7 +194,7 @@ public class StructFieldAst : IDeclaration
     public bool HasGenerics { get; set; }
     public IAst Value { get; set; }
     public Dictionary<string, AssignmentAst> Assignments { get; set; }
-    public List<IAst> ArrayValues { get; set; }
+    public List<Values> ArrayValues { get; set; }
     public List<string> Attributes { get; set; }
 }
 
@@ -433,7 +443,7 @@ public class DeclarationAst : IDeclaration
     public int PointerIndex { get; set; }
     public IAst Value { get; set; }
     public Dictionary<string, AssignmentAst> Assignments { get; set; }
-    public List<IAst> ArrayValues { get; set; }
+    public List<Values> ArrayValues { get; set; }
     public IntPtr MessagePointer { get; set; }
 }
 
@@ -449,7 +459,7 @@ public class CompoundDeclarationAst : IDeclaration
     public bool HasGenerics { get; set; }
     public IAst Value { get; set; }
     public Dictionary<string, AssignmentAst> Assignments { get; set; }
-    public List<IAst> ArrayValues { get; set; }
+    public List<Values> ArrayValues { get; set; }
 }
 
 public class AssignmentAst : IValues
@@ -462,7 +472,7 @@ public class AssignmentAst : IValues
     public OperatorOverloadAst OperatorOverload { get; set; }
     public IAst Value { get; set; }
     public Dictionary<string, AssignmentAst> Assignments { get; set; }
-    public List<IAst> ArrayValues { get; set; }
+    public List<Values> ArrayValues { get; set; }
 }
 
 public class ConditionalAst : IAst
