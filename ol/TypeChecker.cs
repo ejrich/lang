@@ -850,6 +850,7 @@ public static class TypeChecker
                         var elementType = structField.ArrayElementType;
                         foreach (var value in structField.ArrayValues)
                         {
+                            // TODO Use the right value
                             var valueType = VerifyExpression(value, null, scope, out var isConstant);
                             if (valueType != null)
                             {
@@ -2139,6 +2140,7 @@ public static class TypeChecker
                     var elementType = declaration.ArrayElementType;
                     foreach (var value in declaration.ArrayValues)
                     {
+                        // TODO Use the right value
                         var valueType = VerifyExpression(value, null, scope, out var isConstant);
                         if (valueType != null)
                         {
@@ -2909,6 +2911,7 @@ public static class TypeChecker
     {
         foreach (var value in assignment.ArrayValues)
         {
+            // TODO Use the right value
             var valueType = VerifyExpression(value, currentFunction, scope, out var isConstant);
             if (valueType != null)
             {

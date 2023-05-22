@@ -447,7 +447,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static InstructionValue InitializeGlobalArray(IDeclaration declaration, IScope scope, List<IAst> arrayValues)
+    private static InstructionValue InitializeGlobalArray(IDeclaration declaration, IScope scope, List<Values> arrayValues)
     {
         var arrayStruct = (StructAst)declaration.Type;
         if (declaration.TypeDefinition.ConstCount == null)
@@ -475,6 +475,7 @@ public static class ProgramIRBuilder
             arrayVariable.InitialValue = new InstructionValue
             {
                 ValueType = InstructionValueType.ConstantArray, Type = declaration.ArrayElementType,
+                // TODO Get the right value
                 Values = arrayValues.Select(val => EmitConstantIR(val, null, scope)).ToArray(), ArrayLength = length
             };
         }
@@ -487,13 +488,14 @@ public static class ProgramIRBuilder
         };
     }
 
-    private static InstructionValue InitializeGlobalCArray(IDeclaration declaration, IScope scope, List<IAst> arrayValues)
+    private static InstructionValue InitializeGlobalCArray(IDeclaration declaration, IScope scope, List<Values> arrayValues)
     {
         var arrayType = (ArrayType)declaration.Type;
         var constArray = new InstructionValue {ValueType = InstructionValueType.ConstantArray, Type = declaration.ArrayElementType, ArrayLength = arrayType.Length};
 
         if (arrayValues != null)
         {
+            // TODO Get the right value
             constArray.Values = arrayValues.Select(val => EmitConstantIR(val, null, scope)).ToArray();
         }
 
@@ -902,13 +904,14 @@ public static class ProgramIRBuilder
         return arrayData;
     }
 
-    private static void InitializeArrayValues(FunctionIR function, InstructionValue arrayPointer, IType elementType, List<IAst> arrayValues, IScope scope)
+    private static void InitializeArrayValues(FunctionIR function, InstructionValue arrayPointer, IType elementType, List<Values> arrayValues, IScope scope)
     {
         for (var i = 0; i < arrayValues.Count; i++)
         {
             var index = GetConstantInteger(i);
             var pointer = EmitGetPointer(function, arrayPointer, index, elementType, scope);
 
+            // TODO Use the right value
             var value = EmitAndCast(function, arrayValues[i], scope, elementType);
             EmitStore(function, pointer, value, scope);
         }
@@ -1157,7 +1160,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static void EmitArrayAssignments(FunctionIR function, List<IAst> arrayValues, IType type, InstructionValue pointer, IScope scope)
+    private static void EmitArrayAssignments(FunctionIR function, List<Values> arrayValues, IType type, InstructionValue pointer, IScope scope)
     {
         if (type is StructAst arrayStruct)
         {
@@ -1170,6 +1173,7 @@ public static class ProgramIRBuilder
                 var index = GetConstantInteger(i);
                 var elementPointer = EmitGetPointer(function, arrayPointer, index, elementType, scope);
 
+                // TODO Use the right value
                 var value = EmitAndCast(function, arrayValues[i], scope, elementType);
                 EmitStore(function, elementPointer, value, scope);
             }

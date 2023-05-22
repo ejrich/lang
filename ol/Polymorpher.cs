@@ -170,20 +170,7 @@ public static class Polymorpher
         copy.Name = declaration.Name;
         copy.Constant = declaration.Constant;
         copy.TypeDefinition = declaration.HasGenerics ? CopyType(declaration.TypeDefinition, genericTypes) : declaration.TypeDefinition;
-        copy.Value = CopyExpression(declaration.Value, genericTypes, generics);
-
-        if (declaration.Assignments != null)
-        {
-            copy.Assignments = new();
-            foreach (var (name, assignment) in declaration.Assignments)
-            {
-                copy.Assignments[name] = CopyAssignment(assignment, genericTypes, generics);
-            }
-        }
-        else if (declaration.ArrayValues != null)
-        {
-            copy.ArrayValues = declaration.ArrayValues.Select(value => CopyExpression(value, genericTypes, generics)).ToList();
-        }
+        CopyValues(declaration, genericTypes, generics, copy);
 
         return copy;
     }
@@ -199,20 +186,7 @@ public static class Polymorpher
             variableCopy.Name = variable.Name;
         }
         copy.TypeDefinition = declaration.HasGenerics ? CopyType(declaration.TypeDefinition, genericTypes) : declaration.TypeDefinition;
-        copy.Value = CopyExpression(declaration.Value, genericTypes, generics);
-
-        if (declaration.Assignments != null)
-        {
-            copy.Assignments = new(declaration.Assignments.Count);
-            foreach (var (name, assignment) in declaration.Assignments)
-            {
-                copy.Assignments[name] = CopyAssignment(assignment, genericTypes, generics);
-            }
-        }
-        else if (declaration.ArrayValues != null)
-        {
-            copy.ArrayValues = declaration.ArrayValues.Select(value => CopyExpression(value, genericTypes, generics)).ToList();
-        }
+        CopyValues(declaration, genericTypes, generics, copy);
 
         return copy;
     }
@@ -222,19 +196,30 @@ public static class Polymorpher
         var copy = CopyAst(assignment);
         copy.Reference = CopyExpression(assignment.Reference, genericTypes, generics);
         copy.Operator = assignment.Operator;
-        copy.Value = CopyExpression(assignment.Value, genericTypes, generics);
+        CopyValues(assignment, genericTypes, generics, copy);
 
-        if (assignment.Assignments != null)
+        return copy;
+    }
+
+    private static IValues CopyValues(IValues values, IType[] genericTypes, List<string> generics, IValues copy = null)
+    {
+        copy ??= new Values { FileIndex = values.FileIndex, Line = values.Line, Column = values.Column };
+
+        if (values.Value != null)
         {
-            copy.Assignments = new(assignment.Assignments.Count);
-            foreach (var (name, subAssignment) in assignment.Assignments)
+            copy.Value = CopyExpression(values.Value, genericTypes, generics);
+        }
+        else if (values.Assignments != null)
+        {
+            copy.Assignments = new(values.Assignments.Count);
+            foreach (var (name, subAssignment) in values.Assignments)
             {
                 copy.Assignments[name] = CopyAssignment(subAssignment, genericTypes, generics);
             }
         }
-        else if (assignment.ArrayValues != null)
+        else if (values.ArrayValues != null)
         {
-            copy.ArrayValues = assignment.ArrayValues.Select(value => CopyExpression(value, genericTypes, generics)).ToList();
+            copy.ArrayValues = values.ArrayValues.Select(value => (Values)CopyValues(value, genericTypes, generics)).ToList();
         }
 
         return copy;

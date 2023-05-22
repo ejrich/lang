@@ -1920,7 +1920,7 @@ public static class Parser
         }
     }
 
-    private static bool ParseValue(IValues values, TokenEnumerator enumerator, IFunction currentFunction)
+    private static bool ParseValue(IValues values, TokenEnumerator enumerator, IFunction currentFunction, bool arrayValue = false)
     {
         // 1. Step over '=' sign
         if (!enumerator.MoveNext())
@@ -1965,7 +1965,7 @@ public static class Parser
                 }
                 return true;
             case TokenType.OpenBracket:
-                values.ArrayValues = new List<IAst>();
+                values.ArrayValues = new List<Values>();
                 while (enumerator.MoveNext())
                 {
                     if (enumerator.Current.Type == TokenType.CloseBracket)
@@ -1973,8 +1973,9 @@ public static class Parser
                         break;
                     }
 
-                    var value = ParseExpression(enumerator, currentFunction, null, TokenType.Comma, TokenType.CloseBracket);
-                    values.ArrayValues.Add(value);
+                    var elementValues = CreateAst<Values>(enumerator);
+                    ParseValue(elementValues, enumerator, currentFunction, true);
+                    values.ArrayValues.Add(elementValues);
                     if (enumerator.Current.Type == TokenType.CloseBracket)
                     {
                         break;
@@ -1982,7 +1983,9 @@ public static class Parser
                 }
                 break;
             default:
-                values.Value = ParseExpression(enumerator, currentFunction);
+                values.Value = arrayValue ?
+                    ParseExpression(enumerator, currentFunction, null, TokenType.Comma, TokenType.CloseBracket) :
+                    ParseExpression(enumerator, currentFunction);
                 break;
         }
 
