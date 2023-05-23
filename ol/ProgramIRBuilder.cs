@@ -475,8 +475,7 @@ public static class ProgramIRBuilder
             arrayVariable.InitialValue = new InstructionValue
             {
                 ValueType = InstructionValueType.ConstantArray, Type = declaration.ArrayElementType,
-                // TODO Get the right value
-                Values = arrayValues.Select(val => EmitConstantIR(val, null, scope)).ToArray(), ArrayLength = length
+                Values = arrayValues.Select(val => EmitConstantValue(val, elementType, scope)).ToArray(), ArrayLength = length
             };
         }
         ProgramRunner.AddGlobalVariable(arrayVariable);
@@ -495,8 +494,7 @@ public static class ProgramIRBuilder
 
         if (arrayValues != null)
         {
-            // TODO Get the right value
-            constArray.Values = arrayValues.Select(val => EmitConstantIR(val, null, scope)).ToArray();
+            constArray.Values = arrayValues.Select(val => EmitConstantValue(val, declaration.ArrayElementType, scope)).ToArray();
         }
 
         return constArray;
@@ -911,9 +909,7 @@ public static class ProgramIRBuilder
             var index = GetConstantInteger(i);
             var pointer = EmitGetPointer(function, arrayPointer, index, elementType, scope);
 
-            // TODO Use the right value
-            var value = EmitAndCast(function, arrayValues[i], scope, elementType);
-            EmitStore(function, pointer, value, scope);
+            EmitSetValues(function, arrayValues[i], elementType, pointer, scope);
         }
     }
 
@@ -1173,14 +1169,43 @@ public static class ProgramIRBuilder
                 var index = GetConstantInteger(i);
                 var elementPointer = EmitGetPointer(function, arrayPointer, index, elementType, scope);
 
-                // TODO Use the right value
-                var value = EmitAndCast(function, arrayValues[i], scope, elementType);
-                EmitStore(function, elementPointer, value, scope);
+                EmitSetValues(function, arrayValues[i], elementType, elementPointer, scope);
             }
         }
         else if (type is ArrayType arrayType)
         {
             InitializeArrayValues(function, pointer, arrayType.ElementType, arrayValues, scope);
+        }
+    }
+
+    private static void EmitSetValues(FunctionIR function, Values values, IType type, InstructionValue pointer, IScope scope)
+    {
+        if (values.Value != null)
+        {
+            var value = EmitAndCast(function, values.Value, scope, type);
+            EmitStore(function, pointer, value, scope);
+        }
+        else if (values.Assignments != null)
+        {
+            var structDef = (StructAst)type;
+            for (var i = 0; i < structDef.Fields.Count; i++)
+            {
+                var field = structDef.Fields[i];
+                if (values.Assignments.TryGetValue(field.Name, out var assignmentValue))
+                {
+                    var fieldPointer = EmitGetStructPointer(function, pointer, scope, structDef, i, field);
+
+                    EmitAssignments(function, assignmentValue, scope, fieldPointer, field.Type);
+                }
+            }
+        }
+        else if (values.ArrayValues != null)
+        {
+            EmitArrayAssignments(function, values.ArrayValues, type, pointer, scope);
+        }
+        else
+        {
+            Debug.Assert(false, "Expected value");
         }
     }
 
@@ -2013,6 +2038,26 @@ public static class ProgramIRBuilder
                 };
         }
         Debug.Assert(false, "Value is not constant");
+        return null;
+    }
+
+
+    private static InstructionValue EmitConstantValue(Values values, IType type, IScope scope)
+    {
+        if (values.Value != null)
+        {
+            return EmitConstantIR(values.Value, null, scope);
+        }
+        else if (values.Assignments != null)
+        {
+            return GetConstantStruct((StructAst)type, scope, values.Assignments);
+        }
+        else if (values.ArrayValues != null)
+        {
+            // TODO Implement me
+        }
+
+        Debug.Assert(false, "Value is not defined");
         return null;
     }
 
