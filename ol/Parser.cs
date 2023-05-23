@@ -1973,9 +1973,11 @@ public static class Parser
                         break;
                     }
 
-                    var elementValues = CreateAst<Values>(enumerator);
-                    ParseValue(elementValues, enumerator, currentFunction, true);
-                    values.ArrayValues.Add(elementValues);
+                    var elementValues = ParseValues(enumerator, currentFunction);
+                    if (elementValues != null)
+                    {
+                        values.ArrayValues.Add(elementValues);
+                    }
                     if (enumerator.Current.Type == TokenType.CloseBracket)
                     {
                         break;
@@ -1983,13 +1985,84 @@ public static class Parser
                 }
                 break;
             default:
-                values.Value = arrayValue ?
-                    ParseExpression(enumerator, currentFunction, null, TokenType.Comma, TokenType.CloseBracket) :
-                    ParseExpression(enumerator, currentFunction);
+                values.Value = ParseExpression(enumerator, currentFunction);
                 break;
         }
 
         return false;
+    }
+
+    private static Values ParseValues(TokenEnumerator enumerator, IFunction currentFunction)
+    {
+        // 1. Step over '=' sign
+        if (!enumerator.MoveNext())
+        {
+            ErrorReporter.Report("Expected value", enumerator.FileIndex, enumerator.Last);
+            return null;
+        }
+
+        // 2. Parse expression, constant, or object/array initialization as the value
+        var values = new Values();
+        switch (enumerator.Current.Type)
+        {
+            case TokenType.OpenBrace:
+                values.Assignments = new Dictionary<string, AssignmentAst>();
+                while (enumerator.MoveNext())
+                {
+                    var token = enumerator.Current;
+                    if (token.Type == TokenType.CloseBrace)
+                    {
+                        break;
+                    }
+
+                    var assignment = ParseAssignment(enumerator, currentFunction, out var moveNext);
+
+                    if (!values.Assignments.TryAdd(token.Value, assignment))
+                    {
+                        ErrorReporter.Report($"Multiple assignments for field '{token.Value}'", enumerator.FileIndex, token);
+                    }
+
+                    if (moveNext)
+                    {
+                        enumerator.Peek(out token);
+                        if (token.Type == TokenType.CloseBrace)
+                        {
+                            enumerator.MoveNext();
+                            break;
+                        }
+                    }
+                    else if (enumerator.Current.Type == TokenType.CloseBrace)
+                    {
+                        break;
+                    }
+                }
+                break;
+            case TokenType.OpenBracket:
+                values.ArrayValues = new List<Values>();
+                while (enumerator.MoveNext())
+                {
+                    if (enumerator.Current.Type == TokenType.CloseBracket)
+                    {
+                        break;
+                    }
+
+                    var elementValues = ParseValues(enumerator, currentFunction);
+                    if (elementValues != null)
+                    {
+                        values.ArrayValues.Add(elementValues);
+                    }
+                    if (enumerator.Current.Type == TokenType.CloseBracket)
+                    {
+                        break;
+                    }
+                }
+                break;
+            default:
+                values.Value = ParseExpression(enumerator, currentFunction, null, TokenType.Comma, TokenType.CloseBracket);
+                break;
+        }
+
+        return values;
     }
 
     private static AssignmentAst ParseAssignment(TokenEnumerator enumerator, IFunction currentFunction, out bool moveNext, IAst reference = null)
