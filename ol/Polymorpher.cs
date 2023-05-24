@@ -201,7 +201,7 @@ public static class Polymorpher
         return copy;
     }
 
-    private static IValues CopyValues(IValues values, IType[] genericTypes, List<string> generics, IValues copy)
+    private static void CopyValues(IValues values, IType[] genericTypes, List<string> generics, IValues copy)
     {
         if (values.Value != null)
         {
@@ -219,30 +219,12 @@ public static class Polymorpher
         {
             copy.ArrayValues = values.ArrayValues.Select(value => CopyValues(value, genericTypes, generics)).ToList();
         }
-
-        return copy;
     }
 
     private static Values CopyValues(Values values, IType[] genericTypes, List<string> generics)
     {
-        var copy = new Values();
-
-        if (values.Value != null)
-        {
-            copy.Value = CopyExpression(values.Value, genericTypes, generics);
-        }
-        else if (values.Assignments != null)
-        {
-            copy.Assignments = new(values.Assignments.Count);
-            foreach (var (name, subAssignment) in values.Assignments)
-            {
-                copy.Assignments[name] = CopyAssignment(subAssignment, genericTypes, generics);
-            }
-        }
-        else if (values.ArrayValues != null)
-        {
-            copy.ArrayValues = values.ArrayValues.Select(value => CopyValues(value, genericTypes, generics)).ToList();
-        }
+        var copy = CopyAst(values);
+        CopyValues(values, genericTypes, generics, copy);
 
         return copy;
     }

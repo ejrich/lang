@@ -2002,7 +2002,7 @@ public static class Parser
         }
 
         // 2. Parse expression, constant, or object/array initialization as the value
-        var values = new Values();
+        var values = CreateAst<Values>(enumerator);
         switch (enumerator.Current.Type)
         {
             case TokenType.OpenBrace:
