@@ -1973,10 +1973,11 @@ public static class Parser
                         break;
                     }
 
-                    var elementValues = ParseValues(enumerator, currentFunction);
+                    var elementValues = ParseValues(enumerator, currentFunction, out var moveNext);
                     if (elementValues != null)
                     {
                         values.ArrayValues.Add(elementValues);
+                        if (moveNext) enumerator.MoveNext();
                     }
                     if (enumerator.Current.Type == TokenType.CloseBracket)
                     {
@@ -1992,8 +1993,9 @@ public static class Parser
         return false;
     }
 
-    private static Values ParseValues(TokenEnumerator enumerator, IFunction currentFunction)
+    private static Values ParseValues(TokenEnumerator enumerator, IFunction currentFunction, out bool moveNext)
     {
+        moveNext = false;
         var values = CreateAst<Values>(enumerator);
         switch (enumerator.Current.Type)
         {
@@ -2007,14 +2009,14 @@ public static class Parser
                         break;
                     }
 
-                    var assignment = ParseAssignment(enumerator, currentFunction, out var moveNext);
+                    var assignment = ParseAssignment(enumerator, currentFunction, out var getNext);
 
                     if (!values.Assignments.TryAdd(token.Value, assignment))
                     {
                         ErrorReporter.Report($"Multiple assignments for field '{token.Value}'", enumerator.FileIndex, token);
                     }
 
-                    if (moveNext)
+                    if (getNext)
                     {
                         enumerator.Peek(out token);
                         if (token.Type == TokenType.CloseBrace)
@@ -2028,6 +2030,7 @@ public static class Parser
                         break;
                     }
                 }
+                moveNext = true;
                 break;
             case TokenType.OpenBracket:
                 values.ArrayValues = new List<Values>();
@@ -2038,10 +2041,11 @@ public static class Parser
                         break;
                     }
 
-                    var elementValues = ParseValues(enumerator, currentFunction);
+                    var elementValues = ParseValues(enumerator, currentFunction, out var getNext);
                     if (elementValues != null)
                     {
                         values.ArrayValues.Add(elementValues);
+                        if (getNext) enumerator.MoveNext();
                     }
                     if (enumerator.Current.Type == TokenType.CloseBracket)
                     {
