@@ -70,8 +70,11 @@ public interface IValues : IAst
     List<Values> ArrayValues { get; set; }
 }
 
-public class Values
+public class Values : IValues
 {
+    public int FileIndex { get; set; }
+    public uint Line { get; init; }
+    public uint Column { get; init; }
     public IAst Value { get; set; }
     public Dictionary<string, AssignmentAst> Assignments { get; set; }
     public List<Values> ArrayValues { get; set; }

@@ -847,27 +847,7 @@ public static class TypeChecker
                     else
                     {
                         structField.TypeDefinition.ConstCount = (uint)structField.ArrayValues.Count;
-                        var elementType = structField.ArrayElementType;
-                        foreach (var value in structField.ArrayValues)
-                        {
-                            // TODO Use the right value
-                            var valueType = VerifyExpression(value, null, scope, out var isConstant);
-                            if (valueType != null)
-                            {
-                                if (!TypeEquals(elementType, valueType))
-                                {
-                                    ErrorReporter.Report($"Expected array value to be type '{elementType.Name}', but got '{valueType.Name}'", value);
-                                }
-                                else if (!isConstant)
-                                {
-                                    ErrorReporter.Report("Default values in structs array initializers should be constant", value);
-                                }
-                                else
-                                {
-                                    VerifyConstantIfNecessary(value, elementType);
-                                }
-                            }
-                        }
+                        VerifyArrayValues(structField.ArrayElementType, structField.ArrayValues, null, scope, false, true);
                     }
                 }
 
@@ -2137,27 +2117,7 @@ public static class TypeChecker
                 else
                 {
                     declaration.TypeDefinition.ConstCount = (uint)declaration.ArrayValues.Count;
-                    var elementType = declaration.ArrayElementType;
-                    foreach (var value in declaration.ArrayValues)
-                    {
-                        // TODO Use the right value
-                        var valueType = VerifyExpression(value, null, scope, out var isConstant);
-                        if (valueType != null)
-                        {
-                            if (!TypeEquals(elementType, valueType))
-                            {
-                                ErrorReporter.Report($"Expected array value to be type '{elementType.Name}', but got '{valueType.Name}'", value);
-                            }
-                            else if (!isConstant)
-                            {
-                                ErrorReporter.Report($"Global variables can only be initialized with constant values", value);
-                            }
-                            else
-                            {
-                                VerifyConstantIfNecessary(value, elementType);
-                            }
-                        }
-                    }
+                    VerifyArrayValues(declaration.ArrayElementType, declaration.ArrayValues, null, scope, true, false);
                 }
             }
         }
@@ -2344,22 +2304,7 @@ public static class TypeChecker
                 else
                 {
                     declaration.TypeDefinition.ConstCount = (uint)declaration.ArrayValues.Count;
-                    var elementType = declaration.ArrayElementType;
-                    foreach (var value in declaration.ArrayValues)
-                    {
-                        var valueType = VerifyExpression(value, currentFunction, scope);
-                        if (valueType != null)
-                        {
-                            if (!TypeEquals(elementType, valueType))
-                            {
-                                ErrorReporter.Report($"Expected array value to be type '{elementType.Name}', but got '{valueType.Name}'", value);
-                            }
-                            else
-                            {
-                                VerifyConstantIfNecessary(value, elementType);
-                            }
-                        }
-                    }
+                    VerifyArrayValues(declaration.ArrayElementType, declaration.ArrayValues, currentFunction, scope, false, false);
                 }
             }
         }
@@ -2872,7 +2817,7 @@ public static class TypeChecker
             if (type.TypeKind == TypeKind.Array)
             {
                 var arrayStruct = (StructAst)type;
-                VerifyArrayValues(arrayStruct.GenericTypes[0], assignment, currentFunction, scope, global, structField);
+                VerifyArrayValues(arrayStruct.GenericTypes[0], assignment.ArrayValues, currentFunction, scope, global, structField);
             }
             else if (type.TypeKind == TypeKind.CArray)
             {
@@ -2882,7 +2827,7 @@ public static class TypeChecker
                     ErrorReporter.Report($"Expected {arrayType.Length} or fewer array values, but got {assignment.ArrayValues.Count}", assignment);
                 }
 
-                VerifyArrayValues(arrayType.ElementType, assignment, currentFunction, scope, global, structField);
+                VerifyArrayValues(arrayType.ElementType, assignment.ArrayValues, currentFunction, scope, global, structField);
             }
             else
             {
@@ -2907,29 +2852,68 @@ public static class TypeChecker
         ErrorReporter.Report($"Field '{name}' not present in struct '{structDef.Name}'", assignment.Reference);
     }
 
-    private static void VerifyArrayValues(IType elementType, AssignmentAst assignment, IFunction currentFunction, IScope scope, bool global, bool structField)
+    private static void VerifyArrayValues(IType elementType, List<Values> arrayValues, IFunction currentFunction, IScope scope, bool global, bool structField)
     {
-        foreach (var value in assignment.ArrayValues)
+        foreach (var values in arrayValues)
         {
-            // TODO Use the right value
-            var valueType = VerifyExpression(value, currentFunction, scope, out var isConstant);
-            if (valueType != null)
+            if (values.Value != null)
             {
-                if (!TypeEquals(elementType, valueType))
+                var value = values.Value;
+                var valueType = VerifyExpression(values.Value, currentFunction, scope, out var isConstant);
+                if (valueType != null)
                 {
-                    ErrorReporter.Report($"Expected array value to be type '{elementType.Name}', but got '{valueType.Name}'", value);
+                    if (!TypeEquals(elementType, valueType))
+                    {
+                        ErrorReporter.Report($"Expected array value to be type '{elementType.Name}', but got '{valueType.Name}'", value);
+                    }
+                    else if (isConstant)
+                    {
+                        VerifyConstantIfNecessary(value, elementType);
+                    }
+                    else if (global)
+                    {
+                        ErrorReporter.Report($"Global variables can only be initialized with constant values", value);
+                    }
+                    else if (structField)
+                    {
+                        ErrorReporter.Report("Default values in structs array initializers should be constant", value);
+                    }
                 }
-                else if (isConstant)
+            }
+            else if (values.Assignments != null)
+            {
+                if (elementType.TypeKind != TypeKind.Struct && elementType.TypeKind != TypeKind.String)
                 {
-                    VerifyConstantIfNecessary(value, elementType);
+                    ErrorReporter.Report("Can only use field assignments with struct type", values);
+                    return;
                 }
-                else if (global)
+
+                var structDef = elementType as StructAst;
+                foreach (var (name, assignmentValue) in values.Assignments)
                 {
-                    ErrorReporter.Report($"Global variables can only be initialized with constant values", value);
+                    VerifyFieldAssignment(structDef, name, assignmentValue, currentFunction, scope, global, structField);
                 }
-                else if (structField)
+            }
+            else if (values.ArrayValues != null)
+            {
+                if (elementType.TypeKind == TypeKind.Array)
                 {
-                    ErrorReporter.Report("Default values in structs array initializers should be constant", value);
+                    var arrayStruct = (StructAst)elementType;
+                    VerifyArrayValues(arrayStruct.GenericTypes[0], values.ArrayValues, currentFunction, scope, global, structField);
+                }
+                else if (elementType.TypeKind == TypeKind.CArray)
+                {
+                    var arrayType = (ArrayType)elementType;
+                    if (values.ArrayValues.Count > arrayType.Length)
+                    {
+                        ErrorReporter.Report($"Expected {arrayType.Length} or fewer array values, but got {values.ArrayValues.Count}", values);
+                    }
+
+                    VerifyArrayValues(arrayType.ElementType, values.ArrayValues, currentFunction, scope, global, structField);
+                }
+                else
+                {
+                    ErrorReporter.Report("Can only use array assignment with Array types", values);
                 }
             }
         }
