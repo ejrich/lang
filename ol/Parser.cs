@@ -1994,14 +1994,6 @@ public static class Parser
 
     private static Values ParseValues(TokenEnumerator enumerator, IFunction currentFunction)
     {
-        // 1. Step over '=' sign
-        if (!enumerator.MoveNext())
-        {
-            ErrorReporter.Report("Expected value", enumerator.FileIndex, enumerator.Last);
-            return null;
-        }
-
-        // 2. Parse expression, constant, or object/array initialization as the value
         var values = CreateAst<Values>(enumerator);
         switch (enumerator.Current.Type)
         {
