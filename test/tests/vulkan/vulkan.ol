@@ -62,8 +62,6 @@ init_vulkan() {
 
     create_texture_sampler();
 
-    setup_vertices();
-
     load_model();
 
     create_vertex_buffer(vertices, &vertex_buffer, &vertex_buffer_memory);
@@ -1370,81 +1368,16 @@ VkVertexInputBindingDescription get_binding_description() {
 // Part 18: https://vulkan-tutorial.com/en/Vertex_buffers/Vertex_buffer_creation
 vertex_buffer: VkBuffer*;
 vertex_buffer_memory: VkDeviceMemory*;
-vertices: Array<Vertex>[8];
-
-setup_vertices() {
-    position: Vector3 = { x = -0.5; y = -0.5; }
-    color: Vector3 = { x = 1.0; y = 0.0; z = 0.0; }
-    texture_coord: Vector2 = { x = 0.0; y = 0.0; }
-
-    vertices[0].position = position;
-    vertices[0].color = color;
-    vertices[0].texture_coord = texture_coord;
-
-    position.x = 0.5;
-    color.x = 0.0;
-    color.y = 1.0;
-    texture_coord.x = 1.0;
-
-    vertices[1].position = position;
-    vertices[1].color = color;
-    vertices[1].texture_coord = texture_coord;
-
-    position.y = 0.5;
-    color.y = 0.0;
-    color.z = 1.0;
-    texture_coord.y = 1.0;
-
-    vertices[2].position = position;
-    vertices[2].color = color;
-    vertices[2].texture_coord = texture_coord;
-
-    position.x = -0.5;
-    color.x = 1.0;
-    color.y = 1.0;
-    texture_coord.x = 0.0;
-
-    vertices[3].position = position;
-    vertices[3].color = color;
-    vertices[3].texture_coord = texture_coord;
-
-    position.y = -0.5;
-    position.z = -0.5;
-    color.y = 0.0;
-    color.z = 0.0;
-    texture_coord.y = 0.0;
-
-    vertices[4].position = position;
-    vertices[4].color = color;
-    vertices[4].texture_coord = texture_coord;
-
-    position.x = 0.5;
-    color.x = 0.0;
-    color.y = 1.0;
-    texture_coord.x = 1.0;
-
-    vertices[5].position = position;
-    vertices[5].color = color;
-    vertices[5].texture_coord = texture_coord;
-
-    position.y = 0.5;
-    color.y = 0.0;
-    color.z = 1.0;
-    texture_coord.y = 1.0;
-
-    vertices[6].position = position;
-    vertices[6].color = color;
-    vertices[6].texture_coord = texture_coord;
-
-    position.x = -0.5;
-    color.x = 1.0;
-    color.y = 1.0;
-    texture_coord.x = 0.0;
-
-    vertices[7].position = position;
-    vertices[7].color = color;
-    vertices[7].texture_coord = texture_coord;
-}
+vertices: Array<Vertex> = [
+    { position = { x = -0.5; y = -0.5; z =  0.0; } color = { x = 1.0; y = 0.0; z = 0.0; } texture_coord = { x = 0.0; y = 0.0; } },
+    { position = { x =  0.5; y = -0.5; z =  0.0; } color = { x = 0.0; y = 1.0; z = 0.0; } texture_coord = { x = 1.0; y = 0.0; } },
+    { position = { x =  0.5; y =  0.5; z =  0.0; } color = { x = 0.0; y = 0.0; z = 1.0; } texture_coord = { x = 1.0; y = 1.0; } },
+    { position = { x = -0.5; y =  0.5; z =  0.0; } color = { x = 1.0; y = 1.0; z = 1.0; } texture_coord = { x = 0.0; y = 1.0; } },
+    { position = { x = -0.5; y = -0.5; z = -0.5; } color = { x = 1.0; y = 0.0; z = 0.0; } texture_coord = { x = 0.0; y = 0.0; } },
+    { position = { x =  0.5; y = -0.5; z = -0.5; } color = { x = 0.0; y = 1.0; z = 0.0; } texture_coord = { x = 1.0; y = 0.0; } },
+    { position = { x =  0.5; y =  0.5; z = -0.5; } color = { x = 0.0; y = 0.0; z = 1.0; } texture_coord = { x = 1.0; y = 1.0; } },
+    { position = { x = -0.5; y =  0.5; z = -0.5; } color = { x = 1.0; y = 1.0; z = 1.0; } texture_coord = { x = 0.0; y = 1.0; } },
+]
 
 create_vertex_buffer(Array<Vertex> vertices, VkBuffer** vertex_buffer, VkDeviceMemory** vertex_buffer_memory) {
     size := size_of(Vertex) * vertices.length;
