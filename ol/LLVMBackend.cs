@@ -2177,9 +2177,19 @@ public static unsafe class LLVMBackend
                 }
                 else
                 {
-                    for (var i = 0; i < value.ArrayLength; i++)
+                    var i = 0;
+                    for (; i < value.Values.Length; i++)
                     {
                         values[i] = GetConstantValue(value.Values[i]);
+                    }
+
+                    if (i < value.ArrayLength)
+                    {
+                        var defaultValue = GetDefaultValue(value.Type);
+                        for (; i < value.ArrayLength; i++)
+                        {
+                            values[i] = defaultValue;
+                        }
                     }
                 }
                 return LLVMValueRef.CreateConstArray(_types[value.Type.TypeIndex], values);

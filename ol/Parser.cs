@@ -1983,6 +1983,10 @@ public static class Parser
                     {
                         break;
                     }
+                    if (enumerator.Current.Type != TokenType.Comma)
+                    {
+                        ErrorReporter.Report("Expected ',' in array value", enumerator.FileIndex, enumerator.Current);
+                    }
                 }
                 break;
             default:
@@ -2051,7 +2055,12 @@ public static class Parser
                     {
                         break;
                     }
+                    if (enumerator.Current.Type != TokenType.Comma)
+                    {
+                        ErrorReporter.Report("Expected ',' in array value", enumerator.FileIndex, enumerator.Current);
+                    }
                 }
+                moveNext = true;
                 break;
             default:
                 values.Value = ParseExpression(enumerator, currentFunction, null, TokenType.Comma, TokenType.CloseBracket);

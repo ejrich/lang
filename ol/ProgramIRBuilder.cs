@@ -459,25 +459,28 @@ public static class ProgramIRBuilder
             };
         }
 
-        var length = declaration.TypeDefinition.ConstCount.Value;
-        var elementType = declaration.ArrayElementType;
+        return AddGlobalArray(arrayStruct, declaration.ArrayElementType, declaration.TypeDefinition.ConstCount.Value, arrayValues, scope);
+    }
 
-        var arrayIndex = Program.GlobalVariables.Count;
+    private static InstructionValue AddGlobalArray(IType arrayStruct, IType elementType, uint length, List<Values> arrayValues, IScope scope)
+    {
         var arrayVariable = new GlobalVariable
         {
             Name = "____array", Size = length * elementType.Size,
             Array = true, ArrayLength = length, Type = elementType
         };
-        Program.GlobalVariables.Add(arrayVariable);
 
         if (arrayValues != null)
         {
             arrayVariable.InitialValue = new InstructionValue
             {
-                ValueType = InstructionValueType.ConstantArray, Type = declaration.ArrayElementType,
+                ValueType = InstructionValueType.ConstantArray, Type = elementType,
                 Values = arrayValues.Select(val => EmitConstantValue(val, elementType, scope)).ToArray(), ArrayLength = length
             };
         }
+
+        var arrayIndex = Program.GlobalVariables.Count;
+        Program.GlobalVariables.Add(arrayVariable);
         ProgramRunner.AddGlobalVariable(arrayVariable);
 
         return new InstructionValue
@@ -2054,7 +2057,26 @@ public static class ProgramIRBuilder
         }
         else if (values.ArrayValues != null)
         {
-            // TODO Implement me
+            if (type is ArrayType arrayType)
+            {
+                return new InstructionValue
+                {
+                    ValueType = InstructionValueType.ConstantArray, Type = arrayType.ElementType,
+                    ArrayLength = arrayType.Length, Values = values.ArrayValues.Select(val => EmitConstantValue(val, arrayType.ElementType, scope)).ToArray()
+                };
+            }
+
+            var arrayStruct = type as StructAst;
+            if (values.ArrayValues.Count == 0)
+            {
+                return new InstructionValue
+                {
+                    ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
+                    Values = new [] {GetConstantS64(0), new InstructionValue {ValueType = InstructionValueType.Null, Type = arrayStruct.Fields[1].Type}}
+                };
+            }
+
+            return AddGlobalArray(arrayStruct, arrayStruct.GenericTypes[0], (uint)values.ArrayValues.Count, values.ArrayValues, scope);
         }
 
         Debug.Assert(false, "Value is not defined");
