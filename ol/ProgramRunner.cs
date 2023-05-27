@@ -150,17 +150,25 @@ public static unsafe class ProgramRunner
                 }
                 break;
             case InstructionValueType.ConstantArray:
+                var size = (int)value.Type.Size;
                 if (value.Values == null)
                 {
-                    var length = (int)value.Type.Size * (int)value.ArrayLength;
+                    var length = size * (int)value.ArrayLength;
                     ClearMemory(pointer, length);
                 }
                 else
                 {
-                    for (var i = 0; i < value.ArrayLength; i++)
+                    var i = 0;
+                    for (; i < value.Values.Length; i++)
                     {
-                        var arrayPointer = pointer + i * (int)value.Type.Size;
+                        var arrayPointer = pointer + i * size;
                         InitializeGlobalVariable(arrayPointer, value.Values[i]);
+                    }
+
+                    if (value.ArrayLength > value.Values.Length)
+                    {
+                        var length = size * (int)(value.ArrayLength - i);
+                        ClearMemory(pointer + i * size, length);
                     }
                 }
                 break;
