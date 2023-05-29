@@ -74,6 +74,7 @@ public static unsafe class LLVMBackend
 
     private static LLVMTypeRef _memsetType;
     private static LLVMValueRef _memset;
+    private static LLVMValueRef _typeTable;
 
     public static string Build()
     {
@@ -140,55 +141,10 @@ public static unsafe class LLVMBackend
         }
 
         // 3. Declare global variables
-        LLVMValueRef typeTable = null;
         _globals = new LLVMValueRef[Program.GlobalVariables.Count];
         for (var i = 0; i < Program.GlobalVariables.Count; i++)
         {
-            var globalVariable = Program.GlobalVariables[i];
-            LLVMValueRef global;
-            if (globalVariable.Array)
-            {
-                var elementType = _types[globalVariable.Type.TypeIndex];
-                global = _module.AddGlobal(LLVM.ArrayType(elementType, globalVariable.ArrayLength), globalVariable.Name);
-
-                if (globalVariable.InitialValue == null)
-                {
-                    var constArray = GetDefaultArrayValue(globalVariable.Type, elementType, (int)globalVariable.ArrayLength);
-                    LLVM.SetInitializer(global, constArray);
-                }
-                else
-                {
-                    var initialValue = GetConstantValue(globalVariable.InitialValue);
-                    LLVM.SetInitializer(global, initialValue);
-                }
-            }
-            else
-            {
-                global = _module.AddGlobal(_types[globalVariable.Type.TypeIndex], globalVariable.Name);
-
-                var initialValue = globalVariable.InitialValue != null
-                    ? GetConstantValue(globalVariable.InitialValue)
-                    : GetDefaultValue(globalVariable.Type);
-                LLVM.SetInitializer(global, initialValue);
-            }
-
-            if (_emitDebug && globalVariable.FileIndex.HasValue)
-            {
-                using var name = new MarshaledString(globalVariable.Name);
-                var file = _debugFiles[globalVariable.FileIndex.Value];
-                var debugType = _debugTypes[globalVariable.Type.TypeIndex];
-                var globalDebug = LLVM.DIBuilderCreateGlobalVariableExpression(_debugBuilder, _debugCompilationUnit, name.Value, (UIntPtr)name.Length, null, UIntPtr.Zero, file, globalVariable.Line, debugType, 0, null, null, 0);
-                LLVM.GlobalSetMetadata(global, 0, globalDebug);
-            }
-
-            LLVM.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
-            _globals[i] = global;
-
-            if (globalVariable.Name == "__type_table")
-            {
-                typeTable = global;
-                SetPrivateConstant(typeTable);
-            }
+            GetOrSetGlobal(i);
         }
 
         // 4. Write the program beginning at the entrypoint
@@ -201,7 +157,7 @@ public static unsafe class LLVMBackend
 
         // 5. Write type table
         var typeArray = CreateConstantArray(_pointerType, _typeInfoArrayType, _typeInfos, "____type_array");
-        LLVM.SetInitializer(typeTable, typeArray);
+        LLVM.SetInitializer(_typeTable, typeArray);
 
         // 6. Compile to object file
         var baseFileName = Path.Combine(BuildSettings.ObjectDirectory, BuildSettings.Name);
@@ -2146,12 +2102,65 @@ public static unsafe class LLVMBackend
         return null;
     }
 
+    private static LLVMValueRef GetOrSetGlobal(int index)
+    {
+        var global = _globals[index];
+        if (global.Handle != IntPtr.Zero) return global;
+
+        var globalVariable = Program.GlobalVariables[index];
+        if (globalVariable.Array)
+        {
+            var elementType = _types[globalVariable.Type.TypeIndex];
+            global = _module.AddGlobal(LLVM.ArrayType(elementType, globalVariable.ArrayLength), globalVariable.Name);
+
+            if (globalVariable.InitialValue == null)
+            {
+                var constArray = GetDefaultArrayValue(globalVariable.Type, elementType, (int)globalVariable.ArrayLength);
+                LLVM.SetInitializer(global, constArray);
+            }
+            else
+            {
+                var initialValue = GetConstantValue(globalVariable.InitialValue);
+                LLVM.SetInitializer(global, initialValue);
+            }
+        }
+        else
+        {
+            global = _module.AddGlobal(_types[globalVariable.Type.TypeIndex], globalVariable.Name);
+
+            var initialValue = globalVariable.InitialValue != null
+                ? GetConstantValue(globalVariable.InitialValue)
+                : GetDefaultValue(globalVariable.Type);
+            LLVM.SetInitializer(global, initialValue);
+        }
+
+        if (_emitDebug && globalVariable.FileIndex.HasValue)
+        {
+            using var name = new MarshaledString(globalVariable.Name);
+            var file = _debugFiles[globalVariable.FileIndex.Value];
+            var debugType = _debugTypes[globalVariable.Type.TypeIndex];
+            var globalDebug = LLVM.DIBuilderCreateGlobalVariableExpression(_debugBuilder, _debugCompilationUnit, name.Value, (UIntPtr)name.Length, null, UIntPtr.Zero, file, globalVariable.Line, debugType, 0, null, null, 0);
+            LLVM.GlobalSetMetadata(global, 0, globalDebug);
+        }
+
+        LLVM.SetLinkage(global, LLVMLinkage.LLVMPrivateLinkage);
+        _globals[index] = global;
+
+        if (globalVariable.Name == "__type_table")
+        {
+            _typeTable = global;
+            SetPrivateConstant(_typeTable);
+        }
+
+        return global;
+    }
+
     private static LLVMValueRef GetConstantValue(InstructionValue value)
     {
         switch (value.ValueType)
         {
             case InstructionValueType.Value:
-                return _globals[value.ValueIndex];
+                return GetOrSetGlobal(value.ValueIndex);
             case InstructionValueType.Constant:
                 return GetConstant(value);
             case InstructionValueType.Null:
