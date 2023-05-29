@@ -118,6 +118,7 @@ public static class TypeChecker
             ErrorReporter.Report($"Input variable '{name}' was not found as a global constant");
         }
 
+        Messages.Submit(MessageType.ReadyForCodeGeneration);
         _generatedCodeWriter?.Close();
     }
 
