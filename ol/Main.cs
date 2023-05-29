@@ -175,7 +175,6 @@ Looking for more options? Command-line options in this compiler are only used to
         TypeChecker.CheckTypes();
         ErrorReporter.ListErrorsAndExit(ErrorCodes.CompilationError);
         ThreadPool.CompleteWork(ThreadPool.IRQueue);
-        Messages.Submit(MessageType.ReadyForCodeGeneration);
         var frontEndTime = stopwatch.Elapsed;
 
         // 4. Build program
