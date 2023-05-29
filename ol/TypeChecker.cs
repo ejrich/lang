@@ -1835,6 +1835,11 @@ public static class TypeChecker
         {
             var scope = GetFileScope(variable);
             VerifyGlobalVariableInitialValue(variable, scope);
+
+            if (!ErrorReporter.Errors.Any())
+            {
+                ProgramIRBuilder.UpdateGlobalVariable(variable, scope);
+            }
         }
     }
 
@@ -2058,7 +2063,7 @@ public static class TypeChecker
         // Verify null values
         if (declaration.Value is NullAst nullAst)
         {
-            // 2a. Verify null can be assigned
+            // Verify null can be assigned
             if (declaration.TypeDefinition == null)
             {
                 ErrorReporter.Report("Cannot assign null value without declaring a type", declaration.Value);

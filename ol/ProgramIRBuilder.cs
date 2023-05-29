@@ -324,46 +324,65 @@ public static class ProgramIRBuilder
                 globalVariable.Size = declaration.Type.Size;
             }
 
-            if (declaration.Value != null)
-            {
-                globalVariable.InitialValue = EmitConstantIR(declaration.Value, null, scope, true);
-            }
-            else
-            {
-                switch (declaration.Type.TypeKind)
-                {
-                    // Initialize arrays
-                    case TypeKind.Array:
-                        globalVariable.InitialValue = InitializeGlobalArray(declaration, scope, declaration.ArrayValues);
-                        break;
-                    case TypeKind.CArray:
-                        globalVariable.InitialValue = InitializeGlobalCArray(declaration, scope, declaration.ArrayValues);
-                        break;
-                    // Initialize struct field default values
-                    case TypeKind.Struct:
-                    case TypeKind.String:
-                        globalVariable.InitialValue = GetConstantStruct((StructAst)declaration.Type, scope, declaration.Assignments);
-                        break;
-                    // Initialize pointers to null
-                    case TypeKind.Pointer:
-                    case TypeKind.Interface:
-                        globalVariable.InitialValue = new InstructionValue {ValueType = InstructionValueType.Null, Type = globalVariable.Type};
-                        break;
-                    // Initialize unions to null
-                    case TypeKind.Union:
-                        globalVariable.InitialValue = new InstructionValue {ValueType = InstructionValueType.ConstantUnion, Type = globalVariable.Type};
-                        break;
-                    // Or initialize to default
-                    default:
-                        globalVariable.InitialValue = GetDefaultConstant(declaration.Type);
-                        break;
-                }
-            }
+            SetGlobalVariableInitialValue(globalVariable, declaration, scope);
 
             declaration.PointerIndex = Program.GlobalVariables.Count;
             globalVariable.Pointer = AllocationValue(Program.GlobalVariables.Count, globalVariable.Type, true);
             Program.GlobalVariables.Add(globalVariable);
             ProgramRunner.AddGlobalVariable(globalVariable);
+        }
+    }
+
+    public static void UpdateGlobalVariable(DeclarationAst declaration, IScope scope)
+    {
+        var globalVariable = Program.GlobalVariables[declaration.PointerIndex];
+
+        if (globalVariable != null)
+        {
+            SetGlobalVariableInitialValue(globalVariable, declaration, scope);
+        }
+        else
+        {
+            EmitGlobalVariable(declaration, scope);
+        }
+    }
+
+    private static void SetGlobalVariableInitialValue(GlobalVariable globalVariable, DeclarationAst declaration, IScope scope)
+    {
+        if (declaration.Value != null)
+        {
+            globalVariable.InitialValue = EmitConstantIR(declaration.Value, null, scope, true);
+        }
+        else
+        {
+            switch (declaration.Type.TypeKind)
+            {
+                // Initialize arrays
+                case TypeKind.Array:
+                    globalVariable.InitialValue = InitializeGlobalArray(declaration, scope, declaration.ArrayValues);
+                    break;
+                case TypeKind.CArray:
+                    globalVariable.InitialValue = InitializeGlobalCArray(declaration, scope, declaration.ArrayValues);
+                    break;
+                // Initialize struct field default values
+                case TypeKind.Struct:
+                case TypeKind.String:
+                    globalVariable.InitialValue = GetConstantStruct((StructAst)declaration.Type, scope, declaration.Assignments);
+                    break;
+                // Initialize pointers to null
+                case TypeKind.Pointer:
+                case TypeKind.Interface:
+                    globalVariable.InitialValue = new InstructionValue {ValueType = InstructionValueType.Null, Type = globalVariable.Type};
+                    break;
+                // Initialize unions to null
+                case TypeKind.Union:
+                    globalVariable.InitialValue = new InstructionValue {ValueType = InstructionValueType.ConstantUnion, Type = globalVariable.Type};
+                    break;
+                // Or initialize to default
+                default:
+                    globalVariable.InitialValue = GetDefaultConstant(declaration.Type);
+                    break;
+            }
         }
     }
 
