@@ -1115,7 +1115,7 @@ write_to_file(File file, u8 char) {
     write_buffer_to_file(file, &char, 1);
 }
 
-write_buffer_to_file(File file, u8* buffer, s64 length) {
+write_buffer_to_file(File file, void* buffer, s64 length) {
     #if os == OS.Linux {
         write(file.handle, buffer, length);
     }
