@@ -1233,16 +1233,16 @@ public static class ProgramIRBuilder
 
     private static void EmitReturn(FunctionIR function, ReturnAst returnAst, IType returnType, ScopeAst scope)
     {
-        SetDebugLocation(function, returnAst, scope);
-
         if (returnAst.Value == null)
         {
             EmitDeferredStatements(function, scope);
-            var instruction = new Instruction {Type = InstructionType.ReturnVoid, Scope = scope};
-            function.Instructions.Add(instruction);
+            SetDebugLocation(function, returnAst, scope);
+            function.Instructions.Add(new Instruction {Type = InstructionType.ReturnVoid, Scope = scope});
         }
         else if (returnType is CompoundType compoundReturnType && returnAst.Value is CompoundExpressionAst compoundExpression)
         {
+            SetDebugLocation(function, returnAst, scope);
+
             uint offset = 0;
             for (var i = 0; i < compoundReturnType.Types.Length; i++)
             {
@@ -1256,13 +1256,26 @@ public static class ProgramIRBuilder
             }
 
             var returnValue = EmitLoad(function, compoundReturnType, function.CompoundReturnAllocation, scope);
+
+            var instructionCount = function.Instructions.Count;
             EmitDeferredStatements(function, scope);
+            if (instructionCount != function.Instructions.Count)
+            {
+                SetDebugLocation(function, returnAst, scope);
+            }
             EmitInstruction(InstructionType.Return, function, null, scope, returnValue);
         }
         else
         {
+            SetDebugLocation(function, returnAst, scope);
             var returnValue = EmitAndCast(function, returnAst.Value, scope, returnType, returnValue: true);
+
+            var instructionCount = function.Instructions.Count;
             EmitDeferredStatements(function, scope);
+            if (instructionCount != function.Instructions.Count)
+            {
+                SetDebugLocation(function, returnAst, scope);
+            }
             EmitInstruction(InstructionType.Return, function, null, scope, returnValue);
         }
     }
