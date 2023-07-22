@@ -751,60 +751,55 @@ write_float(StringBuffer* buffer, FloatFormat format) {
 }
 
 write_integer_to_buffer(StringBuffer* buffer, u64 value, u8 base = 10) {
-    buffer_length := buffer.length;
+    digits: Array<u8>[64];
     length := 0;
     while value > 0 {
         digit := value % base;
-        if digit < 10 {
-            buffer.buffer[buffer.length++] = digit + '0';
-        }
-        else {
-            buffer.buffer[buffer.length++] = digit + '7';
-        }
+        if digit < 10
+            digits[length++] = digit + '0';
+        else
+            digits[length++] = digit + '7';
+
         value /= base;
-        length++;
     }
 
-    reverse_integer_characters(buffer, length, buffer_length);
+    reverse_integer_characters(digits, length);
+
+    str: string = { length = length; data = digits.data; }
+    add_to_string_buffer(buffer, str);
 }
 
 write_pointer_to_buffer(StringBuffer* buffer, void* data) {
     value := cast(u64, data);
     if value {
-        add_to_string_buffer(buffer, "0x");
-        buffer_length := buffer.length;
-        length := 0;
-        while value > 0 {
-            digit := value & 0xF;
-            if digit < 10 {
-                buffer.buffer[buffer.length++] = digit + '0';
-            }
-            else {
-                buffer.buffer[buffer.length++] = digit + '7';
-            }
-            value >>= 4;
-            value &= 0x0FFFFFFFFFFFFFFF;
-            length++;
+        digits: Array<u8>[16];
+        each i in 0..15 {
+            digit := (value >> ((15 - i) * 4)) & 0xF;
+            if digit < 10
+                digits[i] = digit + '0';
+            else
+                digits[i] = digit + '7';
         }
+        str: string = { length = 16; data = digits.data; }
 
-        reverse_integer_characters(buffer, length, buffer_length);
+        add_to_string_buffer(buffer, "0x");
+        add_to_string_buffer(buffer, str);
     }
     else {
         add_to_string_buffer(buffer, "null");
     }
 }
 
-reverse_integer_characters(StringBuffer* buffer, int length, int original_length) {
+reverse_integer_characters(Array<u8> buffer, int length) {
     // Reverse the characters in the number
     // h e l l o 1 2 3
     //           5 6 7   a = o_len + i, b = len - i - 1
     //           7 6 5
-    each i in 0..length / 2 - 1 {
-        a := original_length + i;
-        b := buffer.length - i - 1;
-        temp := buffer.buffer[b];
-        buffer.buffer[b] = buffer.buffer[a];
-        buffer.buffer[a] = temp;
+    each a in 0..length / 2 - 1 {
+        b := length - a - 1;
+        temp := buffer[b];
+        buffer[b] = buffer[a];
+        buffer[a] = temp;
     }
 }
 
