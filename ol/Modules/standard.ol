@@ -1107,6 +1107,21 @@ bool, Array<FileEntry> get_files_in_directory(string path, Allocate allocator = 
         FindClose(find_handle);
     }
 
+    // Sort by name
+    each i in 1..files.length {
+        swapped := false;
+        each j in 0..files.length - i - 1 {
+            if files[j].name > files[j + 1].name {
+                temp := files[j];
+                files[j] = files[j + 1];
+                files[j + 1] = temp;
+                swapped = true;
+            }
+        }
+
+        if !swapped break;
+    }
+
     return true, files;
 }
 
