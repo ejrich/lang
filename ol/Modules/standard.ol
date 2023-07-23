@@ -432,9 +432,14 @@ string format_string(string format, Allocate allocator = default_allocator, Para
 
     format_string_arguments(&string_buffer, format, args);
 
-    value: string = { length = string_buffer.length; data = allocator(string_buffer.length + 1); }
+    value: string = { length = string_buffer.length; data = allocator(string_buffer.length); }
     memory_copy(value.data, buffer.data, string_buffer.length);
-    value[string_buffer.length] = 0; // @Cleanup Make this just length
+    return value;
+}
+
+string allocate_string(string input, Allocate allocator = default_allocator) {
+    value: string = { length = input.length; data = allocator(input.length); }
+    memory_copy(value.data, input.data, input.length);
     return value;
 }
 
@@ -708,14 +713,14 @@ add_char_to_string_buffer(StringBuffer* buffer, u8 char) {
 }
 
 add_chars_to_string_buffer(StringBuffer* buffer, u8* chars, s64 length) {
-    start := 0;
+    char_index := 0;
     while length {
         max_copy_length := buffer.buffer.length - buffer.length;
 
         if length > max_copy_length {
-            memory_copy(buffer.buffer.data + buffer.length, chars + start, max_copy_length);
+            memory_copy(buffer.buffer.data + buffer.length, chars + char_index, max_copy_length);
             buffer.length += max_copy_length;
-            start += max_copy_length;
+            char_index += max_copy_length;
             length -= max_copy_length;
 
             if buffer.flush != null {
@@ -730,7 +735,7 @@ add_chars_to_string_buffer(StringBuffer* buffer, u8* chars, s64 length) {
             }
         }
         else {
-            memory_copy(buffer.buffer.data + buffer.length, chars + start, length);
+            memory_copy(buffer.buffer.data + buffer.length, chars + char_index, length);
             buffer.length += length;
             length = 0;
         }
@@ -1052,8 +1057,9 @@ bool, Array<FileEntry> get_files_in_directory(string path, Allocate allocator = 
             position := 0;
             while position < bytes {
                 dirent := cast(Dirent*, &buffer + position);
+                name := convert_c_string(&dirent.d_name);
 
-                file_entry: FileEntry = { name = convert_c_string(&dirent.d_name); }
+                file_entry: FileEntry = { name = allocate_string(name, allocator); }
                 if dirent.d_type == DirentType.DT_REG {
                     file_entry.type = FileType.File;
                 }
@@ -1069,10 +1075,14 @@ bool, Array<FileEntry> get_files_in_directory(string path, Allocate allocator = 
         close(directory);
     }
     #if os == OS.Windows {
+        wildcard := "/*"; #const
+        path_with_wildcard: Array<u8>[path.length + wildcard.length + 1];
+        memory_copy(path_with_wildcard.data, path.data, path.length);
+        memory_copy(path_with_wildcard.data + path.length, wildcard.data, wildcard.length);
+        path_with_wildcard[path.length + wildcard.length] = 0;
+
         find_data: WIN32_FIND_DATAA;
-        path_with_wildcard := format_string("%/*", path);
-        find_handle := FindFirstFileA(path_with_wildcard, &find_data);
-        default_free(path_with_wildcard.data);
+        find_handle := FindFirstFileA(path_with_wildcard.data, &find_data);
 
         if cast(s64, find_handle) == -1 {
             return false, files;
@@ -1080,7 +1090,7 @@ bool, Array<FileEntry> get_files_in_directory(string path, Allocate allocator = 
 
         while true {
             file_name := convert_c_string(&find_data.cFileName);
-            file_entry: FileEntry = { name = format_string("%", allocator, file_name); }
+            file_entry: FileEntry = { name = allocate_string(file_name, allocator); }
 
             if find_data.dwFileAttributes == FileAttribute.FILE_ATTRIBUTE_NORMAL {
                 file_entry.type = FileType.File;
