@@ -421,7 +421,7 @@ print(string format, Params args) {
     }
 
     buffer: Array<u8>[STRING_BUFFER_MAX_LENGTH];
-    string_buffer: StringBuffer = { buffer = buffer; }
+    string_buffer: StringBuffer = { buffer = buffer; flush = string_buffer_write_to_standard_out; }
     format_string_arguments(&string_buffer, format, args);
     write_buffer_to_standard_out(buffer.data, string_buffer.length);
 }
@@ -441,7 +441,14 @@ string format_string(string format, Allocate allocator = default_allocator, Para
 struct StringBuffer {
     length: s64;
     buffer: Array<u8>;
+    flush: flush_string_buffer;
+    flush_data: void*;
+    allocator: Allocate;
+    buffers: Array<Array<u8>>;
+    total_length: s64;
 }
+
+interface flush_string_buffer(void* data, u8* buffer, s64 length)
 
 union IntFormatValue {
     signed: s64;
@@ -486,7 +493,7 @@ format_string_arguments(StringBuffer* buffer, string format, Array<Any> args) {
             write_value_to_buffer(buffer, arg.type, arg.data);
         }
         else {
-            buffer.buffer[buffer.length++] = char;
+            add_char_to_string_buffer(buffer, char);
         }
     }
 }
@@ -622,11 +629,11 @@ write_value_to_buffer(StringBuffer* buffer, TypeInfo* type, void* data) {
 
             if !found {
                 if value == 0 {
-                    buffer.buffer[buffer.length++] = '0';
+                    add_char_to_string_buffer(buffer, '0');
                 }
                 else {
                     if value < 0 {
-                        buffer.buffer[buffer.length++] = '-';
+                        add_char_to_string_buffer(buffer, '-');
                         value *= -1;
                     }
                     write_integer_to_buffer(buffer, value);
@@ -641,7 +648,8 @@ write_value_to_buffer(StringBuffer* buffer, TypeInfo* type, void* data) {
             type_info := cast(UnionTypeInfo*, type);
             add_to_string_buffer(buffer, "{ ");
 
-            each field in type_info.fields {
+            length := type_info.fields.length;
+            each field, i in type_info.fields {
                 add_to_string_buffer(buffer, field.name);
                 add_to_string_buffer(buffer, ": ");
                 switch field.type_info.type {
@@ -653,11 +661,12 @@ write_value_to_buffer(StringBuffer* buffer, TypeInfo* type, void* data) {
                     default;
                         write_value_to_buffer(buffer, field.type_info, data);
                 }
-                add_to_string_buffer(buffer, ", ");
-            }
 
-            buffer.buffer[buffer.length-2] = ' ';
-            buffer.buffer[buffer.length-1] = '}';
+                if i == length - 1
+                    add_to_string_buffer(buffer, " }");
+                else
+                    add_to_string_buffer(buffer, ", ");
+            }
         }
         case TypeKind.Interface; {
             write_pointer_to_buffer(buffer, data);
@@ -681,21 +690,64 @@ write_value_to_buffer(StringBuffer* buffer, TypeInfo* type, void* data) {
     }
 }
 
-add_to_string_buffer(StringBuffer* buffer, string value) {
-    buffer_length := buffer.length;
-    each i in 0..value.length-1 {
-        buffer.buffer[buffer_length + i] = value[i];
+add_char_to_string_buffer(StringBuffer* buffer, u8 char) {
+    if buffer.length >= buffer.buffer.length {
+        if buffer.flush != null {
+            buffer.flush(buffer.flush_data, buffer.buffer.data, buffer.length);
+            buffer.length = 0;
+        }
+        else if buffer.allocator != null {
+            // TODO Add to new buffers
+        }
+        else {
+            assert(false, "Writing past the end of the string buffer");
+        }
     }
-    buffer.length += value.length;
+
+    buffer.buffer[buffer.length++] = char;
+}
+
+add_chars_to_string_buffer(StringBuffer* buffer, u8* chars, s64 length) {
+    start := 0;
+    while length {
+        max_copy_length := buffer.buffer.length - buffer.length;
+
+        if length > max_copy_length {
+            memory_copy(buffer.buffer.data + buffer.length, chars + start, max_copy_length);
+            buffer.length += max_copy_length;
+            start += max_copy_length;
+            length -= max_copy_length;
+
+            if buffer.flush != null {
+                buffer.flush(buffer.flush_data, buffer.buffer.data, buffer.length);
+                buffer.length = 0;
+            }
+            else if buffer.allocator != null {
+                // TODO Add to new buffers
+            }
+            else {
+                assert(false, "Writing past the end of the string buffer");
+            }
+        }
+        else {
+            memory_copy(buffer.buffer.data + buffer.length, chars + start, length);
+            buffer.length += length;
+            length = 0;
+        }
+    }
+}
+
+add_to_string_buffer(StringBuffer* buffer, string value) {
+    add_chars_to_string_buffer(buffer, value.data, value.length);
 }
 
 write_integer(StringBuffer* buffer, IntFormat format) {
     if format.value.unsigned == 0 {
-        buffer.buffer[buffer.length++] = '0';
+        add_char_to_string_buffer(buffer, '0');
     }
     else {
         if format.signed && format.value.signed < 0 {
-            buffer.buffer[buffer.length++] = '-';
+            add_char_to_string_buffer(buffer, '-');
             format.value.signed *= -1;
         }
         write_integer_to_buffer(buffer, format.value.unsigned, format.base);
@@ -705,7 +757,7 @@ write_integer(StringBuffer* buffer, IntFormat format) {
 write_float(StringBuffer* buffer, FloatFormat format) {
     value := format.value;
     if value < 0 {
-        buffer.buffer[buffer.length++] = '-';
+        add_char_to_string_buffer(buffer, '-');
         value *= -1;
     }
 
@@ -728,24 +780,24 @@ write_float(StringBuffer* buffer, FloatFormat format) {
 
     whole := cast(u64, value);
     if whole == 0 {
-        buffer.buffer[buffer.length++] = '0';
+        add_char_to_string_buffer(buffer, '0');
     }
     else {
         write_integer_to_buffer(buffer, whole);
     }
 
-    buffer.buffer[buffer.length++] = '.';
+    add_char_to_string_buffer(buffer, '.');
     value -= whole;
 
     each x in 0..format.decimal_places - 1 {
         value *= 10;
         digit := cast(u8, value);
-        buffer.buffer[buffer.length++] = digit + '0';
+        add_char_to_string_buffer(buffer, digit + '0');
         value -= digit;
     }
 
     if exponent {
-        buffer.buffer[buffer.length++] = 'e';
+        add_char_to_string_buffer(buffer, 'e');
         write_integer_to_buffer(buffer, exponent);
     }
 }
@@ -791,10 +843,6 @@ write_pointer_to_buffer(StringBuffer* buffer, void* data) {
 }
 
 reverse_integer_characters(Array<u8> buffer, int length) {
-    // Reverse the characters in the number
-    // h e l l o 1 2 3
-    //           5 6 7   a = o_len + i, b = len - i - 1
-    //           7 6 5
     each a in 0..length / 2 - 1 {
         b := length - a - 1;
         temp := buffer[b];
@@ -809,22 +857,23 @@ write_array_to_buffer(StringBuffer* buffer, TypeInfo* element_type, void* data, 
     each i in 0..length-1 {
         element_data := data + element_type.size * i;
         write_value_to_buffer(buffer, element_type, element_data);
-        add_to_string_buffer(buffer, ", ");
+
+        if i == length - 1
+            add_to_string_buffer(buffer, " ]");
+        else
+            add_to_string_buffer(buffer, ", ");
     }
 
-    if length > 0 {
-        buffer.buffer[buffer.length-2] = ' ';
-        buffer.buffer[buffer.length-1] = ']';
-    }
-    else {
-        buffer.buffer[buffer.length++] = ']';
+    if length == 0 {
+        add_char_to_string_buffer(buffer, ']');
     }
 }
 
 write_struct_to_buffer(StringBuffer* buffer, StructTypeInfo* type_info, void* data) {
     add_to_string_buffer(buffer, "{ ");
 
-    each field in type_info.fields {
+    length := type_info.fields.length;
+    each field, i in type_info.fields {
         add_to_string_buffer(buffer, field.name);
         add_to_string_buffer(buffer, ": ");
         element_data := data + field.offset;
@@ -837,15 +886,15 @@ write_struct_to_buffer(StringBuffer* buffer, StructTypeInfo* type_info, void* da
             default;
                 write_value_to_buffer(buffer, field.type_info, element_data);
         }
-        add_to_string_buffer(buffer, ", ");
+
+        if i == length - 1
+            add_to_string_buffer(buffer, " }");
+        else
+            add_to_string_buffer(buffer, ", ");
     }
 
-    if type_info.fields.length > 0 {
-        buffer.buffer[buffer.length-2] = ' ';
-        buffer.buffer[buffer.length-1] = '}';
-    }
-    else {
-        buffer.buffer[buffer.length++] = '}';
+    if length == 0 {
+        add_char_to_string_buffer(buffer, '}');
     }
 }
 
@@ -1101,7 +1150,7 @@ write_to_file(File file, string format, Params args) {
     }
 
     buffer: Array<u8>[STRING_BUFFER_MAX_LENGTH];
-    string_buffer: StringBuffer = { buffer = buffer; }
+    string_buffer: StringBuffer = { buffer = buffer; flush = string_buffer_write_to_file; flush_data = &file; }
     format_string_arguments(&string_buffer, format, args);
     write_buffer_to_file(file, buffer.data, string_buffer.length);
 }
@@ -1266,6 +1315,15 @@ add_exit_callback(ExitCallback callback) {
 #private
 
 STRING_BUFFER_MAX_LENGTH := 1024; #const
+
+string_buffer_write_to_standard_out(void* data, u8* buffer, s64 length) {
+    write_buffer_to_standard_out(buffer, length);
+}
+
+string_buffer_write_to_file(void* data, u8* buffer, s64 length) {
+    file := *cast(File*, data);
+    write_buffer_to_file(file, buffer, length);
+}
 
 struct DefaultAllocation {
     size: u64;
