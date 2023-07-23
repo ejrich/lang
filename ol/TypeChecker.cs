@@ -1972,6 +1972,7 @@ public static class TypeChecker
     {
         declaration.Verified = true;
         var scope = GetFileScope(declaration);
+        var errorCount = ErrorReporter.Errors.Count;
 
         if (declaration.TypeDefinition != null)
         {
@@ -2052,7 +2053,7 @@ public static class TypeChecker
             }
         }
 
-        if (!ErrorReporter.Errors.Any())
+        if (errorCount == ErrorReporter.Errors.Count)
         {
             ProgramIRBuilder.EmitGlobalVariable(declaration, scope);
             Messages.Submit(MessageType.TypeCheckSuccessful, declaration);
