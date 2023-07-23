@@ -44,6 +44,27 @@ operator != (string a, string b) {
     return !(a == b);
 }
 
+operator > (string a, string b) {
+    min_len := a.length;
+    if a.length > b.length min_len = b.length;
+
+    each i in 0..min_len - 1 {
+        if a[i] > b[i] {
+            return true;
+        }
+        if a[i] < b[i] {
+            return false;
+        }
+    }
+
+    return a.length > b.length;
+}
+
+operator < (string a, string b) {
+    if a > b return false;
+    return a != b;
+}
+
 string convert_c_string(u8* string_pointer) {
     length := 0;
     while string_pointer[length] length++;
