@@ -432,8 +432,21 @@ string format_string(string format, Allocate allocator = default_allocator, Para
 
     format_string_arguments(&string_buffer, format, args);
 
-    value: string = { length = string_buffer.length; data = allocator(string_buffer.length); }
-    memory_copy(value.data, buffer.data, string_buffer.length);
+    value: string;
+    // If the formatted string overflows the initial buffer, then allocate the necessary total length
+    // for the final string and format the string arguments again to the final buffer
+    if string_buffer.total_length > 0 {
+        value = { length = string_buffer.total_length; data = allocator(string_buffer.total_length); }
+        string_buffer.length = 0;
+        string_buffer.buffer.length = value.length;
+        string_buffer.buffer.data = value.data;
+        format_string_arguments(&string_buffer, format, args);
+    }
+    else {
+        value = { length = string_buffer.length; data = allocator(string_buffer.length); }
+        memory_copy(value.data, buffer.data, string_buffer.length);
+    }
+
     return value;
 }
 
@@ -448,8 +461,6 @@ struct StringBuffer {
     buffer: Array<u8>;
     flush: flush_string_buffer;
     flush_data: void*;
-    allocator: Allocate;
-    buffers: Array<Array<u8>>;
     total_length: s64;
 }
 
@@ -699,14 +710,12 @@ add_char_to_string_buffer(StringBuffer* buffer, u8 char) {
     if buffer.length >= buffer.buffer.length {
         if buffer.flush != null {
             buffer.flush(buffer.flush_data, buffer.buffer.data, buffer.length);
-            buffer.length = 0;
-        }
-        else if buffer.allocator != null {
-            // TODO Add to new buffers
         }
         else {
-            assert(false, "Writing past the end of the string buffer");
+            buffer.total_length += buffer.length;
         }
+
+        buffer.length = 0;
     }
 
     buffer.buffer[buffer.length++] = char;
@@ -725,14 +734,12 @@ add_chars_to_string_buffer(StringBuffer* buffer, u8* chars, s64 length) {
 
             if buffer.flush != null {
                 buffer.flush(buffer.flush_data, buffer.buffer.data, buffer.length);
-                buffer.length = 0;
-            }
-            else if buffer.allocator != null {
-                // TODO Add to new buffers
             }
             else {
-                assert(false, "Writing past the end of the string buffer");
+                buffer.total_length += buffer.length;
             }
+
+            buffer.length = 0;
         }
         else {
             memory_copy(buffer.buffer.data + buffer.length, chars + char_index, length);
