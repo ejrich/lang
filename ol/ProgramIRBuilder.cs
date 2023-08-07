@@ -1491,35 +1491,47 @@ public static class ProgramIRBuilder
         var iteration = EmitIR(function, each.Iteration, each.Body);
 
         // Load the array data and set the compareTarget to the array count
-        InstructionValue arrayData, compareTarget = null;
-        if (iteration.Type.TypeKind == TypeKind.CArray)
+        InstructionValue arrayData = null, compareTarget = null;
+        switch (iteration.Type.TypeKind)
         {
-            arrayData = iteration;
-            var arrayType = (ArrayType)iteration.Type;
-            compareTarget = GetConstantS64(arrayType.Length);
-        }
-        else
-        {
-            var arrayDef = (StructAst)iteration.Type;
-            var iterationVariable = AddAllocation(function, arrayDef);
-            EmitStore(function, iterationVariable, iteration, each.Body);
+            case TypeKind.CArray:
+                arrayData = iteration;
+                var arrayType = (ArrayType)iteration.Type;
+                compareTarget = GetConstantS64(arrayType.Length);
+                break;
+            case TypeKind.Array:
+                var arrayDef = (StructAst)iteration.Type;
+                var iterationVariable = AddAllocation(function, arrayDef);
+                EmitStore(function, iterationVariable, iteration, each.Body);
 
-            var lengthPointer = EmitGetStructPointer(function, iterationVariable, each.Body, arrayDef, 0);
-            compareTarget = EmitLoad(function, TypeTable.S64Type, lengthPointer, each.Body);
+                var lengthPointer = EmitGetStructPointer(function, iterationVariable, each.Body, arrayDef, 0);
+                compareTarget = EmitLoad(function, TypeTable.S64Type, lengthPointer, each.Body);
 
-            var dataField = arrayDef.Fields[1];
-            var dataPointer = EmitGetStructPointer(function, iterationVariable, each.Body, arrayDef, 1, dataField);
-            arrayData = EmitLoad(function, dataField.Type, dataPointer, each.Body);
+                var dataField = arrayDef.Fields[1];
+                var dataPointer = EmitGetStructPointer(function, iterationVariable, each.Body, arrayDef, 1, dataField);
+                arrayData = EmitLoad(function, dataField.Type, dataPointer, each.Body);
+                break;
+            case TypeKind.Integer:
+                compareTarget = EmitCastValue(function, iteration, TypeTable.S64Type, each.Body);
+                each.IterationVariable.PointerIndex = AddPointer(function, indexVariable);
+                DeclareVariable(function, each.IterationVariable, each.Body, indexVariable);
+                break;
+            default:
+                Debug.Assert(false, "Invalid each iteration type");
+                break;
         }
 
         var conditionBlock = AddBasicBlock(function);
         var indexValue = EmitLoad(function, TypeTable.S64Type, indexVariable, each.Body);
         var condition = EmitInstruction(InstructionType.IntegerGreaterThanOrEqual, function, TypeTable.BoolType, each.Body, indexValue, compareTarget);
 
-        var iterationPointer = EmitGetPointer(function, arrayData, indexValue, each.IterationVariable.Type, each.Body);
-        each.IterationVariable.PointerIndex = AddPointer(function, iterationPointer);
+        if (arrayData != null)
+        {
+            var iterationPointer = EmitGetPointer(function, arrayData, indexValue, each.IterationVariable.Type, each.Body);
+            each.IterationVariable.PointerIndex = AddPointer(function, iterationPointer);
 
-        DeclareVariable(function, each.IterationVariable, each.Body, iterationPointer);
+            DeclareVariable(function, each.IterationVariable, each.Body, iterationPointer);
+        }
 
         return (indexValue, indexVariable, condition, conditionBlock);
     }

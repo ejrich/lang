@@ -3360,6 +3360,14 @@ public static class TypeChecker
                     each.IterationVariable.Type = arrayStruct.GenericTypes[0];
                     each.Body.Identifiers.TryAdd(each.IterationVariable.Name, each.IterationVariable);
                     break;
+                case TypeKind.Integer:
+                    if (each.IndexVariable != null)
+                    {
+                        ErrorReporter.Report("Integer iterator cannot have index variable", each.IndexVariable);
+                    }
+                    each.IterationVariable.Type = TypeTable.S64Type;
+                    each.Body.Identifiers.TryAdd(each.IterationVariable.Name, each.IterationVariable);
+                    break;
                 default:
                     ErrorReporter.Report($"Type {iterationType.Name} cannot be used as an iterator", each.Iteration);
                     break;
