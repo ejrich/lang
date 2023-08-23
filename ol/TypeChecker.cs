@@ -1786,6 +1786,7 @@ public static class TypeChecker
                     VerifySwitch(switchAst, function, scope, inDefer, canBreak);
                     break;
                 case DeferAst defer:
+                    scope.DeferCount++;
                     defer.Statement.Parent = scope;
                     VerifyScope(defer.Statement, function, true);
                     break;
