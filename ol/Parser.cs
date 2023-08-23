@@ -1518,7 +1518,6 @@ public static class Parser
                 }
                 else if (enumerator.MoveNext())
                 {
-                    scope.DeferCount++;
                     deferAst.Statement = ParseScopeBody(enumerator, currentFunction, inDefer: true);
                 }
                 else
