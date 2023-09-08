@@ -30,10 +30,28 @@ bool string_is_empty(string value) {
     return value.data == null;
 }
 
+int string_compare(string a, string b) {
+    min_len := a.length;
+    if a.length > b.length min_len = b.length;
+
+    each i in min_len {
+        if a[i] > b[i] {
+            return 1;
+        }
+        if a[i] < b[i] {
+            return -1;
+        }
+    }
+
+    if a.length > b.length return 1;
+    if a.length < b.length return -1;
+    return 0;
+}
+
 operator == (string a, string b) {
     if a.length != b.length return false;
 
-    each i in 0..a.length-1 {
+    each i in a.length {
         if a[i] != b[i] return false;
     }
 
@@ -48,7 +66,7 @@ operator > (string a, string b) {
     min_len := a.length;
     if a.length > b.length min_len = b.length;
 
-    each i in 0..min_len - 1 {
+    each i in min_len {
         if a[i] > b[i] {
             return true;
         }

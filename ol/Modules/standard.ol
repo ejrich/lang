@@ -1372,9 +1372,7 @@ add_exit_callback(ExitCallback callback) {
 #private
 
 int file_entry_compare(FileEntry a, FileEntry b) {
-    if a.name >  b.name return 1;
-    if a.name == b.name return 0;
-    return -1;
+    return string_compare(a.name, b.name);
 }
 
 STRING_BUFFER_MAX_LENGTH := 1024; #const
