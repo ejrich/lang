@@ -339,8 +339,15 @@ public static class Parser
                     var interfaceAst = ParseInterface(enumerator);
                     if (interfaceAst?.Name != null)
                     {
-                        TypeChecker.AddInterface(interfaceAst);
-                        Asts.Enqueue(interfaceAst);
+                        if (interfaceAst.Generics.Any())
+                        {
+                            TypeChecker.AddPolymorphicInterface(interfaceAst);
+                        }
+                        else
+                        {
+                            TypeChecker.AddInterface(interfaceAst);
+                            Asts.Enqueue(interfaceAst);
+                        }
                     }
                     break;
                 default:
@@ -546,76 +553,24 @@ public static class Parser
         // 2. Parse generics
         if (enumerator.Current.Type == TokenType.LessThan)
         {
-            var commaRequiredBeforeNextType = false;
-            var generics = new HashSet<string>();
-            while (enumerator.MoveNext())
-            {
-                token = enumerator.Current;
-
-                if (token.Type == TokenType.GreaterThan)
-                {
-                    if (!commaRequiredBeforeNextType)
-                    {
-                        ErrorReporter.Report($"Expected comma in generics of function '{function.Name}'", enumerator.FileIndex, token);
-                    }
-
-                    break;
-                }
-
-                if (!commaRequiredBeforeNextType)
-                {
-                    switch (token.Type)
-                    {
-                        case TokenType.Identifier:
-                            if (!generics.Add(token.Value))
-                            {
-                                ErrorReporter.Report($"Duplicate generic '{token.Value}' in function '{function.Name}'", enumerator.FileIndex, token);
-                            }
-                            commaRequiredBeforeNextType = true;
-                            break;
-                        default:
-                            ErrorReporter.Report($"Unexpected token '{token.Value}' in generics of function '{function.Name}'", enumerator.FileIndex, token);
-                            commaRequiredBeforeNextType = true;
-                            break;
-                    }
-                }
-                else
-                {
-                    switch (token.Type)
-                    {
-                        case TokenType.Comma:
-                            commaRequiredBeforeNextType = false;
-                            break;
-                        default:
-                            ErrorReporter.Report($"Unexpected token '{token.Value}' in function '{function.Name}'", enumerator.FileIndex, token);
-                            commaRequiredBeforeNextType = false;
-                            break;
-                    }
-                }
-            }
-
-            if (!generics.Any())
-            {
-                ErrorReporter.Report("Expected function to contain generics", enumerator.FileIndex, enumerator.Current);
-            }
+            ParseGenerics(enumerator, function.Generics, function.Name, "function");
             enumerator.MoveNext();
-            function.Generics.AddRange(generics);
-        }
 
-        // 3. Search for generics in the function return type
-        if (function.ReturnTypeDefinition != null)
-        {
-            for (var i = 0; i < function.Generics.Count; i++)
+            // Search for generics in the function return type
+            if (function.ReturnTypeDefinition != null)
             {
-                var generic = function.Generics[i];
-                if (SearchForGeneric(generic, i, function.ReturnTypeDefinition))
+                for (var i = 0; i < function.Generics.Count; i++)
                 {
-                    function.Flags |= FunctionFlags.ReturnTypeHasGenerics;
+                    var generic = function.Generics[i];
+                    if (SearchForGeneric(generic, i, function.ReturnTypeDefinition))
+                    {
+                        function.Flags |= FunctionFlags.ReturnTypeHasGenerics;
+                    }
                 }
             }
         }
 
-        // 4. Find open paren to start parsing arguments
+        // 3. Find open paren to start parsing arguments
         if (enumerator.Current.Type != TokenType.OpenParen)
         {
             // Add an error to the function AST and continue until open paren
@@ -625,7 +580,7 @@ public static class Parser
                 enumerator.MoveNext();
         }
 
-        // 5. Parse arguments until a close paren
+        // 4. Parse arguments until a close paren
         var commaRequiredBeforeNextArgument = false;
         DeclarationAst currentArgument = null;
         while (enumerator.MoveNext())
@@ -739,7 +694,8 @@ public static class Parser
             ErrorReporter.Report("Unexpected function body or compiler directive", enumerator.FileIndex, enumerator.Last);
             return null;
         }
-        // 6. Handle compiler directives
+
+        // 5. Handle compiler directives
         while (enumerator.Current.Type == TokenType.Pound)
         {
             if (!enumerator.MoveNext())
@@ -815,7 +771,7 @@ public static class Parser
             enumerator.MoveNext();
         }
 
-        // 7. Find open brace to start parsing body
+        // 6. Find open brace to start parsing body
         if (enumerator.Current.Type != TokenType.OpenBrace)
         {
             // Add an error and continue until open paren
@@ -829,7 +785,7 @@ public static class Parser
             }
         }
 
-        // 8. Parse function body
+        // 7. Parse function body
         function.Body = ParseScope(enumerator, function);
 
         return function;
@@ -868,58 +824,8 @@ public static class Parser
         {
             // Clear the '<' before entering loop
             enumerator.MoveNext();
-            var commaRequiredBeforeNextType = false;
-            var generics = new HashSet<string>();
-            while (enumerator.MoveNext())
-            {
-                token = enumerator.Current;
-
-                if (token.Type == TokenType.GreaterThan)
-                {
-                    if (!commaRequiredBeforeNextType)
-                    {
-                        ErrorReporter.Report($"Expected comma in generics for struct '{structAst.Name}'", enumerator.FileIndex, token);
-                    }
-                    break;
-                }
-
-                if (!commaRequiredBeforeNextType)
-                {
-                    switch (token.Type)
-                    {
-                        case TokenType.Identifier:
-                            if (!generics.Add(token.Value))
-                            {
-                                ErrorReporter.Report($"Duplicate generic '{token.Value}' in struct '{structAst.Name}'", enumerator.FileIndex, token);
-                            }
-                            commaRequiredBeforeNextType = true;
-                            break;
-                        default:
-                            ErrorReporter.Report($"Unexpected token '{token.Value}' in generics for struct '{structAst.Name}'", enumerator.FileIndex, token);
-                            commaRequiredBeforeNextType = true;
-                            break;
-                    }
-                }
-                else
-                {
-                    switch (token.Type)
-                    {
-                        case TokenType.Comma:
-                            commaRequiredBeforeNextType = false;
-                            break;
-                        default:
-                            ErrorReporter.Report($"Unexpected token '{token.Value}' in definition of struct '{structAst.Name}'", enumerator.FileIndex, token);
-                            commaRequiredBeforeNextType = false;
-                            break;
-                    }
-                }
-            }
-
-            if (!generics.Any())
-            {
-                ErrorReporter.Report($"Expected struct '{structAst.Name}' to contain generics", enumerator.FileIndex, enumerator.Current);
-            }
-            structAst.Generics = generics.ToList();
+            var generics = structAst.Generics = new();
+            ParseGenerics(enumerator, generics, structAst.Name, "struct");
         }
 
         // 3. Get any inherited structs
@@ -3743,9 +3649,20 @@ public static class Parser
                 else
                 {
                     interfaceAst.Name = interfaceAst.ReturnTypeDefinition.Name;
-                    if (interfaceAst.ReturnTypeDefinition.Generics.Any())
+                    foreach (var generic in interfaceAst.ReturnTypeDefinition.Generics)
                     {
-                        ErrorReporter.Report($"Interface '{interfaceAst.Name}' cannot have generics", interfaceAst.ReturnTypeDefinition);
+                        if (generic.Generics.Any())
+                        {
+                            ErrorReporter.Report($"Invalid generic in interface '{interfaceAst.Name}'", generic);
+                        }
+                        else if (interfaceAst.Generics.Contains(generic.Name))
+                        {
+                            ErrorReporter.Report($"Duplicate generic '{generic.Name}' in interface '{interfaceAst.Name}'", generic.FileIndex, generic.Line, generic.Column);
+                        }
+                        else
+                        {
+                            interfaceAst.Generics.Add(generic.Name);
+                        }
                     }
                     interfaceAst.ReturnTypeDefinition = null;
                 }
@@ -3756,7 +3673,27 @@ public static class Parser
                 break;
         }
 
-        // 2. Parse arguments until a close paren
+        // 2. Parse generics
+        if (enumerator.Current.Type == TokenType.LessThan)
+        {
+            ParseGenerics(enumerator, interfaceAst.Generics, interfaceAst.Name, "interface");
+            enumerator.MoveNext();
+
+            // Search for generics in the return type
+            if (interfaceAst.ReturnTypeDefinition != null)
+            {
+                for (var i = 0; i < interfaceAst.Generics.Count; i++)
+                {
+                    var generic = interfaceAst.Generics[i];
+                    if (SearchForGeneric(generic, i, interfaceAst.ReturnTypeDefinition))
+                    {
+                        interfaceAst.Flags |= FunctionFlags.ReturnTypeHasGenerics;
+                    }
+                }
+            }
+        }
+
+        // 3. Parse arguments until a close paren
         var commaRequiredBeforeNextArgument = false;
         DeclarationAst currentArgument = null;
         while (enumerator.MoveNext())
@@ -3784,6 +3721,14 @@ public static class Parser
                     {
                         currentArgument = CreateAst<DeclarationAst>(token, enumerator.FileIndex);
                         currentArgument.TypeDefinition = ParseType(enumerator);
+                        for (var i = 0; i < interfaceAst.Generics.Count; i++)
+                        {
+                            var generic = interfaceAst.Generics[i];
+                            if (SearchForGeneric(generic, i, currentArgument.TypeDefinition))
+                            {
+                                currentArgument.HasGenerics = true;
+                            }
+                        }
                     }
                     else
                     {
@@ -3851,6 +3796,62 @@ public static class Parser
         }
 
         return interfaceAst;
+    }
+
+    private static void ParseGenerics(TokenEnumerator enumerator, List<string> genericList, string typeName, string typeKind)
+    {
+        var commaRequiredBeforeNextType = false;
+        var generics = new HashSet<string>();
+        while (enumerator.MoveNext())
+        {
+            var token = enumerator.Current;
+
+            if (token.Type == TokenType.GreaterThan)
+            {
+                if (!commaRequiredBeforeNextType)
+                {
+                    ErrorReporter.Report($"Expected comma in generics for {typeKind} '{typeName}'", enumerator.FileIndex, token);
+                }
+                break;
+            }
+
+            if (!commaRequiredBeforeNextType)
+            {
+                switch (token.Type)
+                {
+                    case TokenType.Identifier:
+                        if (!generics.Add(token.Value))
+                        {
+                            ErrorReporter.Report($"Duplicate generic '{token.Value}' in {typeKind} '{typeName}'", enumerator.FileIndex, token);
+                        }
+                        commaRequiredBeforeNextType = true;
+                        break;
+                    default:
+                        ErrorReporter.Report($"Unexpected token '{token.Value}' in generics for {typeKind} '{typeName}'", enumerator.FileIndex, token);
+                        commaRequiredBeforeNextType = true;
+                        break;
+                }
+            }
+            else
+            {
+                switch (token.Type)
+                {
+                    case TokenType.Comma:
+                        commaRequiredBeforeNextType = false;
+                        break;
+                    default:
+                        ErrorReporter.Report($"Unexpected token '{token.Value}' in definition of {typeKind} '{typeName}'", enumerator.FileIndex, token);
+                        commaRequiredBeforeNextType = false;
+                        break;
+                }
+            }
+        }
+
+        if (!generics.Any())
+        {
+            ErrorReporter.Report($"Expected ${typeKind} '{typeName}' to contain generics", enumerator.FileIndex, enumerator.Current);
+        }
+        genericList.AddRange(generics);
     }
 
     private static TypeDefinition ParseType(TokenEnumerator enumerator, IFunction currentFunction = null, bool argument = false, int depth = 0)

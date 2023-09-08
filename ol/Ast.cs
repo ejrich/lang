@@ -26,8 +26,10 @@ public interface IType
 public interface IInterface : IAst
 {
     string Name { get; set; }
+    FunctionFlags Flags { get; set; }
     IType ReturnType { get; set; }
     TypeDefinition ReturnTypeDefinition { get; set; }
+    List<string> Generics { get; }
     List<DeclarationAst> Arguments { get; }
     int ArgumentCount { get; set; }
 }
@@ -36,8 +38,6 @@ public interface IFunction : IInterface
 {
     int ConstantCount { get; set; }
     int FunctionIndex { get; set; }
-    FunctionFlags Flags { get; set; }
-    List<string> Generics { get; }
     ScopeAst Body { get; set; }
     IntPtr MessagePointer { get; set; }
 }
@@ -100,6 +100,7 @@ public class GlobalScope : IScope
     public ConcurrentDictionary<string, List<FunctionAst>> Functions { get; } = new();
     public ConcurrentDictionary<string, IType> Types { get; } = new();
     public ConcurrentDictionary<string, StructAst> PolymorphicStructs = new();
+    public ConcurrentDictionary<string, InterfaceAst> PolymorphicInterfaces = new();
     public ConcurrentDictionary<string, List<FunctionAst>> PolymorphicFunctions = new();
 }
 
@@ -110,6 +111,7 @@ public class PrivateScope : IScope
     public Dictionary<string, List<FunctionAst>> Functions { get; } = new();
     public Dictionary<string, IType> Types { get; } = new();
     public Dictionary<string, StructAst> PolymorphicStructs = new();
+    public Dictionary<string, InterfaceAst> PolymorphicInterfaces = new();
     public Dictionary<string, List<FunctionAst>> PolymorphicFunctions = new();
 }
 
@@ -634,8 +636,12 @@ public class InterfaceAst : IInterface, IType
     public bool Private { get; set; }
     public bool Verified { get; set; }
     public bool Verifying { get; set; }
+    public FunctionFlags Flags { get; set; }
+    public string BaseInterfaceName { get; set; }
     public IType ReturnType { get; set; }
     public TypeDefinition ReturnTypeDefinition { get; set; }
+    public List<string> Generics { get; } = new();
+    public IType[] GenericTypes { get; set; }
     public List<DeclarationAst> Arguments { get; } = new();
     public int ArgumentCount { get; set; }
     public IntPtr MessagePointer { get; set; }
