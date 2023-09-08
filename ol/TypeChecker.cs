@@ -255,6 +255,11 @@ public static class TypeChecker
                 AddUnion(union);
                 break;
             case InterfaceAst interfaceAst:
+                if (interfaceAst.Generics.Any())
+                {
+                    TypeChecker.AddPolymorphicInterface(interfaceAst);
+                    return;
+                }
                 AddInterface(interfaceAst);
                 break;
             case DeclarationAst globalVariable:
@@ -376,6 +381,18 @@ public static class TypeChecker
         }
 
         return privateScope.PolymorphicStructs.TryGetValue(name, out type) || GlobalScope.PolymorphicStructs.TryGetValue(name, out type);
+    }
+
+    private static bool GetPolymorphicInterface(string name, int fileIndex, out InterfaceAst type)
+    {
+        var privateScope = PrivateScopes[fileIndex];
+
+        if (privateScope == null)
+        {
+            return GlobalScope.PolymorphicInterfaces.TryGetValue(name, out type);
+        }
+
+        return privateScope.PolymorphicInterfaces.TryGetValue(name, out type) || GlobalScope.PolymorphicInterfaces.TryGetValue(name, out type);
     }
 
     private static bool GetExistingFunction(string name, int fileIndex, out FunctionAst function, out int functionCount)
@@ -620,6 +637,30 @@ public static class TypeChecker
     {
         Messages.Submit(MessageType.ReadyToBeTypeChecked, union);
         AddTypeAndIdentifier(union.Name, union, union);
+    }
+
+    public static void AddPolymorphicInterface(InterfaceAst interfaceAst)
+    {
+        if (interfaceAst.Private)
+        {
+            var privateScope = PrivateScopes[interfaceAst.FileIndex];
+
+            if (privateScope.PolymorphicInterfaces.ContainsKey(interfaceAst.Name) || GlobalScope.PolymorphicInterfaces.ContainsKey(interfaceAst.Name))
+            {
+                ErrorReporter.Report($"Multiple definitions of polymorphic interface '{interfaceAst.Name}'", interfaceAst);
+                return;
+            }
+
+            privateScope.PolymorphicInterfaces[interfaceAst.Name] = interfaceAst;
+        }
+        else
+        {
+            if (!GlobalScope.PolymorphicInterfaces.TryAdd(interfaceAst.Name, interfaceAst))
+            {
+                ErrorReporter.Report($"Multiple definitions of polymorphic interface '{interfaceAst.Name}'", interfaceAst);
+                return;
+            }
+        }
     }
 
     public static void AddInterface(InterfaceAst interfaceAst)
@@ -1157,7 +1198,11 @@ public static class TypeChecker
 
                 if (argument.HasGenerics)
                 {
-                    ErrorReporter.Report($"Argument '{argument.Name}' in function '{function.Name}' cannot have default value if the argument has a generic type", argument.Value);
+                    if (!isConstant)
+                    {
+                        ErrorReporter.Report($"Expected default value of argument '{argument.Name}' in function '{function.Name}' to be a constant value", argument.Value);
+
+                    }
                 }
                 else if (argument.Value is NullAst nullAst && argument.Type != null)
                 {
@@ -4935,6 +4980,51 @@ public static class TypeChecker
                             }
                         }
                         break;
+                    case TypeKind.Interface:
+                    {
+                        var interfaceDef = (InterfaceAst)callType;
+                        if (interfaceDef.GenericTypes == null || argumentType.Generics.Count != interfaceDef.GenericTypes.Length || argumentType.Name != interfaceDef.BaseInterfaceName)
+                        {
+                            return false;
+                        }
+                        for (var i = 0; i < interfaceDef.GenericTypes.Length; i++)
+                        {
+                            if (!VerifyPolymorphicArgument(interfaceDef.GenericTypes[i], argumentType.Generics[i], genericTypes))
+                            {
+                                return false;
+                            }
+                        }
+                        break;
+                    }
+                    case TypeKind.Function:
+                    {
+                        if (!IsSufficientToPolymorphType(argumentType, genericTypes))
+                        {
+                            return false;
+                        }
+
+                        if (!GetPolymorphicInterface(argumentType.Name, argumentType.FileIndex, out var interfaceDef))
+                        {
+                            return false;
+                        }
+
+                        var functionDef = (FunctionAst)callType;
+                        if (functionDef.Arguments.Count != interfaceDef.Arguments.Count)
+                        {
+                            return false;
+                        }
+
+                        var genericName = PrintTypeDefinition(argumentType, genericTypes);
+                        if (GetType(genericName, argumentType.FileIndex, out var targetType))
+                        {
+                            return TypeEquals(targetType, functionDef);
+                        }
+
+                        var polyInterface = Polymorpher.CreatePolymorphedInterface(interfaceDef, genericName, false, genericTypes);
+                        AddType(genericName, polyInterface, argumentType.FileIndex);
+                        VerifyInterface(polyInterface);
+                        return TypeEquals(polyInterface, functionDef);
+                    }
                     default:
                         return false;
                 }
@@ -4944,6 +5034,24 @@ public static class TypeChecker
                 return false;
             }
         }
+        return true;
+    }
+
+    private static bool IsSufficientToPolymorphType(TypeDefinition type, IType[] genericTypes)
+    {
+        if (type.IsGeneric)
+        {
+            return genericTypes[type.GenericIndex] != null;
+        }
+
+        foreach (var generic in type.Generics)
+        {
+            if (!IsSufficientToPolymorphType(generic, genericTypes))
+            {
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -5281,7 +5389,7 @@ public static class TypeChecker
 
         if (target is InterfaceAst interfaceAst)
         {
-            // Cannot assign interfaces to interface types
+            // Cannot assign interfaces to different interface types
             if (source is InterfaceAst) return false;
             if (source.TypeKind == TypeKind.Pointer)
             {
@@ -5591,66 +5699,23 @@ public static class TypeChecker
                 if (hasGenerics)
                 {
                     var genericName = PrintTypeDefinition(type);
-                    if (GetType(genericName, type.FileIndex, out var structType))
-                    {
-                        return structType;
-                    }
-
-                    if (!GetPolymorphicStruct(type.Name, type.FileIndex, out var structDef))
-                    {
-                        ErrorReporter.Report($"No polymorphic structs of type '{type.Name}'", type);
-                        return null;
-                    }
-
-                    var generics = type.Generics;
-                    var genericTypes = new IType[generics.Count];
-                    var error = false;
-                    var privateGenericTypes = false;
-
-                    for (var i = 0; i < generics.Count; i++)
-                    {
-                        var genericType = genericTypes[i] = VerifyType(generics[i], scope, out var hasGeneric, out _, out _, depth + 1, allowParams);
-                        if (genericType == null && !hasGeneric)
-                        {
-                            error = true;
-                        }
-                        else if (hasGeneric)
-                        {
-                            isGeneric = true;
-                        }
-                        else if (genericType.Private)
-                        {
-                            privateGenericTypes = true;
-                        }
-                    }
-
-                    if (structDef.Generics.Count != type.Generics.Count)
-                    {
-                        ErrorReporter.Report($"Expected type '{type.Name}' to have {structDef.Generics.Count} generic(s), but got {type.Generics.Count}", type);
-                        return null;
-                    }
-
-                    if (error || isGeneric)
-                    {
-                        return null;
-                    }
-
-                    var fileIndex = structDef.FileIndex;
-                    if (privateGenericTypes && !structDef.Private)
-                    {
-                        fileIndex = type.FileIndex;
-                    }
-
-                    // Check that the type wasn't created while verifying the generics
-                    if (GetType(genericName, fileIndex, out var polyType))
+                    if (GetType(genericName, type.FileIndex, out var polyType))
                     {
                         return polyType;
                     }
 
-                    var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, fileIndex, genericName, TypeKind.Struct, privateGenericTypes, genericTypes);
-                    AddType(genericName, polyStruct, fileIndex);
-                    VerifyStruct(polyStruct);
-                    return polyStruct;
+                    if (GetPolymorphicStruct(type.Name, type.FileIndex, out var structDef))
+                    {
+                        return PolymorphStruct(type, structDef, scope, genericName, depth, allowParams, out isGeneric);
+                    }
+
+                    if (GetPolymorphicInterface(type.Name, type.FileIndex, out var interfaceAst))
+                    {
+                        return PolymorphInterface(type, interfaceAst, scope, genericName, depth, allowParams, out isGeneric);
+                    }
+
+                    ErrorReporter.Report($"No polymorphic type found with name '{type.Name}'", type);
+                    return null;
                 }
                 if (GetType(type.Name, type.FileIndex, out var typeValue))
                 {
@@ -5708,10 +5773,50 @@ public static class TypeChecker
             return null;
         }
 
-        var arrayStruct = Polymorpher.CreatePolymorphedStruct(BaseArrayType, fileIndex, name, TypeKind.Array, elementType.Private, elementType);
+        var arrayStruct = Polymorpher.CreatePolymorphedStruct(BaseArrayType, name, TypeKind.Array, elementType.Private, elementType);
         AddType(name, arrayStruct, fileIndex);
         VerifyStruct(arrayStruct);
         return arrayStruct;
+    }
+
+    private static IType PolymorphStruct(TypeDefinition type, StructAst structDef, IScope scope, string genericName, int depth, bool allowParams, out bool isGeneric)
+    {
+        var (polyType, genericTypes, fileIndex, privateGenericTypes) = GetGenericTypes(type, structDef, structDef.Generics, scope, genericName, depth, allowParams, out isGeneric);
+
+        if (genericTypes == null)
+        {
+            return null;
+        }
+
+        if (polyType != null)
+        {
+            return polyType;
+        }
+
+        var polyStruct = Polymorpher.CreatePolymorphedStruct(structDef, genericName, TypeKind.Struct, privateGenericTypes, genericTypes);
+        AddType(genericName, polyStruct, fileIndex);
+        VerifyStruct(polyStruct);
+        return polyStruct;
+    }
+
+    private static IType PolymorphInterface(TypeDefinition type, InterfaceAst interfaceDef, IScope scope, string genericName, int depth, bool allowParams, out bool isGeneric)
+    {
+        var (polyType, genericTypes, fileIndex, privateGenericTypes) = GetGenericTypes(type, interfaceDef, interfaceDef.Generics, scope, genericName, depth, allowParams, out isGeneric);
+
+        if (genericTypes == null)
+        {
+            return null;
+        }
+
+        if (polyType != null)
+        {
+            return polyType;
+        }
+
+        var polyInterface = Polymorpher.CreatePolymorphedInterface(interfaceDef, genericName, privateGenericTypes, genericTypes);
+        AddType(genericName, polyInterface, fileIndex);
+        VerifyInterface(polyInterface);
+        return polyInterface;
     }
 
     private static IType CreatePointerType(string name, IType pointedToType)
@@ -5721,6 +5826,53 @@ public static class TypeChecker
         TypeTable.CreateTypeInfo(pointerType);
 
         return pointerType;
+    }
+
+    private static (IType foundType, IType[] genericTypes, int fileIndex, bool privateGenericTypes) GetGenericTypes(TypeDefinition type, IType typeDef, List<string> typeGenerics, IScope scope, string genericName, int depth, bool allowParams, out bool isGeneric)
+    {
+        isGeneric = false;
+        var generics = type.Generics;
+        if (typeGenerics.Count != generics.Count)
+        {
+            ErrorReporter.Report($"Expected type '{type.Name}' to have {typeGenerics.Count} generic(s), but got {generics.Count}", type);
+            return (null, null, 0, false);
+        }
+
+        var genericTypes = new IType[generics.Count];
+        var error = false;
+        var privateGenericTypes = false;
+
+        for (var i = 0; i < generics.Count; i++)
+        {
+            var genericType = genericTypes[i] = VerifyType(generics[i], scope, out var hasGeneric, out _, out _, depth + 1, allowParams);
+            if (genericType == null && !hasGeneric)
+            {
+                error = true;
+            }
+            else if (hasGeneric)
+            {
+                isGeneric = true;
+            }
+            else if (genericType.Private)
+            {
+                privateGenericTypes = true;
+            }
+        }
+
+        if (error || isGeneric)
+        {
+            return (null, null, 0, false);
+        }
+
+        var fileIndex = typeDef.FileIndex;
+        if (privateGenericTypes && !typeDef.Private)
+        {
+            fileIndex = type.FileIndex;
+        }
+
+        // Check that the type wasn't created while verifying the generics
+        GetType(genericName, fileIndex, out var polyType);
+        return (polyType, genericTypes, fileIndex, privateGenericTypes);
     }
 
     private static IType CreateCompoundType(IType[] types, string name, uint size, bool privateType, int fileIndex)
@@ -5734,17 +5886,21 @@ public static class TypeChecker
     private static string PrintCompoundType(TypeDefinition type)
     {
         var sb = new StringBuilder();
-        PrintGenericTypes(type, sb);
+        PrintGenericTypes(type, null, sb);
         return sb.ToString();
     }
 
-    public static string PrintTypeDefinition(TypeDefinition type)
+    public static string PrintTypeDefinition(TypeDefinition type, IType[] genericTypes = null)
     {
         if (type == null) return string.Empty;
 
         if (type.BakedType != null)
         {
             return type.BakedType.Name;
+        }
+        else if (type.IsGeneric && genericTypes != null)
+        {
+            return genericTypes[type.GenericIndex]?.Name ?? string.Empty;
         }
 
         if (!type.Generics.Any())
@@ -5755,7 +5911,7 @@ public static class TypeChecker
         var sb = new StringBuilder();
         if (type.Name == "*")
         {
-            PrintTypeDefinition(type.Generics[0], sb);
+            PrintTypeDefinition(type.Generics[0], genericTypes, sb);
             sb.Append('*');
         }
         else
@@ -5764,7 +5920,7 @@ public static class TypeChecker
             if (type.Generics.Any())
             {
                 sb.Append('<');
-                PrintGenericTypes(type, sb);
+                PrintGenericTypes(type, genericTypes, sb);
                 sb.Append('>');
             }
         }
@@ -5772,7 +5928,7 @@ public static class TypeChecker
         return sb.ToString();
     }
 
-    private static void PrintTypeDefinition(TypeDefinition type, StringBuilder sb)
+    private static void PrintTypeDefinition(TypeDefinition type, IType[] genericTypes, StringBuilder sb)
     {
         if (type == null) return;
 
@@ -5780,9 +5936,14 @@ public static class TypeChecker
         {
             sb.Append(type.BakedType.Name);
         }
+        else if (type.IsGeneric && genericTypes != null)
+        {
+            var genericName = genericTypes[type.GenericIndex]?.Name ?? string.Empty;
+            sb.Append(genericName);
+        }
         else if (type.Name == "*")
         {
-            PrintTypeDefinition(type.Generics[0], sb);
+            PrintTypeDefinition(type.Generics[0], genericTypes, sb);
             sb.Append('*');
         }
         else
@@ -5791,20 +5952,20 @@ public static class TypeChecker
             if (type.Generics.Any())
             {
                 sb.Append('<');
-                PrintGenericTypes(type, sb);
+                PrintGenericTypes(type, genericTypes, sb);
                 sb.Append('>');
             }
         }
     }
 
-    private static void PrintGenericTypes(TypeDefinition type, StringBuilder sb)
+    private static void PrintGenericTypes(TypeDefinition type, IType[] genericTypes, StringBuilder sb)
     {
         for (var i = 0; i < type.Generics.Count - 1; i++)
         {
-            PrintTypeDefinition(type.Generics[i], sb);
+            PrintTypeDefinition(type.Generics[i], genericTypes, sb);
             sb.Append(", ");
         }
-        PrintTypeDefinition(type.Generics[^1], sb);
+        PrintTypeDefinition(type.Generics[^1], genericTypes, sb);
     }
 
     public static string PrintOperator(Operator op)

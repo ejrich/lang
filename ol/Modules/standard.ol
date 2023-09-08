@@ -172,6 +172,43 @@ array_resize<T>(Array<T>* array, int length, Allocate allocator = default_alloca
 }
 
 
+// Sorting algorithms
+interface int SortCompare<T>(T a, T b)
+
+bubble_sort<T>(Array<T> array) {
+    each i in 1..array.length {
+        swapped := false;
+        each j in 0..array.length - i - 1 {
+            if array[j] > array[j + 1] {
+                temp := array[j];
+                array[j] = array[j + 1];
+                array[j + 1] = temp;
+                swapped = true;
+            }
+        }
+
+        if !swapped break;
+    }
+}
+
+bubble_sort<T>(Array<T> array, SortCompare<T> compare) {
+    each i in 1..array.length {
+        swapped := false;
+        each j in 0..array.length - i - 1 {
+            comparison := compare(array[j], array[j + 1]);
+            if comparison == 1 {
+                temp := array[j];
+                array[j] = array[j + 1];
+                array[j + 1] = temp;
+                swapped = true;
+            }
+        }
+
+        if !swapped break;
+    }
+}
+
+
 // Assertions
 #import compiler
 assert(bool assertion, int exit_code = 1) #call_location #inline {
@@ -1115,19 +1152,7 @@ bool, Array<FileEntry> get_files_in_directory(string path, Allocate allocator = 
     }
 
     // Sort by name
-    each i in 1..files.length {
-        swapped := false;
-        each j in 0..files.length - i - 1 {
-            if files[j].name > files[j + 1].name {
-                temp := files[j];
-                files[j] = files[j + 1];
-                files[j + 1] = temp;
-                swapped = true;
-            }
-        }
-
-        if !swapped break;
-    }
+    bubble_sort(files, file_entry_compare);
 
     return true, files;
 }
@@ -1345,6 +1370,12 @@ add_exit_callback(ExitCallback callback) {
 }
 
 #private
+
+int file_entry_compare(FileEntry a, FileEntry b) {
+    if a.name >  b.name return 1;
+    if a.name == b.name return 0;
+    return -1;
+}
 
 STRING_BUFFER_MAX_LENGTH := 1024; #const
 

@@ -6,11 +6,11 @@ namespace ol;
 
 public static class Polymorpher
 {
-    public static StructAst CreatePolymorphedStruct(StructAst baseStruct, int fileIndex, string name, TypeKind typeKind, bool privateGenericTypes, params IType[] genericTypes)
+    public static StructAst CreatePolymorphedStruct(StructAst baseStruct, string name, TypeKind typeKind, bool privateGenericTypes, params IType[] genericTypes)
     {
         var polyStruct = new StructAst
         {
-            FileIndex = fileIndex, Line = baseStruct.Line, Column = baseStruct.Column, Name = name,
+            FileIndex = baseStruct.FileIndex, Line = baseStruct.Line, Column = baseStruct.Column, Name = name,
             TypeKind = typeKind, Private = baseStruct.Private || privateGenericTypes,
             BaseStructName = baseStruct.Name, BaseTypeDefinition = baseStruct.BaseTypeDefinition,
             BaseStruct = baseStruct.BaseStruct, GenericTypes = genericTypes
@@ -37,6 +37,28 @@ public static class Polymorpher
         return polyStruct;
     }
 
+    public static InterfaceAst CreatePolymorphedInterface(InterfaceAst baseInterface, string name, bool privateGenericTypes, IType[] genericTypes)
+    {
+        var polyInterface = new InterfaceAst
+        {
+            FileIndex = baseInterface.FileIndex, Line = baseInterface.Line, Column = baseInterface.Column, Name = name,
+            Private = baseInterface.Private || privateGenericTypes, ArgumentCount = baseInterface.ArgumentCount,
+            BaseInterfaceName = baseInterface.Name, GenericTypes = genericTypes,
+            ReturnTypeDefinition = baseInterface.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics) ?
+                CopyType(baseInterface.ReturnTypeDefinition, genericTypes) :
+                baseInterface.ReturnTypeDefinition
+        };
+
+        foreach (var argument in baseInterface.Arguments)
+        {
+            polyInterface.Arguments.Add(argument.HasGenerics ?
+                CopyDeclaration(argument, genericTypes, baseInterface.Generics) :
+                argument);
+        }
+
+        return polyInterface;
+    }
+
     public static FunctionAst CreatePolymorphedFunction(FunctionAst baseFunction, string name, bool privateGenericTypes, IType[] genericTypes)
     {
         var function = CopyAst(baseFunction);
@@ -56,14 +78,9 @@ public static class Polymorpher
 
         foreach (var argument in baseFunction.Arguments)
         {
-            if (argument.HasGenerics)
-            {
-                function.Arguments.Add(CopyDeclaration(argument, genericTypes, baseFunction.Generics));
-            }
-            else
-            {
-                function.Arguments.Add(argument);
-            }
+            function.Arguments.Add(argument.HasGenerics ?
+                CopyDeclaration(argument, genericTypes, baseFunction.Generics) :
+                argument);
         }
 
         function.Body = CopyScope(baseFunction.Body, genericTypes, baseFunction.Generics);
@@ -447,6 +464,9 @@ public static class Polymorpher
                     compoundCopy.Children.Add(CopyExpression(child, genericTypes, generics));
                 }
                 return compoundCopy;
+            case ContinueAst:
+            case BreakAst:
+                return ast;
             case null:
                 return null;
             default:
