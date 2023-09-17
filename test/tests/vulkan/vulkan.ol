@@ -582,7 +582,7 @@ close_window() {
     #if os == OS.Linux {
         XFreeGC(window.handle, window.graphics_context);
         XDestroyWindow(window.handle, window.window);
-        XCloseDisplay(window.handle);
+        // XCloseDisplay(window.handle);
     }
     #if os == OS.Windows {
         CloseWindow(window.handle);
