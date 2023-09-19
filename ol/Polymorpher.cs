@@ -66,6 +66,7 @@ public static class Polymorpher
         function.Name = name;
         function.Private = baseFunction.Private || privateGenericTypes;
         function.ArgumentCount = baseFunction.ArgumentCount;
+        function.ParamsElementType = baseFunction.ParamsElementType;
 
         if (baseFunction.Flags.HasFlag(FunctionFlags.ReturnTypeHasGenerics))
         {
