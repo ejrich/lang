@@ -4569,6 +4569,7 @@ public static class TypeChecker
                         {
                             match = VerifyArgument(call.Arguments[callArgIndex], argument, function.ParamsElementType);
                         }
+                        callArgIndex++;
                     }
                     else
                     {
