@@ -163,13 +163,6 @@ struct Matrix4 {
     d: Vector4;
 }
 
-struct Quaternion {
-    x: float;
-    y: float;
-    z: float;
-    w: float;
-}
-
 
 operator + (Vector3 a, Vector3 b) {
     c: Vector3 = { x = a.x + b.x; y = a.y + b.y; z = a.z + b.z; }
@@ -247,4 +240,28 @@ Vector3 normalize(Vector3 a) {
     a.y /= length;
     a.z /= length;
     return a;
+}
+
+
+struct Quaternion {
+    x: float;
+    y: float;
+    z: float;
+    w: float;
+}
+
+operator * (Quaternion a, Quaternion b) {
+    c: Quaternion = {
+        x = a.w * b.x + a.x * b.w - a.y * b.z + a.z * b.y;
+        y = a.w * b.y + a.x * b.z + a.y * b.w - a.z * b.x;
+        z = a.w * b.z - a.x * b.y + a.y * b.x + a.z * b.w;
+        w = a.w * b.w - a.x * b.x - a.y * b.y - a.z * b.z;
+    }
+
+    return c;
+}
+
+Quaternion inverse(Quaternion a) {
+    inverse: Quaternion = { x = -a.x; y = -a.y; z = -a.z; w = a.w; }
+    return inverse;
 }
