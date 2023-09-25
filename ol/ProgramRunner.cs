@@ -672,9 +672,11 @@ public static unsafe class ProgramRunner
                         Debug.Assert(stagingRegister != null, "Unable to set staging register for capturing inputs");
                     }
 
+                    var i = 0;
                     foreach (var (_, input) in assembly.InRegisters)
                     {
-                        var value = GetValue(input.Value, registers, stackPointer, function, arguments);
+                        var inputValue = instruction.Value1.Values[i++];
+                        var value = GetValue(inputValue, registers, stackPointer, function, arguments);
                         if (input.RegisterDefinition.Type == RegisterType.General)
                         {
                             WriteAssemblyInstruction(mov, input.RegisterDefinition, null, assemblyCode, null, value.ULong);
@@ -724,15 +726,17 @@ public static unsafe class ProgramRunner
                         }
                         Debug.Assert(stagingRegister != null, "Unable to set staging register for capturing outputs");
 
+                        i = 0;
                         var movPointer = Assembly.Instructions["mov"][1];
                         foreach (var output in assembly.OutValues)
                         {
-                            var value = GetValue(output.Value, registers, stackPointer, function, arguments);
+                            var outputValue = instruction.Value2.Values[i++];
+                            var value = GetValue(outputValue, registers, stackPointer, function, arguments);
 
                             WriteAssemblyInstruction(mov, stagingRegister, null, assemblyCode, null, value.ULong);
-                            if (output.Value.Type.TypeKind == TypeKind.Float)
+                            if (outputValue.Type.TypeKind == TypeKind.Float)
                             {
-                                if (output.Value.Type.Size == 4)
+                                if (outputValue.Type.Size == 4)
                                 {
                                     WriteAssemblyInstruction(Assembly.Instructions["movss"][0], stagingRegister, output.RegisterDefinition, assemblyCode);
                                 }
