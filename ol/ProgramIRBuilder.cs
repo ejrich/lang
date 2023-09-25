@@ -1632,19 +1632,27 @@ public static class ProgramIRBuilder
         SetDebugLocation(function, assembly, scope);
 
         // Get the values to place in the input registers
+        var i = 0;
+        var inputValues = new InstructionValue[assembly.InRegisters.Count];
         foreach (var (_, input) in assembly.InRegisters)
         {
-            input.Value = input.GetPointer ? EmitGetReference(function, input.Ast, scope, out _).value :
+            inputValues[i++] = input.GetPointer ? EmitGetReference(function, input.Ast, scope, out _).value :
                 EmitIR(function, input.Ast, scope);
         }
 
         // Get the output values from the registers
+        i = 0;
+        var outputValues = new InstructionValue[assembly.OutValues.Count];
         foreach (var output in assembly.OutValues)
         {
-            output.Value = EmitGetReference(function, output.Ast, scope, out _).value;
+            outputValues[i++] = EmitGetReference(function, output.Ast, scope, out _).value;
         }
 
-        var asmInstruction = new Instruction {Type = InstructionType.InlineAssembly, Scope = scope, Source = assembly};
+        var asmInstruction = new Instruction {
+            Type = InstructionType.InlineAssembly, Scope = scope, Source = assembly,
+            Value1 = new InstructionValue {Values = inputValues},
+            Value2 = new InstructionValue {Values = outputValues}
+        };
         function.Instructions.Add(asmInstruction);
     }
 

@@ -1487,8 +1487,9 @@ public static unsafe class LLVMBackend
                         {
                             foreach (var (register, input) in assembly.InRegisters)
                             {
-                                arguments[i] = GetValue(input.Value, values, allocations, functionPointer);
-                                argumentTypes[i++] = _types[input.Value.Type.TypeIndex];
+                                var inputValue = instruction.Value1.Values[i];
+                                arguments[i] = GetValue(inputValue, values, allocations, functionPointer);
+                                argumentTypes[i++] = _types[inputValue.Type.TypeIndex];
                                 constraintString.AppendFormat("{{{0}}},", register);
                             }
                             constraintString.Remove(constraintString.Length-1, 1);
@@ -1551,8 +1552,9 @@ public static unsafe class LLVMBackend
                             for (i = 0; i < assembly.OutValues.Count; i++)
                             {
                                 var output = assembly.OutValues[i];
-                                arguments[i] = GetValue(output.Value, values, allocations, functionPointer);
-                                var type = output.Value.Type;
+                                var outputValue = instruction.Value2.Values[i];
+                                arguments[i] = GetValue(outputValue, values, allocations, functionPointer);
+                                var type = outputValue.Type;
                                 var pointedType = _types[type.TypeIndex];
                                 argumentTypes[i] = _pointerType;
                                 argumentElementTypes[i] = LLVM.CreateTypeAttribute(_context, _elementTypeAttributeKind, pointedType);

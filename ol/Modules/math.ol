@@ -250,6 +250,26 @@ struct Quaternion {
     w: float;
 }
 
+Quaternion quaternion_from_axis_angle(float x = 0.0, float y = 0.0, float z = 0.0, float angle = 0.0) {
+    half_angle := angle / 2.0;
+    axis_scale := sine(half_angle);
+
+    axis := normalize(vec3(x, y, z));
+    scaled_axis := multiply(axis, axis_scale);
+
+    result: Quaternion = {
+        x = scaled_axis.x;
+        y = scaled_axis.y;
+        z = scaled_axis.z;
+        w = cosine(half_angle);
+    }
+    foo := result.x * result.x + result.y * result.y + result.z * result.z + result.w * result.w;
+    length := square_root(foo);
+    print("Quaternion = %, Length = %\n", length);
+
+    return result;
+}
+
 operator * (Quaternion a, Quaternion b) {
     c: Quaternion = {
         x = a.w * b.x + a.x * b.w - a.y * b.z + a.z * b.y;

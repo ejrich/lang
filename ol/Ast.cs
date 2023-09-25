@@ -668,7 +668,6 @@ public class AssemblyInputAst : IAst
     public RegisterDefinition RegisterDefinition { get; set; }
     public IAst Ast { get; set; }
     public bool GetPointer { get; set; }
-    public InstructionValue Value { get; set; }
 }
 
 public class AssemblyInstructionAst : IAst
