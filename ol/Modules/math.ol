@@ -263,9 +263,6 @@ Quaternion quaternion_from_axis_angle(float x = 0.0, float y = 0.0, float z = 0.
         z = scaled_axis.z;
         w = cosine(half_angle);
     }
-    foo := result.x * result.x + result.y * result.y + result.z * result.z + result.w * result.w;
-    length := square_root(foo);
-    print("Quaternion = %, Length = %\n", length);
 
     return result;
 }
