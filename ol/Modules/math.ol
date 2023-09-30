@@ -282,3 +282,21 @@ Quaternion inverse(Quaternion a) {
     inverse: Quaternion = { x = -a.x; y = -a.y; z = -a.z; w = a.w; }
     return inverse;
 }
+
+Quaternion lerp(float t, Quaternion a, Quaternion b) {
+    c: Quaternion = {
+        x = a.x * (1.0 - t) + b.x * t;
+        y = a.y * (1.0 - t) + b.y * t;
+        z = a.z * (1.0 - t) + b.z * t;
+        w = a.w * (1.0 - t) + b.w * t;
+    }
+
+    length := square_root(c.x * c.x + c.y * c.y + c.z * c.z + c.w * c.w);
+
+    c.x /= length;
+    c.y /= length;
+    c.z /= length;
+    c.w /= length;
+
+    return c;
+}
