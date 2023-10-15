@@ -279,7 +279,7 @@ public static class ProgramIRBuilder
                     case TypeKind.Float:
                         return value.ConstantValue.Double.ToString();
                     default:
-                        return $"\"{value.ConstantString}\"";
+                        return $"\"{value.ConstantString.Value}\"";
                 }
             case InstructionValueType.Null:
                 return "null";
@@ -1572,7 +1572,8 @@ public static class ProgramIRBuilder
 
     private static void FinishEachBody(FunctionIR function, ScopeAst eachBody, int instructionCount, IType indexType, InstructionValue indexValue, InstructionValue indexVariable, Instruction conditionJump, BasicBlock conditionBlock, BasicBlock eachBodyBlock, BasicBlock eachIncrementBlock, BasicBlock afterBlock)
     {
-        if (function.BasicBlocks[^1].Location < function.Instructions.Count)
+        var currentBlock = function.BasicBlocks[^1];
+        if (currentBlock.Location < function.Instructions.Count)
         {
             AddBasicBlock(function, eachIncrementBlock);
         }
@@ -1584,7 +1585,7 @@ public static class ProgramIRBuilder
                 var instruction = function.Instructions[instructionCount];
                 if (instruction.Type == InstructionType.Jump && instruction.Value1.JumpBlock == eachIncrementBlock)
                 {
-                    instruction.Value1.JumpBlock = eachBodyBlock;
+                    instruction.Value1.JumpBlock = currentBlock;
                 }
             }
         }
