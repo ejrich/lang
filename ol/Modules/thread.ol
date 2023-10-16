@@ -23,13 +23,13 @@ u64 create_thread(ThreadProcedure proc, void* arg) {
     }
 }
 
-bool create_semaphore(Semaphore* semaphore, int allowed = 1) {
+bool create_semaphore(Semaphore* semaphore, int allowed = 1, int initial_value = 0) {
     success: bool;
     #if os == OS.Linux {
-        success = sem_init(&semaphore.sem, 0, allowed) == 0;
+        success = sem_init(&semaphore.sem, 0, initial_value) == 0;
     }
     #if os == OS.Windows {
-        semaphore.handle = CreateSemaphore(null, 0, allowed, null);
+        semaphore.handle = CreateSemaphore(null, initial_value, allowed, null);
         success = semaphore.handle != null;
     }
 
