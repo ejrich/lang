@@ -7,4 +7,4 @@ map <leader>t<F10> :Dispatch ./test/bin/tests<CR>
 au BufEnter *.cs :setlocal commentstring=//\ %s
 au BufEnter *.ol :setlocal commentstring=//\ %s
 
-call SetupSvn()
+lua SetupP4(vim.fn.hostname() .. "-lang")
