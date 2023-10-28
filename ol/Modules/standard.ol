@@ -963,6 +963,19 @@ bool file_exists(string path) {
     return exists;
 }
 
+bool create_directory(string path) {
+    created: bool;
+
+    #if os == OS.Linux {
+        created = mkdir(path.data, 0x1FF) == 0;
+    }
+    #if os == OS.Windows {
+        created = CreateDirectoryA(path.data, null) == true;
+    }
+
+    return created;
+}
+
 struct File {
     handle: s64;
 }

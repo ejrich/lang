@@ -22,6 +22,8 @@ bool PathFileExistsA(string pszPath) #extern "shlwapi"
 int GetFullPathNameA(string lpFileName, int nBufferLength, u8* lpBuffer, u8** lpFilePart) #extern "kernel32"
 Handle* OpenFile(string lpFileName, OFSTRUCT* lpReOpenBuff, OpenFileType uStyle) #extern "kernel32"
 bool CloseHandle(Handle* hObject) #extern "kernel32"
+bool CreateDirectoryA(string lpPathName, SECURITY_ATTRIBUTES* lpSecurityAttributes) #extern "kernel32"
+
 int SetFilePointer(Handle* hFile, u64 lDistanceToMove, u64* lpDistanceToMoveHigh, MoveMethod dwMoveMethod) #extern "kernel32"
 bool ReadFile(Handle* hFile, void* lpBuffer, int nNumberOfBytesToRead, int* nNumberOfBytesRead, void* lpOverlapped) #extern "kernel32"
 bool WriteFile(Handle* hFile, void* lpBuffer, int nNumberOfBytesToWrite, int* nNumberOfBytesWritten, void* lpOverlapped) #extern "kernel32"
