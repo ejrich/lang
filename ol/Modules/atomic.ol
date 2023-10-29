@@ -1,7 +1,7 @@
 // This module contains atomic operations like compare exchange and increment
 
 T compare_exchange<T>(T* pointer, T value, T comparand) {
-    #assert type_of(T).type == TypeKind.Integer || type_of(T).type == TypeKind.Pointer;
+    #assert type_of(T).type == TypeKind.Integer || type_of(T).type == TypeKind.Enum || type_of(T).type == TypeKind.Pointer;
 
     result: T;
     #if size_of(T) == 1 {
