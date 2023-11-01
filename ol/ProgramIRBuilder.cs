@@ -50,7 +50,7 @@ public static class ProgramIRBuilder
             Program.EntryPoint = functionIR;
         }
 
-        var entryBlock = AddBasicBlock(functionIR);
+        AddBasicBlock(functionIR);
 
         for (var i = 0; i < function.Arguments.Count; i++)
         {
@@ -1292,7 +1292,7 @@ public static class ProgramIRBuilder
 
         AddBasicBlock(function, bodyBlock);
         EmitScope(function, conditional.IfBlock, returnType, breakBlock, continueBlock);
-        var jumpToAfter = PatchConditionalBody(function, conditional, scope, instructionCount, bodyBlock, ref elseBlock);
+        var jumpToAfter = PatchConditionalBody(function, conditional, scope, instructionCount, ref elseBlock);
 
         // Jump to the else block, otherwise fall through to the then block
         if (conditional.ElseBlock == null)
@@ -1316,7 +1316,7 @@ public static class ProgramIRBuilder
 
         AddBasicBlock(function, bodyBlock);
         EmitScopeInline(function, conditional.IfBlock, returnType, returnAllocation, returnBlock, breakBlock, continueBlock);
-        var jumpToAfter = PatchConditionalBody(function, conditional, scope, instructionCount, bodyBlock, ref elseBlock);
+        var jumpToAfter = PatchConditionalBody(function, conditional, scope, instructionCount, ref elseBlock);
 
         // Jump to the else block, otherwise fall through to the then block
         if (conditional.ElseBlock == null)
@@ -1328,9 +1328,10 @@ public static class ProgramIRBuilder
         return FinishConditional(function, conditional, elseBlock, jumpToAfter);
     }
 
-    private static Instruction PatchConditionalBody(FunctionIR function, ConditionalAst conditional, IScope scope, int instructionCount, BasicBlock bodyBlock, ref BasicBlock elseBlock)
+    private static Instruction PatchConditionalBody(FunctionIR function, ConditionalAst conditional, IScope scope, int instructionCount, ref BasicBlock elseBlock)
     {
         Instruction jumpToAfter = null;
+        var currentBlock = function.BasicBlocks[^1];
 
         // For when the the if block does not return and there is an else block, a jump to the after block is required
         if (!(conditional.IfBlock.Returns || conditional.IfBlock.Breaks) && conditional.ElseBlock != null)
@@ -1339,7 +1340,7 @@ public static class ProgramIRBuilder
             function.Instructions.Add(jumpToAfter);
             AddBasicBlock(function, elseBlock);
         }
-        else if (bodyBlock.Location < function.Instructions.Count)
+        else if (currentBlock.Location < function.Instructions.Count)
         {
             AddBasicBlock(function, elseBlock);
         }
@@ -1351,10 +1352,10 @@ public static class ProgramIRBuilder
                 var instruction = function.Instructions[instructionCount];
                 if (instruction.Type == InstructionType.ConditionalJump && instruction.Value2.JumpBlock == elseBlock)
                 {
-                    instruction.Value2.JumpBlock = bodyBlock;
+                    instruction.Value2.JumpBlock = currentBlock;
                 }
             }
-            elseBlock = bodyBlock;
+            elseBlock = currentBlock;
         }
 
         return jumpToAfter;
@@ -1395,14 +1396,15 @@ public static class ProgramIRBuilder
 
     private static (BasicBlock, BasicBlock) BeginWhile(FunctionIR function, IAst condition, IScope scope)
     {
-        SetDebugLocation(function, condition, scope);
-
         // Create a block for the condition expression and then jump to the following
         var conditionBlock = function.BasicBlocks[^1];
         if (conditionBlock.Location < function.Instructions.Count)
         {
             conditionBlock = AddBasicBlock(function);
         }
+
+        SetDebugLocation(function, condition, scope);
+
         var whileBodyBlock = new BasicBlock();
         var afterBlock = new BasicBlock();
         EmitConditionExpression(function, condition, scope, whileBodyBlock, afterBlock);
