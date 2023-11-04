@@ -2632,14 +2632,18 @@ public static class ProgramIRBuilder
     {
         if (functionPointer == null)
         {
-            var identifier = GetScopeIdentifier(scope, call.Name, out var _);
+            var identifier = GetScopeIdentifier(scope, call.Name, out var global);
             if (identifier is DeclarationAst declaration)
             {
-                functionPointer = EmitLoad(function, declaration.Type, function.Pointers[declaration.PointerIndex + function.PointerOffset], scope);
+                var pointer = global ? Program.GlobalVariables[declaration.PointerIndex].Pointer :
+                    function.Pointers[declaration.PointerIndex + function.PointerOffset];
+                functionPointer = EmitLoad(function, declaration.Type, pointer, scope);
             }
             else if (identifier is VariableAst variable)
             {
-                functionPointer = EmitLoad(function, variable.Type, function.Pointers[variable.PointerIndex + function.PointerOffset], scope);
+                var pointer = global ? Program.GlobalVariables[variable.PointerIndex].Pointer :
+                    function.Pointers[variable.PointerIndex + function.PointerOffset];
+                functionPointer = EmitLoad(function, variable.Type, pointer, scope);
             }
         }
 
