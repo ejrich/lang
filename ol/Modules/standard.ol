@@ -950,27 +950,35 @@ write_struct_to_buffer(StringBuffer* buffer, StructTypeInfo* type_info, void* da
 
 // File and directory operations and types
 bool file_exists(string path) {
+    null_terminated_path: Array<u8>[path.length + 1];
+    memory_copy(null_terminated_path.data, path.data, path.length);
+    null_terminated_path[path.length] = 0;
+
     exists: bool;
 
     #if os == OS.Linux {
         stat_buf: Stat;
-        exists = stat(path.data, &stat_buf) == 0;
+        exists = stat(null_terminated_path.data, &stat_buf) == 0;
     }
     #if os == OS.Windows {
-        exists = PathFileExistsA(path);
+        exists = PathFileExistsA(null_terminated_path.data);
     }
 
     return exists;
 }
 
 bool create_directory(string path) {
+    null_terminated_path: Array<u8>[path.length + 1];
+    memory_copy(null_terminated_path.data, path.data, path.length);
+    null_terminated_path[path.length] = 0;
+
     created: bool;
 
     #if os == OS.Linux {
-        created = mkdir(path.data, 0x1FF) == 0;
+        created = mkdir(null_terminated_path.data, 0x1FF) == 0;
     }
     #if os == OS.Windows {
-        created = CreateDirectoryA(path.data, null) == true;
+        created = CreateDirectoryA(null_terminated_path.data, null) == true;
     }
 
     return created;
