@@ -44,6 +44,7 @@ bool SetCurrentDirectoryA(string lpPathName) #extern "kernel32"
 
 Handle* GetModuleHandleA(string lpModuleName) #extern "kernel32"
 bool RegisterClassExA(WNDCLASSEXA* wndClass) #extern "user32"
+int GetSystemMetrics(int nIndex) #extern "user32"
 s64 DefWindowProcA(Handle* hWnd, MessageType uMsg, u64 wParam, s64 lParam) #extern "user32"
 Handle* CreateWindowExA(int dwExStyle, string lpClassName, string lpWindowName, WindowStyle dwStyle, u32 x, u32 y, u32 nWidth, u32 nWeight, Handle* hWndParent, Handle* hMenu, Handle* hInstance, void* lpParam) #extern "user32"
 bool ShowWindow(Handle* hWnd, WindowShow nCmdShow) #extern "user32"
