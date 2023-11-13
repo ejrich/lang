@@ -2109,3 +2109,29 @@ s32 XUnionRegion(Region* a, Region* b, Region* c) #extern "X11"
 s32 XWMGeometry(Display* a, s32 b, u8* c, u8* d, u32 e, XSizeHints* f, s32* g, s32* h, s32* i, s32* j, s32* k) #extern "X11"
 
 s32 XXorRegion(Region* a, Region* b, Region* c) #extern "X11"
+
+
+// Xrandr extensions
+struct XRRMonitorInfo {
+    name: u64;
+    primary: s32;
+    automatic: s32;
+    noutput: s32;
+    x: s32;
+    y: s32;
+    width: s32;
+    height: s32;
+    mwidth: s32;
+    mheight: s32;
+    outputs: u64*;
+}
+
+XRRMonitorInfo* XRRAllocateMonitor(Display* dpy, s32 noutput) #extern "Xrandr"
+
+XRRMonitorInfo* XRRGetMonitors(Display* dpy, u64 window, s32 get_active, s32* nmonitors) #extern "Xrandr"
+
+XRRSetMonitor(Display* dpy, u64 window, XRRMonitorInfo* monitor) #extern "Xrandr"
+
+XRRDeleteMonitor(Display* dpy, u64 window, u64 name) #extern "Xrandr"
+
+XRRFreeMonitors(XRRMonitorInfo* monitors) #extern "Xrandr"
