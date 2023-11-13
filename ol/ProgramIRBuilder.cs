@@ -367,6 +367,7 @@ public static class ProgramIRBuilder
                 // Initialize struct field default values
                 case TypeKind.Struct:
                 case TypeKind.String:
+                case TypeKind.Any:
                     globalVariable.InitialValue = GetConstantStruct((StructAst)declaration.Type, scope, declaration.Assignments);
                     break;
                 // Initialize pointers to null
@@ -452,6 +453,7 @@ public static class ProgramIRBuilder
             // Initialize struct field default values
             case TypeKind.Struct:
             case TypeKind.String:
+            case TypeKind.Any:
                 return GetConstantStruct((StructAst)field.Type, scope, field.Assignments);
             // Initialize pointers to null
             case TypeKind.Pointer:
@@ -674,6 +676,7 @@ public static class ProgramIRBuilder
                 // Initialize struct field default values
                 case TypeKind.Struct:
                 case TypeKind.String:
+                case TypeKind.Any:
                     InitializeStruct(function, (StructAst)declaration.Type, allocation, scope, declaration.Assignments);
                     break;
                 // Initialize pointers to null
@@ -811,6 +814,7 @@ public static class ProgramIRBuilder
                 // Initialize struct field default values
                 case TypeKind.Struct:
                 case TypeKind.String:
+                case TypeKind.Any:
                     foreach (var allocation in allocations)
                     {
                         InitializeStruct(function, (StructAst)declaration.Type, allocation, scope, declaration.Assignments);
@@ -1017,6 +1021,7 @@ public static class ProgramIRBuilder
             // Initialize struct field default values
             case TypeKind.Struct:
             case TypeKind.String:
+            case TypeKind.Any:
                 InitializeStruct(function, (StructAst)field.Type, pointer, scope, field.Assignments);
                 break;
             // Initialize pointers to null
