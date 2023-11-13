@@ -862,7 +862,7 @@ public static class TypeChecker
                 }
                 else if (structField.Assignments != null)
                 {
-                    if (structField.Type != null && structField.Type.TypeKind != TypeKind.Struct && structField.Type.TypeKind != TypeKind.String)
+                    if (structField.Type != null && structField.Type.TypeKind != TypeKind.Struct && structField.Type.TypeKind != TypeKind.String && structField.Type.TypeKind != TypeKind.Any)
                     {
                         ErrorReporter.Report($"Can only use object initializer with struct type, got '{PrintTypeDefinition(structField.TypeDefinition)}'", structField.TypeDefinition);
                     }
@@ -2140,7 +2140,7 @@ public static class TypeChecker
             }
             else
             {
-                if (declaration.Type == null || (declaration.Type.TypeKind != TypeKind.Struct && declaration.Type.TypeKind != TypeKind.String))
+                if (declaration.Type == null || (declaration.Type.TypeKind != TypeKind.Struct && declaration.Type.TypeKind != TypeKind.String && declaration.Type.TypeKind != TypeKind.Any))
                 {
                     ErrorReporter.Report($"Can only use object initializer with struct type, got '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
                 }
@@ -2327,7 +2327,7 @@ public static class TypeChecker
             }
             else
             {
-                if (declaration.Type == null || (declaration.Type.TypeKind != TypeKind.Struct && declaration.Type.TypeKind != TypeKind.String))
+                if (declaration.Type == null || (declaration.Type.TypeKind != TypeKind.Struct && declaration.Type.TypeKind != TypeKind.String && declaration.Type.TypeKind != TypeKind.Any))
                 {
                     ErrorReporter.Report($"Can only use object initializer with struct type, got '{PrintTypeDefinition(declaration.TypeDefinition)}'", declaration.TypeDefinition);
                 }
