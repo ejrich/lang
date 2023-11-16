@@ -38,7 +38,7 @@ bool run_test(string test_dir, string test) {
     else {
         skip_file_name := "no_linux"; #const
     }
-    executable := "./ol/bin/Debug/net6.0/ol"; #const
+    executable := "./ol/bin/Debug/net8.0/ol"; #const
 
     skip_file := format_string("%/%", test_dir, skip_file_name);
     skip := file_exists(skip_file);
