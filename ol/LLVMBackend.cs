@@ -1245,13 +1245,8 @@ public static unsafe class LLVMBackend
 
     private static void WriteFunction(LLVMValueRef functionPointer, FunctionIR function)
     {
-        // Declare the basic blocks
-        Span<LLVMBasicBlockRef> basicBlocks = stackalloc LLVMBasicBlockRef[function.BasicBlocks.Count];
-        foreach (var block in function.BasicBlocks)
-        {
-            basicBlocks[block.Index] = functionPointer.AppendBasicBlock(block.Index.ToString());
-        }
-        LLVM.PositionBuilderAtEnd(_builder, basicBlocks[0]);
+        var stackBlock = functionPointer.AppendBasicBlock("__stack");
+        LLVM.PositionBuilderAtEnd(_builder, stackBlock);
         _builder.CurrentDebugLocation = null;
 
         // Allocate the function stack
@@ -1281,6 +1276,18 @@ public static unsafe class LLVMBackend
 
             var stackPointerValue = _builder.BuildCall2(_stackSaveType, _stackSave, Array.Empty<LLVMValueRef>(), "stackPointer");
             _builder.BuildStore(stackPointerValue, stackPointer);
+        }
+
+        // Declare the basic blocks
+        Span<LLVMBasicBlockRef> basicBlocks = stackalloc LLVMBasicBlockRef[function.BasicBlocks.Count];
+        foreach (var block in function.BasicBlocks)
+        {
+            basicBlocks[block.Index] = functionPointer.AppendBasicBlock(block.Index.ToString());
+        }
+
+        if (function.BasicBlocks.Any())
+        {
+            _builder.BuildBr(basicBlocks[0]);
         }
 
         LLVMMetadataRef debugBlock = null;
@@ -2391,7 +2398,12 @@ public static unsafe class LLVMBackend
         }
 
         #if DEBUG
-        LLVM.VerifyModule(_module, LLVMVerifierFailureAction.LLVMPrintMessageAction, null);
+        var errors = LLVM.VerifyModule(_module, LLVMVerifierFailureAction.LLVMPrintMessageAction, null);
+        if (errors != 0)
+        {
+            Console.WriteLine("LLVM module failed verification, see output");
+            Environment.Exit(ErrorCodes.BuildError);
+        }
         #endif
 
         // Use current architecture of machine if not specified
