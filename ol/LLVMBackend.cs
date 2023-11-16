@@ -770,11 +770,7 @@ public static unsafe class LLVMBackend
         Span<LLVMValueRef> enumValueRefs = stackalloc LLVMValueRef[enumAst.Values.Count];
         foreach (var (name, value) in enumAst.Values)
         {
-            var enumValueNameString = GetString(name);
-            var enumValue = LLVM.ConstInt(LLVM.Int64Type(), (ulong)value.Value, 0);
-
-            Span<LLVMValueRef> enumValueFields = stackalloc LLVMValueRef[] {enumValueNameString, enumValue};
-            enumValueRefs[value.Index] = LLVMValueRef.CreateConstNamedStruct(_enumValueType, enumValueFields);
+            enumValueRefs[value.Index] = CreateEnumValue(name, value);
         }
 
         var valuesArray = CreateConstantArray(_enumValueType, _enumValueArrayType, enumValueRefs, "____enum_values");
@@ -782,6 +778,15 @@ public static unsafe class LLVMBackend
 
         Span<LLVMValueRef> fields = stackalloc LLVMValueRef[]{typeName, typeKind, typeSize, _typeInfos[enumAst.BaseType.TypeIndex], valuesArray, attributes};
         CreateAndSetTypeInfo(_enumTypeInfoType, fields, enumAst.TypeIndex);
+    }
+
+    private static LLVMValueRef CreateEnumValue(string name, EnumValueAst value)
+    {
+        var enumValueNameString = GetString(name);
+        var enumValue = LLVM.ConstInt(LLVM.Int64Type(), (ulong)value.Value, 0);
+
+        Span<LLVMValueRef> enumValueFields = stackalloc LLVMValueRef[] {enumValueNameString, enumValue};
+        return LLVMValueRef.CreateConstNamedStruct(_enumValueType, enumValueFields);
     }
 
     private static void DeclarePrimitive(PrimitiveAst primitive)
