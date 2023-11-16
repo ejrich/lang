@@ -1380,7 +1380,8 @@ public static class ProgramIRBuilder
         }
         else
         {
-            afterBlock = elseBlock.Location < function.Instructions.Count ? AddBasicBlock(function) : elseBlock;
+            var currentBlock = function.BasicBlocks[^1];
+            afterBlock = currentBlock.Location < function.Instructions.Count ? AddBasicBlock(function) : elseBlock;
         }
 
         if (jumpToAfter != null)
