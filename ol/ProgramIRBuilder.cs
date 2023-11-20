@@ -1378,10 +1378,14 @@ public static class ProgramIRBuilder
         {
             afterBlock = AddBasicBlock(function);
         }
-        else
+        else if (elseBlock.Location < function.Instructions.Count)
         {
             var currentBlock = function.BasicBlocks[^1];
-            afterBlock = currentBlock.Location < function.Instructions.Count ? AddBasicBlock(function) : elseBlock;
+            afterBlock = currentBlock.Location < function.Instructions.Count ? AddBasicBlock(function) : currentBlock;
+        }
+        else
+        {
+            afterBlock = elseBlock;
         }
 
         if (jumpToAfter != null)
@@ -1477,12 +1481,12 @@ public static class ProgramIRBuilder
         if (each.Iteration != null)
         {
             var (indexValue, indexVariable, condition, conditionBlock) = BeginEachIteration(function, each);
-            EmitEachBody(function, each.Body, TypeTable.S64Type, returnType, indexValue, indexVariable, condition, conditionBlock);
+            EmitEachBody(function, each, TypeTable.S64Type, returnType, indexValue, indexVariable, condition, conditionBlock);
         }
         else
         {
             var (indexValue, indexVariable, condition, conditionBlock) = BeginEachRange(function, each);
-            EmitEachBody(function, each.Body, TypeTable.S32Type, returnType, indexValue, indexVariable, condition, conditionBlock);
+            EmitEachBody(function, each, TypeTable.S32Type, returnType, indexValue, indexVariable, condition, conditionBlock);
         }
     }
 
@@ -1565,20 +1569,20 @@ public static class ProgramIRBuilder
     }
 
 
-    private static void EmitEachBody(FunctionIR function, ScopeAst eachBody, IType indexType, IType returnType, InstructionValue indexValue, InstructionValue indexVariable, InstructionValue condition, BasicBlock conditionBlock)
+    private static void EmitEachBody(FunctionIR function, EachAst each, IType indexType, IType returnType, InstructionValue indexValue, InstructionValue indexVariable, InstructionValue condition, BasicBlock conditionBlock)
     {
-        var conditionJump = new Instruction {Type = InstructionType.ConditionalJump, Scope = eachBody, Value1 = condition};
+        var conditionJump = new Instruction {Type = InstructionType.ConditionalJump, Scope = each.Body, Value1 = condition};
         function.Instructions.Add(conditionJump);
         var instructionCount = function.Instructions.Count;
 
         var eachBodyBlock = AddBasicBlock(function);
         var eachIncrementBlock = new BasicBlock();
         var afterBlock = new BasicBlock();
-        EmitScope(function, eachBody, returnType, afterBlock, eachIncrementBlock);
-        FinishEachBody(function, eachBody, instructionCount, indexType, indexValue, indexVariable, conditionJump, conditionBlock, eachBodyBlock, eachIncrementBlock, afterBlock);
+        EmitScope(function, each.Body, returnType, afterBlock, eachIncrementBlock);
+        FinishEachBody(function, each, instructionCount, indexType, indexValue, indexVariable, conditionJump, conditionBlock, eachBodyBlock, eachIncrementBlock, afterBlock);
     }
 
-    private static void FinishEachBody(FunctionIR function, ScopeAst eachBody, int instructionCount, IType indexType, InstructionValue indexValue, InstructionValue indexVariable, Instruction conditionJump, BasicBlock conditionBlock, BasicBlock eachBodyBlock, BasicBlock eachIncrementBlock, BasicBlock afterBlock)
+    private static void FinishEachBody(FunctionIR function, EachAst each, int instructionCount, IType indexType, InstructionValue indexValue, InstructionValue indexVariable, Instruction conditionJump, BasicBlock conditionBlock, BasicBlock eachBodyBlock, BasicBlock eachIncrementBlock, BasicBlock afterBlock)
     {
         var currentBlock = function.BasicBlocks[^1];
         if (currentBlock.Location < function.Instructions.Count)
@@ -1598,10 +1602,12 @@ public static class ProgramIRBuilder
             }
         }
 
+        SetDebugLocation(function, each, each.Body);
+
         var incrementValue = new InstructionValue {ValueType = InstructionValueType.Constant, Type = indexType, ConstantValue = new Constant {Integer = 1}};
-        var nextValue = EmitInstruction(InstructionType.IntegerAdd, function, TypeTable.S32Type, eachBody, indexValue, incrementValue);
-        EmitStore(function, indexVariable, nextValue, eachBody);
-        EmitJump(function, eachBody, conditionBlock);
+        var nextValue = EmitInstruction(InstructionType.IntegerAdd, function, TypeTable.S32Type, each.Body, indexValue, incrementValue);
+        EmitStore(function, indexVariable, nextValue, each.Body);
+        EmitJump(function, each.Body, conditionBlock);
 
         AddBasicBlock(function, afterBlock);
         conditionJump.Value2 = BasicBlockValue(afterBlock);
@@ -1614,26 +1620,26 @@ public static class ProgramIRBuilder
         if (each.Iteration != null)
         {
             var (indexValue, indexVariable, condition, conditionBlock) = BeginEachIteration(function, each);
-            EmitInlineEachBody(function, each.Body, TypeTable.S64Type, returnType, returnAllocation, returnBlock, indexValue, indexVariable, condition, conditionBlock);
+            EmitInlineEachBody(function, each, TypeTable.S64Type, returnType, returnAllocation, returnBlock, indexValue, indexVariable, condition, conditionBlock);
         }
         else
         {
             var (indexValue, indexVariable, condition, conditionBlock) = BeginEachRange(function, each);
-            EmitInlineEachBody(function, each.Body, TypeTable.S32Type, returnType, returnAllocation, returnBlock, indexValue, indexVariable, condition, conditionBlock);
+            EmitInlineEachBody(function, each, TypeTable.S32Type, returnType, returnAllocation, returnBlock, indexValue, indexVariable, condition, conditionBlock);
         }
     }
 
-    private static void EmitInlineEachBody(FunctionIR function, ScopeAst eachBody, IType indexType, IType returnType, InstructionValue returnAllocation, BasicBlock returnBlock, InstructionValue indexValue, InstructionValue indexVariable, InstructionValue condition, BasicBlock conditionBlock)
+    private static void EmitInlineEachBody(FunctionIR function, EachAst each, IType indexType, IType returnType, InstructionValue returnAllocation, BasicBlock returnBlock, InstructionValue indexValue, InstructionValue indexVariable, InstructionValue condition, BasicBlock conditionBlock)
     {
-        var conditionJump = new Instruction {Type = InstructionType.ConditionalJump, Scope = eachBody, Value1 = condition};
+        var conditionJump = new Instruction {Type = InstructionType.ConditionalJump, Scope = each.Body, Value1 = condition};
         function.Instructions.Add(conditionJump);
         var instructionCount = function.Instructions.Count;
 
         var eachBodyBlock = AddBasicBlock(function);
         var eachIncrementBlock = new BasicBlock();
         var afterBlock = new BasicBlock();
-        EmitScopeInline(function, eachBody, returnType, returnAllocation, returnBlock, afterBlock, eachIncrementBlock);
-        FinishEachBody(function, eachBody, instructionCount, indexType, indexValue, indexVariable, conditionJump, conditionBlock, eachBodyBlock, eachIncrementBlock, afterBlock);
+        EmitScopeInline(function, each.Body, returnType, returnAllocation, returnBlock, afterBlock, eachIncrementBlock);
+        FinishEachBody(function, each, instructionCount, indexType, indexValue, indexVariable, conditionJump, conditionBlock, eachBodyBlock, eachIncrementBlock, afterBlock);
     }
 
     private static void EmitInlineAssembly(FunctionIR function, AssemblyAst assembly, IScope scope)
