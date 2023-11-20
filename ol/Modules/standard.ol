@@ -226,8 +226,7 @@ assert(bool assertion, string message, int exit_code = 1) #call_location #inline
     #if build_env == BuildEnv.Debug {
         if assertion return;
 
-        if message.length == 0 print("Assertion failed\n");
-        else print("Assertion failed: % at % %:%\n", message, file, line, column);
+        print("Assertion failed: % at % %:%\n", message, file, line, column);
 
         asm { int3; }
         exit_program(exit_code);
