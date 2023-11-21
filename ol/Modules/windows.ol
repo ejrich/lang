@@ -51,7 +51,7 @@ bool ShowWindow(Handle* hWnd, WindowShow nCmdShow) #extern "user32"
 bool UpdateWindow(Handle* hWnd) #extern "user32"
 bool CloseWindow(Handle* hWnd) #extern "user32"
 bool GetWindowRect(Handle* hWnd, RECT* lpRect) #extern "user32"
-bool SetWindowPos(Handle* hWnd, Handle* hWndInsertAfter, int X, int Y, int cx, int cy, u32 uFlags) #extern "user32"
+bool SetWindowPos(Handle* hWnd, Handle* hWndInsertAfter, int X, int Y, int cx, int cy, SWPFlags uFlags) #extern "user32"
 
 bool GetMessage(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax) #extern "user32"
 bool PeekMessageA(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax, RemoveMsg wRemoveMsg) #extern "user32"
@@ -1378,6 +1378,24 @@ struct RECT {
     top: s64;
     right: s64;
     bottom: s64;
+}
+
+enum SWPFlags {
+    SWP_NOSIZE         = 0x1;
+    SWP_NOMOVE         = 0x2;
+    SWP_NOZORDER       = 0x4;
+    SWP_NOREDRAW       = 0x8;
+    SWP_NOACTIVATE     = 0x10;
+    SWP_DRAWFRAME      = 0x20;
+    SWP_FRAMECHANGED   = 0x20;
+    SWP_SHOWWINDOW     = 0x40;
+    SWP_HIDEWINDOW     = 0x80;
+    SWP_NOCOPYBITS     = 0x100;
+    SWP_NOOWNERZORDER  = 0x200;
+    SWP_NOREPOSITION   = 0x200;
+    SWP_NOSENDCHANGING = 0x400;
+    SWP_DEFERASE       = 0x2000;
+    SWP_ASYNCWINDOWPOS = 0x4000;
 }
 
 enum NtStatus {
