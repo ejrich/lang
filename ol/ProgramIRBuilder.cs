@@ -2389,6 +2389,12 @@ public static class ProgramIRBuilder
         }
 
         var callFunction = call.Function;
+        // If the call is inline and the function does not have body, escape early
+        if (call.Inline && !callFunction.Body.Children.Any())
+        {
+            return null;
+        }
+
         var argumentCount = call.Function.Flags.HasFlag(FunctionFlags.Varargs) ? call.Arguments.Count : call.Function.Arguments.Count;
         var arguments = new InstructionValue[argumentCount];
 

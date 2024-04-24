@@ -14,8 +14,6 @@ public static unsafe class LLVMBackend
     private static LLVMModuleRef _module;
     private static LLVMContextRef _context;
     private static LLVMBuilderRef _builder;
-    private static LLVMPassManagerRef _passManager;
-    private static LLVMCodeGenOptLevel _codeGenLevel;
     private static uint _elementTypeAttributeKind;
 
     private static LLVMTypeRef[] _types;
@@ -161,7 +159,7 @@ public static unsafe class LLVMBackend
 
         // 6. Compile to object file
         var baseFileName = Path.Combine(BuildSettings.ObjectDirectory, BuildSettings.Name);
-        return Compile(baseFileName, BuildSettings.OutputAssembly);
+        return Compile(baseFileName);
     }
 
     private static void InitLLVM()
@@ -169,24 +167,9 @@ public static unsafe class LLVMBackend
         _module = LLVMModuleRef.CreateWithName(BuildSettings.Name);
         _context = _module.Context;
         _builder = LLVMBuilderRef.Create(_context);
-        _passManager = _module.CreateFunctionPassManager();
         using var elementType = new MarshaledString("elementtype");
         _elementTypeAttributeKind = LLVM.GetEnumAttributeKindForName(elementType.Value, (UIntPtr)elementType.Length);
 
-        if (BuildSettings.Release)
-        {
-            LLVM.AddBasicAliasAnalysisPass(_passManager);
-            LLVM.AddPromoteMemoryToRegisterPass(_passManager);
-            LLVM.AddInstructionCombiningPass(_passManager);
-            LLVM.AddReassociatePass(_passManager);
-            LLVM.AddGVNPass(_passManager);
-            LLVM.AddCFGSimplificationPass(_passManager);
-            LLVM.AddLoopVectorizePass(_passManager);
-            LLVM.AddSLPVectorizePass(_passManager);
-
-            LLVM.InitializeFunctionPassManager(_passManager);
-            _codeGenLevel = LLVMCodeGenOptLevel.LLVMCodeGenLevelAggressive;
-        }
         if (BuildSettings.EmitDebug)
         {
             _emitDebug = true;
@@ -207,7 +190,6 @@ public static unsafe class LLVMBackend
             _debugFunctions = new LLVMMetadataRef[Program.Functions.Count];
         }
 
-        LLVM.ContextSetOpaquePointers(_context, 1); // Can be removed once llvm gets rid of non-opaque pointers
         _pointerType = LLVM.PointerTypeInContext(_context, 0);
         _null = LLVM.ConstNull(_pointerType);
     }
@@ -2078,9 +2060,6 @@ public static unsafe class LLVMBackend
                 _builder.BuildBr(basicBlocks[blockIndex]);
             }
         }
-
-        // Optimize the function if release build
-        LLVM.RunFunctionPassManager(_passManager, functionPointer);
     }
 
     private static LLVMValueRef GetValue(InstructionValue value, ReadOnlySpan<LLVMValueRef> values, ReadOnlySpan<LLVMValueRef> allocations, LLVMValueRef functionPointer)
@@ -2390,22 +2369,81 @@ public static unsafe class LLVMBackend
         return LLVM.BuildCall2(_builder, assemblyFunctionType, asm, null, 0, name);
     }
 
-    private static string Compile(string baseFileName, bool outputIntermediate)
+    private static string Compile(string baseFileName)
     {
         if (_emitDebug)
         {
             LLVM.DIBuilderFinalize(_debugBuilder);
         }
 
-        #if DEBUG
-        var errors = LLVM.VerifyModule(_module, LLVMVerifierFailureAction.LLVMPrintMessageAction, null);
-        if (errors != 0)
+        var targetMachine = CreateTargetMachine();
+
+        // Optimize the module when in release mode
+        if (BuildSettings.Release)
         {
-            Console.WriteLine("LLVM module failed verification, see output");
-            Environment.Exit(ErrorCodes.BuildError);
+            var passBuilderOptions = LLVM.CreatePassBuilderOptions();
+            LLVM.PassBuilderOptionsSetLoopInterleaving(passBuilderOptions, 1);
+            LLVM.PassBuilderOptionsSetLoopVectorization(passBuilderOptions, 1);
+            LLVM.PassBuilderOptionsSetSLPVectorization(passBuilderOptions, 1);
+            LLVM.PassBuilderOptionsSetLoopUnrolling(passBuilderOptions, 1);
+
+            using var passes = new MarshaledString("gvn,instcombine,mem2reg,simplifycfg");
+            var errors = LLVM.RunPasses(_module, passes.Value, targetMachine, passBuilderOptions);
+
+            LLVM.DisposePassBuilderOptions(passBuilderOptions);
+
+            if (errors != null)
+            {
+                var optimizeErrorMessage = LLVM.GetErrorMessage(errors);
+                var optimizeErrorMessageString = SpanExtensions.AsString(optimizeErrorMessage);
+                Console.WriteLine($"LLVM optimization error, see output:\n\n{optimizeErrorMessageString}");
+                LLVM.DisposeErrorMessage(optimizeErrorMessage);
+                Environment.Exit(ErrorCodes.BuildError);
+            }
+        }
+
+        #if DEBUG
+        {
+            var errors = LLVM.VerifyModule(_module, LLVMVerifierFailureAction.LLVMPrintMessageAction, null);
+            if (errors != 0)
+            {
+                Console.WriteLine("LLVM module failed verification, see output");
+                Environment.Exit(ErrorCodes.BuildError);
+            }
         }
         #endif
 
+        if (BuildSettings.OutputAssembly)
+        {
+            var llvmIrFile = $"{baseFileName}.ll";
+            _module.PrintToFile(llvmIrFile);
+
+            var assemblyFile = $"{baseFileName}.s";
+            targetMachine.TryEmitToFile(_module, assemblyFile, LLVMCodeGenFileType.LLVMAssemblyFile, out _);
+        }
+
+        #if _LINUX
+        var objectFile = $"{baseFileName}.o";
+        #elif _WINDOWS
+        var objectFile = $"{baseFileName}.obj";
+        #endif
+
+        if (!targetMachine.TryEmitToFile(_module, objectFile, LLVMCodeGenFileType.LLVMObjectFile, out var errorMessage))
+        {
+            Console.WriteLine($"LLVM Build error: {errorMessage}");
+
+            Messages.Submit(MessageType.CodeGenerationFailed);
+            Messages.CompleteAndWait();
+
+            Environment.Exit(ErrorCodes.BuildError);
+        }
+
+        Messages.Submit(MessageType.CodeGenerated, objectFile);
+        return objectFile;
+    }
+
+    private static LLVMTargetMachineRef CreateTargetMachine()
+    {
         // Use current architecture of machine if not specified
         if (BuildSettings.OutputArchitecture == OutputArchitecture.None)
         {
@@ -2457,7 +2495,7 @@ public static unsafe class LLVMBackend
         #endif
         _module.Target = targetTriple;
 
-        if (outputIntermediate)
+        if (BuildSettings.OutputAssembly)
         {
             using var test = new MarshaledString("test");
             using var intelString = new MarshaledString("--x86-asm-syntax=intel");
@@ -2469,35 +2507,9 @@ public static unsafe class LLVMBackend
             }
         }
 
-        var targetMachine = target.CreateTargetMachine(targetTriple, "generic", string.Empty, _codeGenLevel, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
+        var targetMachine = target.CreateTargetMachine(targetTriple, "generic", string.Empty, BuildSettings.Release ? LLVMCodeGenOptLevel.LLVMCodeGenLevelAggressive : LLVMCodeGenOptLevel.LLVMCodeGenLevelNone, LLVMRelocMode.LLVMRelocDefault, LLVMCodeModel.LLVMCodeModelDefault);
 
-        if (outputIntermediate)
-        {
-            var llvmIrFile = $"{baseFileName}.ll";
-            _module.PrintToFile(llvmIrFile);
-
-            var assemblyFile = $"{baseFileName}.s";
-            targetMachine.TryEmitToFile(_module, assemblyFile, LLVMCodeGenFileType.LLVMAssemblyFile, out _);
-        }
-
-        #if _LINUX
-        var objectFile = $"{baseFileName}.o";
-        #elif _WINDOWS
-        var objectFile = $"{baseFileName}.obj";
-        #endif
-
-        if (!targetMachine.TryEmitToFile(_module, objectFile, LLVMCodeGenFileType.LLVMObjectFile, out var errorMessage))
-        {
-            Console.WriteLine($"LLVM Build error: {errorMessage}");
-
-            Messages.Submit(MessageType.CodeGenerationFailed);
-            Messages.CompleteAndWait();
-
-            Environment.Exit(ErrorCodes.BuildError);
-        }
-
-        Messages.Submit(MessageType.CodeGenerated, objectFile);
-        return objectFile;
+        return targetMachine;
     }
 
     private static void InitializeX86LLVM()
