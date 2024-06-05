@@ -220,7 +220,7 @@ void __start(int argc, u8** argv) {
 
     __command_line_arguments = args;
 
-    #if true main();
+    main();
 
     exit_program(__exit_code);
 }

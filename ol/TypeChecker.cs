@@ -108,7 +108,7 @@ public static class TypeChecker
                 ErrorReporter.Report("Only one main function can be defined", functions[1]);
             }
         }
-        else
+        else if (ErrorReporter.Errors.Count == 0)
         {
             ErrorReporter.Report("'main' function of the program is not defined");
         }
@@ -4373,7 +4373,11 @@ public static class TypeChecker
 
         if (functionCount == 0)
         {
-            ErrorReporter.Report($"Call to undefined function '{call.Name}'", call);
+            // This is to prevent errors from being reported in the runtime module
+            if (call.Name != "main")
+            {
+                ErrorReporter.Report($"Call to undefined function '{call.Name}'", call);
+            }
         }
         else
         {
