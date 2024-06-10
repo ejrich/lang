@@ -70,7 +70,7 @@ CreateThread(SECURITY_ATTRIBUTES* lpThreadAttributes, u64 dwStackSize, ThreadPro
 Handle* CreateSemaphoreA(SECURITY_ATTRIBUTES* lpSemaphoreAttributes, u64 lInitialCount, u64 lMaximumCount, string lpName) #extern "kernel32"
 bool ReleaseSemaphore(Handle* hSemaphore, u64 lReleaseCount, u64* lpPreviousCount) #extern "kernel32"
 int WaitForSingleObject(Handle* hHandle, int dwMilliseconds) #extern "kernel32"
-int GetEnvironmentVariable(string lpName, u8** lpBuffer, int nSize) #extern "kernel32"
+int GetEnvironmentVariable(string lpName, u8* lpBuffer, int nSize) #extern "kernel32"
 
 STD_INPUT_HANDLE  := -10; #const
 STD_OUTPUT_HANDLE := -11; #const
@@ -228,11 +228,6 @@ enum FileAttribute {
     FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS = 0x400000;
 }
 
-struct FILETIME {
-    dwLowDateTime: int;
-    dwHighDateTime: int;
-}
-
 interface s64 WNDPROC(Handle* hWnd, MessageType uMsg, u64 wParam, s64 lParam)
 
 struct WNDCLASSEXA {
@@ -267,7 +262,7 @@ enum WindowClassStyle {
 
 CW_USEDEFAULT: u32 = 0x80000000; #const
 
-enum WindowStyle {
+enum WindowStyle : u32 {
     WS_OVERLAPPED       = 0x0;
     WS_TILED            = 0x0;
     WS_MAXIMIZEBOX      = 0x10000;
@@ -1398,7 +1393,7 @@ enum SWPFlags {
     SWP_ASYNCWINDOWPOS = 0x4000;
 }
 
-enum NtStatus {
+enum NtStatus : u32 {
     STATUS_SUCCESS           = 0x0;
     STATUS_INVALID_HANDLE    = 0xC0000008;
     STATUS_INVALID_PARAMETER = 0xC000000D;
