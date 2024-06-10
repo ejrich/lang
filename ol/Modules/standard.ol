@@ -1265,7 +1265,7 @@ u64 file_get_last_modified(string file) {
         if found {
             file_time: FILETIME;
             GetFileTime(file_handle.handle, null, null, &file_time);
-            time = cast(u64, file_time.dwHighDateTime) << 32 || file_time.dwLowDateTime;
+            time = cast(u64, file_time.dwHighDateTime) << 32 | file_time.dwLowDateTime;
             close_file(file_handle);
         }
     }
