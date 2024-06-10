@@ -13,12 +13,15 @@
 * Concise standard library
 * API to define the program _with_ the program, not makefiles
 
-### How to build this project
+### How to build and use this project
 
 * Download [NASM](https://www.nasm.us/) to build the runtime binary
 * Build the runtime object file, this contains the program entrypoint `_start`
     * Linux - run `./build_runtime.sh`
     * Windows - run `.\build_runtime.bat`
+* Download and install [LLVM](https://releases.llvm.org/)
+    * Currently only version 17 is supported
+* __FOR WINDOWS ONLY__ - Download the [Windows SDK](https://developer.microsoft.com/en-us/windows/downloads/windows-sdk/) (can also be installed with Visual Studio)
 * Install the [.Net 8 SDK](https://dotnet.microsoft.com/download)
 * Run `dotnet restore`
 * Once the dependencies are installed, run `dotnet build --no-restore`
