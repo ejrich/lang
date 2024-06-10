@@ -79,6 +79,13 @@ public static class Parser
         _libraryDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Modules");
         #endif
         AddModule("runtime");
+
+        #if _LINUX
+        AddModule("linux");
+        #elif _WINDOWS
+        AddModule("windows");
+        #endif
+
         QueueFileIfNotExists(entrypoint);
 
         ThreadPool.CompleteWork(ThreadPool.ParseQueue);

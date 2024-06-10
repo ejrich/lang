@@ -3,13 +3,6 @@
 // -- This module is included automatically with the build,
 // -- so it does not need to be imported.
 
-#if os == OS.Linux {
-    #import linux
-}
-#if os == OS.Windows {
-    #import windows
-}
-
 // Runtime structs and supporting functions
 struct Array<T> {
     length: s64;
