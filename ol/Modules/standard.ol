@@ -1078,7 +1078,7 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
             }
         }
 
-        file.handle := OpenFile(null_terminated_path.data, &file_info, open_type);
+        file.handle = OpenFile(null_terminated_path.data, &file_info, open_type);
 
         if fileehandle == null {
             return false, file;
