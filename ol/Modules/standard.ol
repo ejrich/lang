@@ -977,14 +977,21 @@ bool create_directory(string path) {
         created = mkdir(null_terminated_path.data, 0x1FF) == 0;
     }
     #if os == OS.Windows {
-        created = CreateDirectoryA(null_terminated_path.data, null) == true;
+        created = CreateDirectoryA(null_terminated_path.data, null);
     }
 
     return created;
 }
 
-struct File {
-    handle: s64;
+#if os == OS.Windows {
+    struct File {
+        handle: Handle*;
+    }
+}
+else {
+    struct File {
+        handle: s64;
+    }
 }
 
 enum FileFlags {
@@ -1071,16 +1078,14 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
             }
         }
 
-        file_handle := OpenFile(null_terminated_path.data, &file_info, open_type);
+        file.handle := OpenFile(null_terminated_path.data, &file_info, open_type);
 
-        if file_handle == null {
+        if fileehandle == null {
             return false, file;
         }
         else if flags & FileFlags.Append {
-            SetFilePointer(file_handle, 0, null, MoveMethod.FILE_END);
+            SetFilePointer(file.handle, 0, null, MoveMethod.FILE_END);
         }
-
-        file.handle = cast(s64, file_handle);
     }
 
     return true, file;
@@ -1183,8 +1188,7 @@ bool close_file(File file) {
         return success == 0;
     }
     #if os == OS.Windows {
-        handle := cast(Handle*, file.handle);
-        return CloseHandle(handle);
+        return CloseHandle(file.handle);
     }
 
     return false;
@@ -1204,14 +1208,13 @@ bool, string read_file(string file_path, Allocate allocator = default_allocator)
             read(file.handle, file_contents.data, size);
         }
         #if os == OS.Windows {
-            handle := cast(Handle*, file.handle);
-            size := SetFilePointer(handle, 0, null, MoveMethod.FILE_END);
-            SetFilePointer(handle, 0, null, MoveMethod.FILE_BEGIN);
+            size := SetFilePointer(file.handle, 0, null, MoveMethod.FILE_END);
+            SetFilePointer(file.handle, 0, null, MoveMethod.FILE_BEGIN);
 
             file_contents = { length = size; data = allocator(size); }
 
             read: int;
-            ReadFile(handle, file_contents.data, size, &read, null);
+            ReadFile(file.handle, file_contents.data, size, &read, null);
         }
 
         close_file(file);
@@ -1241,9 +1244,8 @@ write_buffer_to_file(File file, void* buffer, s64 length) {
         write(file.handle, buffer, length);
     }
     #if os == OS.Windows {
-        handle := cast(Handle*, file.handle);
         written: int;
-        WriteFile(handle, buffer, length, &written, null);
+        WriteFile(file.handle, buffer, length, &written, null);
     }
 }
 
@@ -1259,11 +1261,13 @@ u64 file_get_last_modified(string file) {
         time = stat_buf.st_mtim.tv_sec;
     }
     #if os == OS.Windows {
-        file_handle := open_file(file);
-        time: FILETIME;
-        GetFileTime(file_handle.handle, null, null, &time);
-        time = cast(u64, time.dwHighDateTime) << 32 || time.dwLowDateTime;
-        close_file(file_handle);
+        found, file_handle := open_file(file);
+        if found {
+            file_time: FILETIME;
+            GetFileTime(file_handle.handle, null, null, &file_time);
+            time = cast(u64, time.dwHighDateTime) << 32 || time.dwLowDateTime;
+            close_file(file_handle);
+        }
     }
 
     return time;
