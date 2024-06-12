@@ -58,7 +58,7 @@ bool run_test(string test_dir, string test) {
     }
 
     compile_only_file := format_string("%/%", test_dir, compile_only_file_name);
-    compile_only := file_exists(skip_file);
+    compile_only := file_exists(compile_only_file);
     default_free(compile_only_file.data);
     if compile_only return true;
 
