@@ -2069,6 +2069,8 @@ public static unsafe class ProgramRunner
 
     private static void ClearMemory(IntPtr pointer, int length)
     {
+        if (length <= 0) return;
+
         Span<byte> bytes = stackalloc byte[length];
         bytes.Fill(0);
         fixed (byte* bytePointer = &bytes[0])
