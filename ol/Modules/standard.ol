@@ -1161,11 +1161,11 @@ bool, Array<FileEntry> get_files_in_directory(string path, Allocate allocator = 
             file_name := convert_c_string(&find_data.cFileName);
             file_entry: FileEntry = { name = allocate_string(file_name, allocator); }
 
-            if find_data.dwFileAttributes == FileAttribute.FILE_ATTRIBUTE_NORMAL {
-                file_entry.type = FileType.File;
-            }
-            else if find_data.dwFileAttributes == FileAttribute.FILE_ATTRIBUTE_DIRECTORY {
+            if find_data.dwFileAttributes & FileAttribute.FILE_ATTRIBUTE_DIRECTORY {
                 file_entry.type = FileType.Directory;
+            }
+            else {
+                file_entry.type = FileType.File;
             }
 
             array_insert(&files, file_entry, allocator, reallocator);
