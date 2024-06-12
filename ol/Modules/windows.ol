@@ -70,7 +70,7 @@ CreateThread(SECURITY_ATTRIBUTES* lpThreadAttributes, u64 dwStackSize, ThreadPro
 Handle* CreateSemaphoreA(SECURITY_ATTRIBUTES* lpSemaphoreAttributes, u64 lInitialCount, u64 lMaximumCount, string lpName) #extern "kernel32"
 bool ReleaseSemaphore(Handle* hSemaphore, u64 lReleaseCount, u64* lpPreviousCount) #extern "kernel32"
 int WaitForSingleObject(Handle* hHandle, int dwMilliseconds) #extern "kernel32"
-int GetEnvironmentVariable(string lpName, u8* lpBuffer, int nSize) #extern "kernel32"
+int GetEnvironmentVariableA(string lpName, u8* lpBuffer, int nSize) #extern "kernel32"
 
 STD_INPUT_HANDLE  := -10; #const
 STD_OUTPUT_HANDLE := -11; #const
