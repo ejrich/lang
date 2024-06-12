@@ -2814,7 +2814,7 @@ public static class Parser
                 directive.Library = new Library {Name = name, FileName = fileName};
                 if (enumerator.Peek(out token) && token.Type == TokenType.Literal)
                 {
-                    directive.Library.LibPath = token.Value;
+                    directive.Library.LibPath = Path.IsPathRooted(token.Value) ? token.Value : Path.Combine(directory, token.Value);
                     enumerator.MoveNext();
                 }
                 break;

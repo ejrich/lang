@@ -11,8 +11,8 @@
   </ItemGroup>
 
   <ItemGroup Condition="'$(Configuration)' == 'Release'">
-    <None Remove="Modules/**/*.ol" />
-    <Content Include="Modules/**/*.ol">
+    <None Remove="Modules/**/*" />
+    <Content Include="Modules/**/*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
