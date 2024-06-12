@@ -206,6 +206,7 @@ struct WIN32_FIND_DATAA {
     wFinderFlags: s16;
 }
 
+[flags]
 enum FileAttribute {
     FILE_ATTRIBUTE_READONLY              = 0x1;
     FILE_ATTRIBUTE_HIDDEN                = 0x2;
