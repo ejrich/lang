@@ -23,7 +23,7 @@
     u32 vkGetPhysicalDeviceXlibPresentationSupportKHR(VkPhysicalDevice* physicalDevice, u32 queueFamilyIndex, Display* dpy, u64 visualID) #extern vulkan
 }
 #if os == OS.Windows {
-    #system_library vulkan "vulkan-1" "C:/VulkanSDK/1.2.198.1/Lib"
+    #system_library vulkan "vulkan-1" "lib"
 
     VK_KHR_WIN32_SURFACE_EXTENSION_NAME := "VK_KHR_win32_surface";
 
