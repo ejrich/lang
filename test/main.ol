@@ -34,9 +34,11 @@ main() {
 bool run_test(string test_dir, string test) {
     #if os == OS.Windows {
         skip_file_name := "no_windows"; #const
+        compile_only_file_name := "compile_only_windows"; #const
     }
     else {
         skip_file_name := "no_linux"; #const
+        compile_only_file_name := "no_run_linux"; #const
     }
     executable := "./ol/bin/Debug/net8.0/ol"; #const
 
@@ -54,6 +56,11 @@ bool run_test(string test_dir, string test) {
         print(" -- Test Failed\n");
         return false;
     }
+
+    compile_only_file := format_string("%/%", test_dir, compile_only_file_name);
+    compile_only := file_exists(skip_file);
+    default_free(compile_only_file.data);
+    if compile_only return true;
 
     command = format_string("./%/bin/%", test_dir, test);
 
