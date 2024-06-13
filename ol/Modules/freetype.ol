@@ -2,7 +2,7 @@
     #system_library freetype "freetype"
 }
 #if os == OS.Windows {
-    #system_library freetype "freetype" "lib"
+    #library freetype "lib/freetype"
 }
 
 struct FT_Memory {}
