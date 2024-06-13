@@ -1484,7 +1484,11 @@ public static class Parser
         var scope = CreateAst<ScopeAst>(enumerator);
         if (topLevel)
         {
-            scope.Children.Add(ParseTopLevelAst(enumerator, directory));
+            var ast = ParseTopLevelAst(enumerator, directory);
+            if (ast != null)
+            {
+                scope.Children.Add(ast);
+            }
         }
         else
         {
@@ -1509,7 +1513,11 @@ public static class Parser
 
             if (topLevel)
             {
-                scope.Children.Add(ParseTopLevelAst(enumerator, directory));
+                var ast = ParseTopLevelAst(enumerator, directory);
+                if (ast != null)
+                {
+                    scope.Children.Add(ast);
+                }
             }
             else
             {
@@ -2814,6 +2822,24 @@ public static class Parser
                     enumerator.MoveNext();
                 }
                 break;
+            case "copy_to_output_directory":
+                if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Literal)
+                {
+                    ErrorReporter.Report($"Expected path of file to copy, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
+                    return null;
+                }
+                var copyPath = Path.IsPathRooted(enumerator.Current.Value) ? enumerator.Current.Value : Path.Combine(directory, enumerator.Current.Value);
+                var fileInfo = new FileInfo(copyPath);
+
+                if (!fileInfo.Exists)
+                {
+                    ErrorReporter.Report($"File '{enumerator.Current.Value}' not found, unable to copy to output directory", enumerator.FileIndex, enumerator.Current);
+                }
+                else
+                {
+                    BuildSettings.FilesToCopy.Add(fileInfo);
+                }
+                return null;
             case "private":
                 if (enumerator.Private)
                 {
@@ -2824,7 +2850,7 @@ public static class Parser
                     TypeChecker.PrivateScopes[enumerator.FileIndex] = new PrivateScope{Parent = TypeChecker.GlobalScope};
                 }
                 enumerator.Private = true;
-                break;
+                return null;
             default:
                 ErrorReporter.Report($"Unsupported top-level compiler directive '{token.Value}'", enumerator.FileIndex, token);
                 return null;
