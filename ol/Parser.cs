@@ -2787,15 +2787,11 @@ public static class Parser
                     return null;
                 }
                 var path = enumerator.Current.Value;
-                directive.Library = new Library {Name = name, Path = path};
-                if (path[0] == '/')
+                directive.Library = new Library
                 {
-                    directive.Library.AbsolutePath = path;
-                }
-                else
-                {
-                    directive.Library.AbsolutePath = Path.Combine(directory, path);
-                }
+                    Name = name, Path = path,
+                    AbsolutePath = Path.IsPathRooted(path) ? path : Path.Combine(directory, path)
+                };
                 break;
             case "system_library":
                 directive.Type = DirectiveType.SystemLibrary;
