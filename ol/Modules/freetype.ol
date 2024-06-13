@@ -1,3 +1,10 @@
+#if os == OS.Linux {
+    #system_library freetype "freetype"
+}
+#if os == OS.Windows {
+    #system_library freetype "freetype" "lib"
+}
+
 struct FT_Memory {}
 interface void* FT_Alloc_Func(FT_Memory* memory, s64 size)
 
@@ -322,9 +329,9 @@ struct FT_GlyphSlot {
     internal: FT_Slot_Internal*;
 }
 
-s32 FT_Init_FreeType(FT_Library** alibrary) #extern "freetype"
+s32 FT_Init_FreeType(FT_Library** alibrary) #extern freetype
 
-s32 FT_Done_FreeType(FT_Library* library) #extern "freetype"
+s32 FT_Done_FreeType(FT_Library* library) #extern freetype
 
 struct FT_Parameter {
     tag: u64;
@@ -342,21 +349,21 @@ struct FT_Open_Args {
     params: FT_Parameter*;
 }
 
-s32 FT_New_Face(FT_Library* library, u8* filepathname, s64 face_index, FT_Face** aface) #extern "freetype"
+s32 FT_New_Face(FT_Library* library, u8* filepathname, s64 face_index, FT_Face** aface) #extern freetype
 
-s32 FT_New_Memory_Face(FT_Library* library, u8* file_base, s64 file_size, s64 face_index, FT_Face** aface) #extern "freetype"
+s32 FT_New_Memory_Face(FT_Library* library, u8* file_base, s64 file_size, s64 face_index, FT_Face** aface) #extern freetype
 
-s32 FT_Open_Face(FT_Library* library, FT_Open_Args* args, s64 face_index, FT_Face** aface) #extern "freetype"
+s32 FT_Open_Face(FT_Library* library, FT_Open_Args* args, s64 face_index, FT_Face** aface) #extern freetype
 
-s32 FT_Attach_File(FT_Face* face, u8* filepathname) #extern "freetype"
+s32 FT_Attach_File(FT_Face* face, u8* filepathname) #extern freetype
 
-s32 FT_Attach_Stream(FT_Face* face, FT_Open_Args* parameters) #extern "freetype"
+s32 FT_Attach_Stream(FT_Face* face, FT_Open_Args* parameters) #extern freetype
 
-s32 FT_Reference_Face(FT_Face* face) #extern "freetype"
+s32 FT_Reference_Face(FT_Face* face) #extern freetype
 
-s32 FT_Done_Face(FT_Face* face) #extern "freetype"
+s32 FT_Done_Face(FT_Face* face) #extern freetype
 
-s32 FT_Select_Size(FT_Face* face, s32 strike_index) #extern "freetype"
+s32 FT_Select_Size(FT_Face* face, s32 strike_index) #extern freetype
 
 enum FT_Size_Request_Type {
     FT_SIZE_REQUEST_TYPE_NOMINAL;
@@ -375,11 +382,11 @@ struct FT_Size_RequestRec {
     vertResolution: u32;
 }
 
-s32 FT_Request_Size(FT_Face* face, FT_Size_RequestRec* req) #extern "freetype"
+s32 FT_Request_Size(FT_Face* face, FT_Size_RequestRec* req) #extern freetype
 
-s32 FT_Set_Char_Size(FT_Face* face, s64 char_width, s64 char_height, u32 horz_resolution, u32 vert_resolution) #extern "freetype"
+s32 FT_Set_Char_Size(FT_Face* face, s64 char_width, s64 char_height, u32 horz_resolution, u32 vert_resolution) #extern freetype
 
-s32 FT_Set_Pixel_Sizes(FT_Face* face, u32 pixel_width, u32 pixel_height) #extern "freetype"
+s32 FT_Set_Pixel_Sizes(FT_Face* face, u32 pixel_width, u32 pixel_height) #extern freetype
 
 [flags]
 enum FT_LoadFlags {
@@ -406,13 +413,13 @@ enum FT_LoadFlags {
     FT_LOAD_SVG_ONLY                    = 0x800000;
 }
 
-s32 FT_Load_Glyph(FT_Face* face, u32 glyph_index, FT_LoadFlags load_flags) #extern "freetype"
+s32 FT_Load_Glyph(FT_Face* face, u32 glyph_index, FT_LoadFlags load_flags) #extern freetype
 
-s32 FT_Load_Char(FT_Face* face, u64 char_code, FT_LoadFlags load_flags) #extern "freetype"
+s32 FT_Load_Char(FT_Face* face, u64 char_code, FT_LoadFlags load_flags) #extern freetype
 
-FT_Set_Transform(FT_Face* face, FT_Matrix* matrix, FT_Vector* delta) #extern "freetype"
+FT_Set_Transform(FT_Face* face, FT_Matrix* matrix, FT_Vector* delta) #extern freetype
 
-FT_Get_Transform(FT_Face* face, FT_Matrix* matrix, FT_Vector* delta) #extern "freetype"
+FT_Get_Transform(FT_Face* face, FT_Matrix* matrix, FT_Vector* delta) #extern freetype
 
 enum FT_Render_Mode {
     FT_RENDER_MODE_NORMAL = 0;
@@ -424,7 +431,7 @@ enum FT_Render_Mode {
     FT_RENDER_MODE_MAX;
 }
 
-s32 FT_Render_Glyph(FT_GlyphSlot* slot, FT_Render_Mode render_mode) #extern "freetype"
+s32 FT_Render_Glyph(FT_GlyphSlot* slot, FT_Render_Mode render_mode) #extern freetype
 
 enum FT_Kerning_Mode {
     FT_KERNING_DEFAULT = 0;
@@ -432,60 +439,60 @@ enum FT_Kerning_Mode {
     FT_KERNING_UNSCALED;
 }
 
-s32 FT_Get_Kerning(FT_Face* face, u32 left_glyph, u32 right_glyph, u32 kern_mode, FT_Vector* akerning) #extern "freetype"
+s32 FT_Get_Kerning(FT_Face* face, u32 left_glyph, u32 right_glyph, u32 kern_mode, FT_Vector* akerning) #extern freetype
 
-s32 FT_Get_Track_Kerning(FT_Face* face, s64 point_size, s32 degree, s64* akerning) #extern "freetype"
+s32 FT_Get_Track_Kerning(FT_Face* face, s64 point_size, s32 degree, s64* akerning) #extern freetype
 
-s32 FT_Select_Charmap(FT_Face* face, FT_Encoding encoding) #extern "freetype"
+s32 FT_Select_Charmap(FT_Face* face, FT_Encoding encoding) #extern freetype
 
-s32 FT_Set_Charmap(FT_Face* face, FT_CharMap* charmap) #extern "freetype"
+s32 FT_Set_Charmap(FT_Face* face, FT_CharMap* charmap) #extern freetype
 
-s32 FT_Get_Charmap_Index(FT_CharMap* charmap) #extern "freetype"
+s32 FT_Get_Charmap_Index(FT_CharMap* charmap) #extern freetype
 
-u32 FT_Get_Char_Index(FT_Face* face, u64 charcode) #extern "freetype"
+u32 FT_Get_Char_Index(FT_Face* face, u64 charcode) #extern freetype
 
-u64 FT_Get_First_Char(FT_Face* face, u32* agindex) #extern "freetype"
+u64 FT_Get_First_Char(FT_Face* face, u32* agindex) #extern freetype
 
-u64 FT_Get_Next_Char(FT_Face* face, u64 char_code, u32* agindex) #extern "freetype"
+u64 FT_Get_Next_Char(FT_Face* face, u64 char_code, u32* agindex) #extern freetype
 
-s32 FT_Face_Properties(FT_Face* face, u32 num_properties, FT_Parameter* properties) #extern "freetype"
+s32 FT_Face_Properties(FT_Face* face, u32 num_properties, FT_Parameter* properties) #extern freetype
 
-u32 FT_Get_Name_Index(FT_Face* face, u8* glyph_name) #extern "freetype"
+u32 FT_Get_Name_Index(FT_Face* face, u8* glyph_name) #extern freetype
 
-s32 FT_Get_Glyph_Name(FT_Face* face, u32 glyph_index, void* buffer, u32 buffer_max) #extern "freetype"
+s32 FT_Get_Glyph_Name(FT_Face* face, u32 glyph_index, void* buffer, u32 buffer_max) #extern freetype
 
-u8* FT_Get_Postscript_Name(FT_Face* face) #extern "freetype"
+u8* FT_Get_Postscript_Name(FT_Face* face) #extern freetype
 
-s32 FT_Get_SubGlyph_Info(FT_GlyphSlot* glyph, u32 sub_index, s32* p_index, u32* p_flags, s32* p_arg1, s32* p_arg2, FT_Matrix* p_transform) #extern "freetype"
+s32 FT_Get_SubGlyph_Info(FT_GlyphSlot* glyph, u32 sub_index, s32* p_index, u32* p_flags, s32* p_arg1, s32* p_arg2, FT_Matrix* p_transform) #extern freetype
 
-u16 FT_Get_FSType_Flags(FT_Face* face) #extern "freetype"
+u16 FT_Get_FSType_Flags(FT_Face* face) #extern freetype
 
-u32 FT_Face_GetCharVariantIndex(FT_Face* face, u64 charcode, u64 variantSelector) #extern "freetype"
+u32 FT_Face_GetCharVariantIndex(FT_Face* face, u64 charcode, u64 variantSelector) #extern freetype
 
-s32 FT_Face_GetCharVariantIsDefault(FT_Face* face, u64 charcode, u64 variantSelector) #extern "freetype"
+s32 FT_Face_GetCharVariantIsDefault(FT_Face* face, u64 charcode, u64 variantSelector) #extern freetype
 
-u32* FT_Face_GetVariantSelectors(FT_Face* face) #extern "freetype"
+u32* FT_Face_GetVariantSelectors(FT_Face* face) #extern freetype
 
-u32* FT_Face_GetVariantsOfChar(FT_Face* face, u64 charcode) #extern "freetype"
+u32* FT_Face_GetVariantsOfChar(FT_Face* face, u64 charcode) #extern freetype
 
-u32* FT_Face_GetCharsOfVariant(FT_Face* face, u64 variantSelector) #extern "freetype"
+u32* FT_Face_GetCharsOfVariant(FT_Face* face, u64 variantSelector) #extern freetype
 
-s64 FT_MulDiv(s64 a, s64 b, s64 c) #extern "freetype"
+s64 FT_MulDiv(s64 a, s64 b, s64 c) #extern freetype
 
-s64 FT_MulFix(s64 a, s64 b) #extern "freetype"
+s64 FT_MulFix(s64 a, s64 b) #extern freetype
 
-s64 FT_DivFix(s64 a, s64 b) #extern "freetype"
+s64 FT_DivFix(s64 a, s64 b) #extern freetype
 
-s64 FT_RoundFix(s64 a) #extern "freetype"
+s64 FT_RoundFix(s64 a) #extern freetype
 
-s64 FT_CeilFix(s64 a) #extern "freetype"
+s64 FT_CeilFix(s64 a) #extern freetype
 
-s64 FT_FloorFix(s64 a) #extern "freetype"
+s64 FT_FloorFix(s64 a) #extern freetype
 
-FT_Vector_Transform(FT_Vector* vector, FT_Matrix* matrix) #extern "freetype"
+FT_Vector_Transform(FT_Vector* vector, FT_Matrix* matrix) #extern freetype
 
-FT_Library_Version(FT_Library* library, s32* amajor, s32* aminor, s32* apatch) #extern "freetype"
+FT_Library_Version(FT_Library* library, s32* amajor, s32* aminor, s32* apatch) #extern freetype
 
-u8 FT_Face_CheckTrueTypePatents(FT_Face* face) #extern "freetype"
+u8 FT_Face_CheckTrueTypePatents(FT_Face* face) #extern freetype
 
-u8 FT_Face_SetUnpatentedHinting(FT_Face* face, u8 value) #extern "freetype"
+u8 FT_Face_SetUnpatentedHinting(FT_Face* face, u8 value) #extern freetype
