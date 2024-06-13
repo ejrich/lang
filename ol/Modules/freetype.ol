@@ -3,9 +3,7 @@
 }
 #if os == OS.Windows {
     #library freetype "lib/freetype"
-
-    #import compiler
-    #run copy_to_output_directory("lib/freetype.dll");
+    #copy_to_output_directory "lib/freetype.dll"
 }
 
 struct FT_Memory {}
