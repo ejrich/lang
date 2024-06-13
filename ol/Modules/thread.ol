@@ -6,7 +6,8 @@ u64 create_thread(ThreadProcedure proc, void* arg) {
         pthread_create(&thread_id, null, proc, arg);
     }
     #if os == OS.Windows {
-        CreateThread(null, 0, proc, arg, 0, &thread_id);
+        handle := CreateThread(null, 0, proc, arg, 0, null);
+        thread_id := cast(u64, handle);
     }
 
     return thread_id;
@@ -41,7 +42,7 @@ semaphore_wait(Semaphore* semaphore) {
         sem_wait(&semaphore.sem);
     }
     #if os == OS.Windows {
-        WaitForSingleObject(&semaphore.handle, INFINITE);
+        WaitForSingleObject(semaphore.handle, INFINITE);
     }
 }
 
@@ -50,6 +51,6 @@ semaphore_release(Semaphore* semaphore) {
         sem_post(&semaphore.sem);
     }
     #if os == OS.Windows {
-        ReleaseSemaphore(&semaphore.handle, 1, null);
+        ReleaseSemaphore(semaphore.handle, 1, null);
     }
 }
