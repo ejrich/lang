@@ -7,7 +7,7 @@ u64 create_thread(ThreadProcedure proc, void* arg) {
     }
     #if os == OS.Windows {
         handle := CreateThread(null, 0, proc, arg, 0, null);
-        thread_id := cast(u64, handle);
+        thread_id = cast(u64, handle);
     }
 
     return thread_id;
@@ -30,7 +30,7 @@ bool create_semaphore(Semaphore* semaphore, int allowed = 1, int initial_value =
         success = sem_init(&semaphore.sem, 0, initial_value) == 0;
     }
     #if os == OS.Windows {
-        semaphore.handle = CreateSemaphore(null, initial_value, allowed, null);
+        semaphore.handle = CreateSemaphoreA(null, initial_value, allowed, null);
         success = semaphore.handle != null;
     }
 
