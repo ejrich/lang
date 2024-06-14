@@ -323,6 +323,9 @@ public static class Parser
                             case DirectiveType.Run:
                                 RunDirectives.Enqueue(directive);
                                 break;
+                            case DirectiveType.CopyToOutputDirectory:
+                                TypeChecker.CopyFileToOutputDirectory(directive);
+                                break;
                             default:
                                 Directives.Enqueue(directive);
                                 break;
@@ -2739,7 +2742,7 @@ public static class Parser
                 directive.Value = ParseExpression(enumerator, null);
                 if (enumerator.Peek(out var message) && message.Type == TokenType.Literal)
                 {
-                    directive.AssertMessage = message.Value;
+                    directive.StringValue = message.Value;
                     enumerator.MoveNext();
                 }
                 break;
@@ -2823,23 +2826,14 @@ public static class Parser
                 }
                 break;
             case "copy_to_output_directory":
+                directive.Type = DirectiveType.CopyToOutputDirectory;
                 if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Literal)
                 {
                     ErrorReporter.Report($"Expected path of file to copy, but got '{enumerator.Current.Value}'", enumerator.FileIndex, enumerator.Current);
                     return null;
                 }
-                var copyPath = Path.IsPathRooted(enumerator.Current.Value) ? enumerator.Current.Value : Path.Combine(directory, enumerator.Current.Value);
-                var fileInfo = new FileInfo(copyPath);
-
-                if (!fileInfo.Exists)
-                {
-                    ErrorReporter.Report($"File '{enumerator.Current.Value}' not found, unable to copy to output directory", enumerator.FileIndex, enumerator.Current);
-                }
-                else
-                {
-                    BuildSettings.FilesToCopy.Add(fileInfo);
-                }
-                return null;
+                directive.StringValue = Path.IsPathRooted(enumerator.Current.Value) ? enumerator.Current.Value : Path.Combine(directory, enumerator.Current.Value);
+                break;
             case "private":
                 if (enumerator.Private)
                 {
@@ -2883,7 +2877,7 @@ public static class Parser
                 directive.Value = ParseExpression(enumerator, currentFunction);
                 if (enumerator.Peek(out var message) && message.Type == TokenType.Literal)
                 {
-                    directive.AssertMessage = message.Value;
+                    directive.StringValue = message.Value;
                     enumerator.MoveNext();
                 }
                 currentFunction.Flags |= FunctionFlags.HasDirectives;

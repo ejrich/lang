@@ -41,7 +41,6 @@ public static class BuildSettings
     }
 
     private static string GetFileName(string name) => name.Replace(BuildSettings.Path, string.Empty);
-
 }
 
 public enum LinkerType : byte
