@@ -539,7 +539,7 @@ public class CompilerDirectiveAst : IAst
     public IAst Value { get; set; }
     public Import Import { get; set; }
     public Library Library { get; set; }
-    public string AssertMessage { get; set; }
+    public string StringValue { get; set; }
 }
 
 public class RunDirectiveFunction : IFunction
@@ -771,7 +771,8 @@ public enum DirectiveType
     ImportFile,
     Library,
     SystemLibrary,
-    Insert
+    Insert,
+    CopyToOutputDirectory
 }
 
 public enum TypeKind

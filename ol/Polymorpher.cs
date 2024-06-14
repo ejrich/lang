@@ -306,7 +306,7 @@ public static class Polymorpher
         var copy = CopyAst(compilerDirective);
         copy.Type = compilerDirective.Type;
         copy.Value = CopyAst(compilerDirective.Value, genericTypes, generics);
-        copy.AssertMessage = compilerDirective.AssertMessage;
+        copy.StringValue = compilerDirective.StringValue;
         return copy;
     }
 

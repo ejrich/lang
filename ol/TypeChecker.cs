@@ -163,7 +163,7 @@ public static class TypeChecker
 
                             if (!ProgramRunner.ExecuteCondition(condition, directive.Value))
                             {
-                                var message = directive.AssertMessage == null ? "Assertion failed" : $"Assertion failed, {directive.AssertMessage}";
+                                var message = directive.StringValue == null ? "Assertion failed" : $"Assertion failed, {directive.StringValue}";
                                 ErrorReporter.Report(message, directive.Value);
                             }
                         }
@@ -284,6 +284,9 @@ public static class TypeChecker
                         break;
                     case DirectiveType.SystemLibrary:
                         AddSystemLibrary(directive);
+                        break;
+                    case DirectiveType.CopyToOutputDirectory:
+                        CopyFileToOutputDirectory(directive);
                         break;
                     default:
                         Parser.Directives.Enqueue(directive);
@@ -705,6 +708,21 @@ public static class TypeChecker
         if (!_libraries.TryAdd(library.Name, library))
         {
             ErrorReporter.Report($"Library '{library.Name}' already defined", directive);
+        }
+    }
+
+    public static void CopyFileToOutputDirectory(CompilerDirectiveAst directive)
+    {
+        if (directive.StringValue == null) return;
+
+        var fileInfo = new FileInfo(directive.StringValue);
+        if (!fileInfo.Exists)
+        {
+            ErrorReporter.Report($"File '{directive.StringValue}' not found, unable to copy to output directory", directive);
+        }
+        else
+        {
+            BuildSettings.FilesToCopy.Add(fileInfo);
         }
     }
 
@@ -1768,15 +1786,15 @@ public static class TypeChecker
                                     if (function is FunctionAst functionAst)
                                     {
                                         var message = $"Assertion failed in function '{functionAst.Name}'";
-                                        if (directive.AssertMessage != null)
-                                            message += $", {directive.AssertMessage}";
+                                        if (directive.StringValue != null)
+                                            message += $", {directive.StringValue}";
                                         ErrorReporter.Report(message, directive.Value);
                                     }
                                     else if (function is OperatorOverloadAst overload)
                                     {
                                         var message = $"Assertion failed in overload for operator '{PrintOperator(overload.Operator)}' of type '{PrintTypeDefinition(overload.Type)}'";
-                                        if (directive.AssertMessage != null)
-                                            message += $", {directive.AssertMessage}";
+                                        if (directive.StringValue != null)
+                                            message += $", {directive.StringValue}";
                                         ErrorReporter.Report(message, directive.Value);
                                     }
                                 }
