@@ -1253,7 +1253,7 @@ public static unsafe class LLVMBackend
             if (_stackSave == null)
             {
                 _stackSaveType = LLVMTypeRef.CreateFunction(_pointerType, Array.Empty<LLVMTypeRef>());
-                _stackSave = _module.AddFunction("llvm.stacksave", _stackSaveType);
+                _stackSave = _module.AddFunction("llvm.stacksave.p0", _stackSaveType);
             }
 
             var stackPointerValue = _builder.BuildCall2(_stackSaveType, _stackSave, Array.Empty<LLVMValueRef>(), "stackPointer");
@@ -2328,7 +2328,7 @@ public static unsafe class LLVMBackend
         {
             Span<LLVMTypeRef> argumentTypes = stackalloc []{_pointerType};
             _stackRestoreType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), argumentTypes, false);
-            _stackRestore = _module.AddFunction("llvm.stackrestore", _stackRestoreType);
+            _stackRestore = _module.AddFunction("llvm.stackrestore.p0", _stackRestoreType);
         }
 
         var stackPointerValue = _builder.BuildLoad2(_pointerType, stackPointer);
