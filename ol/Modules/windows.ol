@@ -72,6 +72,9 @@ bool ReleaseSemaphore(Handle* hSemaphore, u64 lReleaseCount, u64* lpPreviousCoun
 int WaitForSingleObject(Handle* hHandle, int dwMilliseconds) #extern "kernel32"
 int GetEnvironmentVariableA(string lpName, u8* lpBuffer, int nSize) #extern "kernel32"
 
+GetSystemTime(SYSTEMTIME* lpSystemTime) #extern "kernel32"
+GetLocalTime(SYSTEMTIME* lpSystemTime) #extern "kernel32"
+
 STD_INPUT_HANDLE  := -10; #const
 STD_OUTPUT_HANDLE := -11; #const
 STD_ERROR_HANDLE  := -12; #const
@@ -1424,6 +1427,17 @@ struct SYSTEM_INFO {
     dwAllocationGranularity: int;
     wProcessorLevel: s16;
     wProcessorRevision: s16;
+}
+
+struct SYSTEMTIME {
+    wYear: u16;
+    wMonth: u16;
+    wDayOfWeek: u16;
+    wDay: u16;
+    wHour: u16;
+    wMinute: u16;
+    wSecond: u16;
+    wMilliseconds: u16;
 }
 
 INFINITE := -1; #const
