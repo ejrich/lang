@@ -372,7 +372,6 @@ public static unsafe class TypeTable
                     functionTypeInfo.Arguments = MakeArguments(function.Arguments);
                 }
 
-
                 if (function.Attributes != null)
                 {
                     functionTypeInfo.Attributes = MakeAttributes(function.Attributes);
