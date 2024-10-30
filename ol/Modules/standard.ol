@@ -171,6 +171,14 @@ array_resize<T>(Array<T>* array, int length, Allocate allocator = default_alloca
     array.length = length;
 }
 
+bool array_contains<T>(Array<T> array, T value) {
+    each element in array {
+        if element == value return true;
+    }
+
+    return false;
+}
+
 
 // Sorting algorithms
 interface int SortCompare<T>(T a, T b)
