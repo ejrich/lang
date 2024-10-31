@@ -5160,7 +5160,8 @@ public static class TypeChecker
                     case Operator.GreaterThanEqual:
                     case Operator.LessThanEqual:
                         if ((type == TypeKind.Enum && nextType == TypeKind.Enum)
-                            || (type == TypeKind.Type && nextType == TypeKind.Type))
+                            || (type == TypeKind.Type && nextType == TypeKind.Type)
+                            || (type == TypeKind.Interface && nextType == TypeKind.Interface))
                         {
                             if ((op != Operator.Equality && op != Operator.NotEqual) || !TypeEquals(expression.Type, nextExpressionType))
                             {
