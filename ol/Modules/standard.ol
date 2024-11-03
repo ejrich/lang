@@ -518,16 +518,17 @@ struct IntFormat {
     value: IntFormatValue;
     signed := true;
     base: u8 = 10;
+    min_chars := 1;
 }
 
-IntFormat int_format(s64 value, u8 base = 10) #inline {
-    format: IntFormat = { signed = true; base = base; }
+IntFormat int_format(s64 value, u8 base = 10, int min_chars = 1) #inline {
+    format: IntFormat = { signed = true; base = base; min_chars = min_chars; }
     format.value.signed = value;
     return format;
 }
 
 IntFormat uint_format(u64 value, u8 base = 10) #inline {
-    format: IntFormat = { signed = false; base = base; }
+    format: IntFormat = { signed = false; base = base; min_chars = min_chars; }
     format.value.unsigned = value;
     return format;
 }
@@ -806,7 +807,7 @@ write_integer(StringBuffer* buffer, IntFormat format) {
             add_char_to_string_buffer(buffer, '-');
             format.value.signed *= -1;
         }
-        write_integer_to_buffer(buffer, format.value.unsigned, format.base);
+        write_integer_to_buffer(buffer, format.value.unsigned, format.base, format.min_chars);
     }
 }
 
@@ -858,7 +859,7 @@ write_float(StringBuffer* buffer, FloatFormat format) {
     }
 }
 
-write_integer_to_buffer(StringBuffer* buffer, u64 value, u8 base = 10) {
+write_integer_to_buffer(StringBuffer* buffer, u64 value, u8 base = 10, int min_chars = 1) {
     digits: Array<u8>[64];
     length := 0;
     while value > 0 {
