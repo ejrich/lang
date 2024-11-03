@@ -527,7 +527,7 @@ IntFormat int_format(s64 value, u8 base = 10, int min_chars = 1) #inline {
     return format;
 }
 
-IntFormat uint_format(u64 value, u8 base = 10) #inline {
+IntFormat uint_format(u64 value, u8 base = 10, int min_chars = 1) #inline {
     format: IntFormat = { signed = false; base = base; min_chars = min_chars; }
     format.value.unsigned = value;
     return format;
@@ -870,6 +870,10 @@ write_integer_to_buffer(StringBuffer* buffer, u64 value, u8 base = 10, int min_c
             digits[length++] = digit + '7';
 
         value /= base;
+    }
+
+    while length < min_chars {
+        digits[length++] = '0';
     }
 
     reverse_integer_characters(digits, length);
