@@ -49,7 +49,7 @@ add_source_file(string file) #compiler
 
 string get_compiler_working_directory() #compiler
 
-report_error(string error) #compiler
+report_error(string error, CompilerAst* ast = null) #compiler
 
 // Ast definitions
 enum AstType {

@@ -53,6 +53,17 @@ public static unsafe class Messages
     }
 
     [StructLayout(LayoutKind.Explicit, Size=Size)]
+    public struct CompilerAst
+    {
+        [FieldOffset(0)] public AstType Type;
+        [FieldOffset(8)] public String File;
+        [FieldOffset(24)] public uint Line;
+        [FieldOffset(28)] public uint Column;
+
+        public const int Size = 32;
+    }
+
+    [StructLayout(LayoutKind.Explicit, Size=Size)]
     public struct Function
     {
         [FieldOffset(0)] public AstType Type;

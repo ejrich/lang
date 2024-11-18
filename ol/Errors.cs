@@ -18,6 +18,7 @@ public class Error
 {
     public string Message { get; init; }
     public int? FileIndex { get; set; }
+    public string FileName { get; set; }
     public uint Line { get; set; }
     public uint Column { get; set; }
 }
@@ -53,6 +54,11 @@ public static class ErrorReporter
         Report(new Error {Message = message, FileIndex = fileIndex, Line = line, Column = column});
     }
 
+    public static void Report(string message, string fileName, uint line, uint column)
+    {
+        Report(new Error {Message = message, FileName = fileName, Line = line, Column = column});
+    }
+
     private static void Report(Error error)
     {
         if (!Errors.Any())
@@ -76,6 +82,10 @@ public static class ErrorReporter
                 if (error.FileIndex.HasValue && error.FileIndex >= 0)
                 {
                     Console.WriteLine($"{BuildSettings.FileName(error.FileIndex.Value)}: {error.Message} at line {error.Line}:{error.Column}");
+                }
+                else if (error.FileName != null)
+                {
+                    Console.WriteLine($"{error.FileName}: {error.Message} at line {error.Line}:{error.Column}");
                 }
                 else
                 {

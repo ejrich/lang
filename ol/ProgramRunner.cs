@@ -1731,7 +1731,18 @@ public static unsafe class ProgramRunner
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
                     var error = Marshal.PtrToStructure<String>(value.Pointer);
                     var errorString = Marshal.PtrToStringAnsi(error.Data, (int)error.Length);
-                    ErrorReporter.Report(errorString, fileIndex, line, column);
+
+                    var astPointer = GetValue(arguments[1], registers, stackPointer, function, functionArgs);
+                    if (astPointer.Pointer == IntPtr.Zero)
+                    {
+                        ErrorReporter.Report(errorString, fileIndex, line, column);
+                    }
+                    else
+                    {
+                        var ast = Marshal.PtrToStructure<Messages.CompilerAst>(astPointer.Pointer);
+                        var fileString = Marshal.PtrToStringAnsi(ast.File.Data, (int)ast.File.Length);
+                        ErrorReporter.Report(errorString, fileString, ast.Line, ast.Column);
+                    }
                     break;
                 }
                 case "intercept_compiler_messages":
