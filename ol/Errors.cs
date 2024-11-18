@@ -11,6 +11,7 @@ public static class ErrorCodes
     public const int CompilationError = 3;
     public const int BuildError = 4;
     public const int LinkError = 5;
+    public const int InternalError = 6;
 }
 
 public class Error

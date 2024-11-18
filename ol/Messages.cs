@@ -419,7 +419,18 @@ public static unsafe class Messages
     {
         if (_waitingForNext)
         {
-            MessageReceiveMutex.Release();
+            try {
+                MessageReceiveMutex.Release();
+            }
+            catch (SemaphoreFullException e)
+            {
+                // @Robustness Fix this error
+                ErrorReporter.Report("Internal compiler error running program");
+                #if DEBUG
+                Console.WriteLine(e);
+                #endif
+                Environment.Exit(ErrorCodes.InternalError);
+            }
         }
 
         MessageWaitMutex.WaitOne();
