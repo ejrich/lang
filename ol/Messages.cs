@@ -156,7 +156,7 @@ public static unsafe class Messages
 
     private static readonly ConcurrentQueue<CompilerMessage> MessageQueue = new();
     private static readonly Semaphore MessageWaitMutex = new(0, int.MaxValue);
-    private static readonly Semaphore MessageReceiveMutex = new(0, 1);
+    private static readonly Semaphore MessageReceiveMutex = new(0, int.MaxValue);
 
     private static bool _completed;
     public static bool Intercepting;
@@ -435,7 +435,6 @@ public static unsafe class Messages
             }
             catch (SemaphoreFullException e)
             {
-                // @Robustness Fix this error
                 ErrorReporter.Report("Internal compiler error running program");
                 #if DEBUG
                 Console.WriteLine(e);
