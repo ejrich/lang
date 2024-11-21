@@ -365,8 +365,6 @@ void* default_reallocator(void* pointer, u64 old_size, u64 size) {
         }
     }
 
-    // If the pointer in not in the list of allocations, exit
-    assert(false, "Pointer not found in list of allocations\n");
     return pointer;
 }
 
@@ -378,8 +376,6 @@ default_free(void* data) {
             return;
         }
     }
-
-    assert(false, "Pointer not found in list of allocations\n");
 }
 
 
