@@ -310,6 +310,8 @@ public static class TypeChecker
 
     private static void AddType(string name, IType type, int fileIndex)
     {
+        if (string.IsNullOrWhiteSpace(name)) return;
+
         if (type.Private)
         {
             var privateScope = PrivateScopes[fileIndex];
@@ -334,6 +336,8 @@ public static class TypeChecker
 
     private static bool AddTypeAndIdentifier(string name, IType type, IAst ast)
     {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+
         if (type.Private)
         {
             var privateScope = PrivateScopes[type.FileIndex];

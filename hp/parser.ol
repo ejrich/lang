@@ -13,6 +13,9 @@ parse(string file_contents, string library, string output_file) {
             if type == TokenType.Typedef {
                 node = parse_typedef(node, lib_file);
             }
+            else if type == TokenType.Enum {
+                node = parse_enum(node, lib_file);
+            }
             else if type == TokenType.Struct {
                 node = parse_struct(node, lib_file, alias = false);
             }
@@ -78,8 +81,11 @@ struct TypeDefinition {
 types: HashTable<TypeDefinition>;
 
 TypeDefinition, Node<Token>* parse_type(Node<Token>* node) {
-    if node.data.type == TokenType.Const {
-        node = node.next;
+    switch node.data.type {
+        case TokenType.Const;
+        case TokenType.Enum;
+        case TokenType.Struct;
+            node = node.next;
     }
 
     type := node.data.type;
@@ -303,7 +309,8 @@ Node<Token>* parse_arguments(Node<Token>* node, FunctionDefinition* function, bo
             argument.array_length, node = get_array_length(node.next);
         }
         else if type == TokenType.Comma {
-            array_insert(&function.arguments, argument);
+            if argument.type.name != "void" || argument.type.pointer_count != 0
+                array_insert(&function.arguments, argument);
 
             // Reset argument fields
             new_arg = true;
@@ -315,7 +322,8 @@ Node<Token>* parse_arguments(Node<Token>* node, FunctionDefinition* function, bo
             node = node.next;
         }
         else if type == TokenType.CloseParen {
-            if !new_arg array_insert(&function.arguments, argument);
+            if !new_arg && (argument.type.name != "void" || argument.type.pointer_count != 0)
+                array_insert(&function.arguments, argument);
             // Move over ')' and ';'
             node = move_until(node.next, TokenType.SemiColon);
 
@@ -564,6 +572,8 @@ Node<Token>* parse_enum(Node<Token>* node, File file) {
     if node {
         enum_def: Enum;
 
+        // print("% %\n", node.data.value, node.data.type);
+
         if node.data.type == TokenType.Identifier {
             enum_def.alias = node.data.value;
             node = node.next;
@@ -601,11 +611,21 @@ Node<Token>* parse_enum(Node<Token>* node, File file) {
             node = node.next;
         }
 
-        enum_def.name = node.data.value;
+        if node {
+            if node.data.type == TokenType.SemiColon {
+                enum_def.name = enum_def.alias;
 
-        // Move over ';'
-        node = node.next;
-        node = node.next;
+                // Move over ';'
+                node = node.next;
+            }
+            else if node.data.type == TokenType.Identifier {
+                enum_def.name = node.data.value;
+
+                // Move over ';'
+                node = node.next;
+                node = node.next;
+            }
+        }
 
         // Print struct definition to file
         write_to_file(file, "enum % {\n", enum_def.name);
