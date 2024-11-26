@@ -2811,7 +2811,8 @@ public static class TypeChecker
                             case Operator.Multiply:
                             case Operator.Divide:
                                 if (!(lhs == TypeKind.Integer && rhs == TypeKind.Integer) &&
-                                    !(lhs == TypeKind.Float && (rhs == TypeKind.Float || rhs == TypeKind.Integer)))
+                                    !(lhs == TypeKind.Float && (rhs == TypeKind.Float || rhs == TypeKind.Integer)) &&
+                                    !(lhs == TypeKind.Pointer && rhs == TypeKind.Integer && (assignment.Operator == Operator.Add || assignment.Operator == Operator.Subtract)))
                                 {
                                     ErrorReporter.Report($"Operator '{PrintOperator(assignment.Operator)}' not applicable to types '{type.Name}' and '{valueType.Name}'", assignment.Value);
                                 }
