@@ -135,7 +135,8 @@ public static class TypeChecker
                         var conditional = directive.Value as ConditionalAst;
                         if (VerifyCondition(conditional.Condition, null, GetFileScope(conditional), true))
                         {
-                            var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
+                            var scope = GetFileScope(conditional);
+                            var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition, scope);
 
                             if (ProgramRunner.ExecuteCondition(condition, conditional.Condition))
                             {
@@ -159,7 +160,8 @@ public static class TypeChecker
                     case DirectiveType.Assert:
                         if (VerifyCondition(directive.Value, null, GetFileScope(directive), true))
                         {
-                            var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
+                            var scope = GetFileScope(directive.Value);
+                            var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value, scope);
 
                             if (!ProgramRunner.ExecuteCondition(condition, directive.Value))
                             {
@@ -1763,7 +1765,7 @@ public static class TypeChecker
                             var conditional = directive.Value as ConditionalAst;
                             if (VerifyCondition(conditional.Condition, null, scope, true))
                             {
-                                var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition);
+                                var condition = ProgramIRBuilder.CreateRunnableCondition(conditional.Condition, scope);
 
                                 if (ProgramRunner.ExecuteCondition(condition, conditional.Condition))
                                 {
@@ -1783,7 +1785,7 @@ public static class TypeChecker
                             end--;
                             if (VerifyCondition(directive.Value, null, scope, true))
                             {
-                                var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value);
+                                var condition = ProgramIRBuilder.CreateRunnableCondition(directive.Value, scope);
 
                                 if (!ProgramRunner.ExecuteCondition(condition, directive.Value))
                                 {

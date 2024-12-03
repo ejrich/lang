@@ -147,12 +147,12 @@ public static class ProgramIRBuilder
         return function;
     }
 
-    public static FunctionIR CreateRunnableCondition(IAst ast)
+    public static FunctionIR CreateRunnableCondition(IAst ast, IScope scope)
     {
         var function = new FunctionIR {Allocations = new(), Instructions = new(), BasicBlocks = new()};
         AddBasicBlock(function);
 
-        var value = EmitIR(function, ast, TypeChecker.GlobalScope);
+        var value = EmitIR(function, ast, scope);
 
         // This logic is the opposite of EmitConditionExpression because for runnable conditions the returned value
         // should be true if the result of the expression is truthy.
@@ -2047,7 +2047,7 @@ public static class ProgramIRBuilder
         return expressionValue;
     }
 
-    private static InstructionValue EmitConstantIR(IAst ast, FunctionIR function, IScope scope = null, bool allowFunctions = false)
+    private static InstructionValue EmitConstantIR(IAst ast, FunctionIR function, IScope scope, bool allowFunctions = false)
     {
         switch (ast)
         {
@@ -2096,7 +2096,7 @@ public static class ProgramIRBuilder
             case ExpressionAst expression:
                 var expressionFunction = new FunctionIR {Instructions = new(), BasicBlocks = new(1)};
                 AddBasicBlock(expressionFunction);
-                var returnValue = EmitExpression(expressionFunction, expression, TypeChecker.GlobalScope);
+                var returnValue = EmitExpression(expressionFunction, expression, scope);
                 expressionFunction.Instructions.Add(new Instruction {Type = InstructionType.Return, Value1 = returnValue});
 
                 var result = ProgramRunner.ExecuteFunction(expressionFunction);
