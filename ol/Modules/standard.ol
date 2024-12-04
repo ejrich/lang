@@ -796,7 +796,9 @@ add_to_string_buffer(StringBuffer* buffer, string value) {
 
 write_integer(StringBuffer* buffer, IntFormat format) {
     if format.value.unsigned == 0 {
-        add_char_to_string_buffer(buffer, '0');
+        each i in format.min_chars {
+            add_char_to_string_buffer(buffer, '0');
+        }
     }
     else {
         if format.signed && format.value.signed < 0 {
