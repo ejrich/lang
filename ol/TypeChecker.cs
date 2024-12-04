@@ -3914,7 +3914,15 @@ public static class TypeChecker
             case CallAst call:
                 return VerifyCall(call, currentFunction, scope);
             case ExpressionAst expression:
-                return VerifyExpressionType(expression, currentFunction, scope, out isConstant);
+            {
+                var type = VerifyExpressionType(expression, currentFunction, scope, out isConstant);
+                if (getArrayLength && isConstant && type.TypeKind == TypeKind.Integer)
+                {
+                    var constantValue = ProgramIRBuilder.EmitConstantIR(expression, null, scope);
+                    arrayLength = (uint)constantValue.ConstantValue.UnsignedInteger;
+                }
+                return type;
+            }
             case IndexAst index:
                 var indexType = GetVariable(index.Name, index, scope, out _);
                 return VerifyIndex(index, indexType, currentFunction, scope, out _);

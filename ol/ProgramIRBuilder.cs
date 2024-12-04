@@ -2047,7 +2047,7 @@ public static class ProgramIRBuilder
         return expressionValue;
     }
 
-    private static InstructionValue EmitConstantIR(IAst ast, FunctionIR function, IScope scope, bool allowFunctions = false)
+    public static InstructionValue EmitConstantIR(IAst ast, FunctionIR function, IScope scope, bool allowFunctions = false)
     {
         switch (ast)
         {
