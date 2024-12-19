@@ -34,7 +34,11 @@ public static class Linker
         foreach (var file in BuildSettings.FilesToCopy)
         {
             var outputPath = Path.Combine(outputDirectory, file.Name);
-            if (File.Exists(outputPath)) File.Delete(outputPath);
+            if (File.Exists(outputPath))
+            {
+                File.SetAttributes(outputPath, FileAttributes.Normal);
+                File.Delete(outputPath);
+            }
             file.CopyTo(outputPath, true);
         }
 
