@@ -65,7 +65,7 @@ public static class Linker
         var libraryDirectories = string.Join(' ', BuildSettings.LibraryDirectories.Select(d => $"/libpath:\"{d}\""));
         var dependencies = string.Join(' ', BuildSettings.Libraries.Select(lib => GetLibraryName(lib, "lib")));
 
-        var linkerArguments = $"/entry:_start {debug}/out:\"{executableFile}.exe\" \"{objectFile}\" \"{defaultObjects}\" /libpath:\"{libDirectory.FullName}\" {libraryDirectories} {libraries} {dependencies}";
+        var linkerArguments = $"/entry:_start {debug}/out:\"{executableFile}.exe\" \"{objectFile}\" \"{defaultObjects}\" /libpath:\"{libDirectory.FullName}\" {libraryDirectories} {libraries} {dependencies} /subsystem:windows";
 
         Console.WriteLine($"Linking: lld-link {linkerArguments}\n");
         #endif

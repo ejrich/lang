@@ -261,3 +261,5 @@ struct tm {
 
 u64 time(u64* second) #extern "c"
 tm* localtime(u64* timer) #extern "c"
+
+home_environment_variable := "HOME"; #const

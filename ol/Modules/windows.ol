@@ -79,6 +79,8 @@ STD_INPUT_HANDLE  := -10; #const
 STD_OUTPUT_HANDLE := -11; #const
 STD_ERROR_HANDLE  := -12; #const
 
+home_environment_variable := "UserProfile"; #const
+
 struct Handle {}
 
 enum AllocationType {
