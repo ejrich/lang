@@ -57,6 +57,7 @@ bool UpdateWindow(Handle* hWnd) #extern "user32"
 bool CloseWindow(Handle* hWnd) #extern "user32"
 bool GetWindowRect(Handle* hWnd, RECT* lpRect) #extern "user32"
 bool SetWindowPos(Handle* hWnd, Handle* hWndInsertAfter, int X, int Y, int cx, int cy, SWPFlags uFlags) #extern "user32"
+bool SetProcessDPIAware() #extern "user32"
 
 bool GetMessage(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax) #extern "user32"
 bool PeekMessageA(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax, RemoveMsg wRemoveMsg) #extern "user32"
