@@ -559,6 +559,7 @@ write_buffer_to_standard_out(u8* buffer, s64 length) {
         write(stdout, buffer, length);
     }
     #if os == OS.Windows {
+        AttachConsole(-1);
         std_out := GetStdHandle(STD_OUTPUT_HANDLE);
         if std_out {
             written: int;

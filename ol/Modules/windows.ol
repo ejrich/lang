@@ -17,6 +17,8 @@ bool QueryPerformanceFrequency(u64* lpFrequency) #extern "kernel32"
 
 Handle* GetStdHandle(int nStdHandle) #extern "kernel32"
 bool WriteConsoleA(Handle* hConsoleOutput, void* lpBuffer, int nNumberOfCharsToWrite, int* lpNumberOfCharsWritten, void* lpReserved) #extern "kernel32"
+OutputDebugStringA(string lpOutputString) #extern "kernel32"
+bool AttachConsole(int dwProcessId) #extern "kernel32"
 
 bool PathFileExistsA(string pszPath) #extern "shlwapi"
 int GetFullPathNameA(string lpFileName, int nBufferLength, u8* lpBuffer, u8** lpFilePart) #extern "kernel32"
