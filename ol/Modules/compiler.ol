@@ -42,6 +42,15 @@ enum OutputArchitecture : u8 {
 
 set_output_architecture(OutputArchitecture arch) #compiler
 
+#if os == OS.Windows {
+    enum WindowsSubsystem {
+        Console;
+        Windows;
+    }
+
+    set_windows_subsystem(WindowsSubsystem subsystem) #compiler
+}
+
 
 ///// Metaprogramming features for code exploration and generation
 

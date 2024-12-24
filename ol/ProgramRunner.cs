@@ -1702,6 +1702,14 @@ public static unsafe class ProgramRunner
                     SetOutputArchitecture(value.Byte);
                     break;
                 }
+                #if _WINDOWS
+                case "set_windows_subsystem":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    Linker.Subsystem = (Linker.WindowsSubsystem)value.Integer;
+                    break;
+                }
+                #endif
                 case "add_source_file":
                 {
                     if (Messages.Intercepting)

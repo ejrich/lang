@@ -13,6 +13,14 @@ public static class Linker
     private const string LinkerName = "ld";
     #elif _WINDOWS
     private const string LinkerName = "lld-link";
+
+    public enum WindowsSubsystem
+    {
+        Console,
+        Windows
+    }
+
+    public static WindowsSubsystem Subsystem = WindowsSubsystem.Console;
     #endif
 
     public static void Link(string objectFile)
@@ -65,7 +73,14 @@ public static class Linker
         var libraryDirectories = string.Join(' ', BuildSettings.LibraryDirectories.Select(d => $"/libpath:\"{d}\""));
         var dependencies = string.Join(' ', BuildSettings.Libraries.Select(lib => GetLibraryName(lib, "lib")));
 
-        var linkerArguments = $"/entry:_start {debug}/out:\"{executableFile}.exe\" \"{objectFile}\" \"{defaultObjects}\" /libpath:\"{libDirectory.FullName}\" {libraryDirectories} {libraries} {dependencies} /subsystem:windows";
+        var subsystem = Subsystem switch
+        {
+            WindowsSubsystem.Console => "console",
+            WindowsSubsystem.Windows => "windows",
+            _ => "console"
+        };
+
+        var linkerArguments = $"/entry:_start {debug}/out:\"{executableFile}.exe\" \"{objectFile}\" \"{defaultObjects}\" /libpath:\"{libDirectory.FullName}\" {libraryDirectories} {libraries} {dependencies} /subsystem:{subsystem}";
 
         Console.WriteLine($"Linking: lld-link {linkerArguments}\n");
         #endif
