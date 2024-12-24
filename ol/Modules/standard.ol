@@ -559,12 +559,17 @@ write_buffer_to_standard_out(u8* buffer, s64 length) {
         write(stdout, buffer, length);
     }
     #if os == OS.Windows {
-        AttachConsole(-1);
         std_out := GetStdHandle(STD_OUTPUT_HANDLE);
-        if std_out {
-            written: int;
-            WriteConsoleA(std_out, buffer, length, &written, null);
+        if std_out == null {
+            AttachConsole(-1);
+            std_out = GetStdHandle(STD_OUTPUT_HANDLE);
+
+            // Fail out here since the handle wasn't able to be created
+            if std_out == null return;
         }
+
+        written: int;
+        WriteConsoleA(std_out, buffer, length, &written, null);
     }
 }
 
