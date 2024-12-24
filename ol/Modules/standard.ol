@@ -1317,12 +1317,10 @@ string get_environment_variable(string name, Allocate allocator = default_alloca
         }
     }
     #if os == OS.Windows {
-        max_length := 32767; #const
-        buffer: Array<u8>[max_length];
-        result.length = GetEnvironmentVariableA(name, buffer.data, max_length);
+        result.length = GetEnvironmentVariableA(name, null, 0);
         if result.length {
             result.data = allocator(result.length);
-            memory_copy(result.data, buffer.data, result.length);
+            result.length = GetEnvironmentVariableA(name, result.data, result.length);
         }
     }
 
