@@ -1062,6 +1062,9 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
         }
     }
     #if os == OS.Windows {
+        file_exists := PathFileExistsA(null_terminated_path.data);
+        if !file_exists && flags == FileFlags.Read return false, file;
+
         open_type: OpenFileType;
         file_info: OFSTRUCT;
 
