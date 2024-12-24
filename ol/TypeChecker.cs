@@ -2426,13 +2426,16 @@ public static class TypeChecker
         for (var i = 0; i < declaration.Variables.Length; i++)
         {
             var variable = declaration.Variables[i];
-            if (GetScopeIdentifier(scope, variable.Name, out _))
+            if (variable != null)
             {
-                ErrorReporter.Report($"Identifier '{variable.Name}' already defined", variable);
-            }
-            else
-            {
-                scope.Identifiers.TryAdd(variable.Name, variable);
+                if (GetScopeIdentifier(scope, variable.Name, out _))
+                {
+                    ErrorReporter.Report($"Identifier '{variable.Name}' already defined", variable);
+                }
+                else
+                {
+                    scope.Identifiers.TryAdd(variable.Name, variable);
+                }
             }
         }
 
@@ -2449,7 +2452,7 @@ public static class TypeChecker
             }
             else if (declaration.Type.TypeKind == TypeKind.Void)
             {
-                ErrorReporter.Report($"Variables '{string.Join(", ", declaration.Variables.Select(v => v.Name))}' cannot be assigned type 'void'", declaration.TypeDefinition);
+                ErrorReporter.Report($"Variables '{string.Join(", ", declaration.Variables.Select(v => v?.Name))}' cannot be assigned type 'void'", declaration.TypeDefinition);
             }
             else
             {
@@ -2466,7 +2469,10 @@ public static class TypeChecker
 
                 foreach (var variable in declaration.Variables)
                 {
-                    variable.Type = declaration.Type;
+                    if (variable != null)
+                    {
+                        variable.Type = declaration.Type;
+                    }
                 }
             }
         }
@@ -2501,7 +2507,7 @@ public static class TypeChecker
                 {
                     if (valueType.TypeKind == TypeKind.Void)
                     {
-                        ErrorReporter.Report($"Variables '{string.Join(", ", declaration.Variables.Select(v => v.Name))}' cannot be assigned type 'void'", declaration.Value);
+                        ErrorReporter.Report($"Variables '{string.Join(", ", declaration.Variables.Select(v => v?.Name))}' cannot be assigned type 'void'", declaration.Value);
                     }
                     else if (valueType.TypeKind == TypeKind.Compound)
                     {
@@ -2532,13 +2538,16 @@ public static class TypeChecker
                         {
                             var type = compoundType.Types[i];
                             var variable = declaration.Variables[i];
-                            if (type.TypeKind == TypeKind.Void)
+                            if (variable != null)
                             {
-                                ErrorReporter.Report($"Variable '{variable.Name}' cannot be assigned type 'void'", declaration.Value);
-                            }
-                            else
-                            {
-                                variable.Type = type;
+                                if (type.TypeKind == TypeKind.Void)
+                                {
+                                    ErrorReporter.Report($"Variable '{variable.Name}' cannot be assigned type 'void'", declaration.Value);
+                                }
+                                else
+                                {
+                                    variable.Type = type;
+                                }
                             }
                         }
                     }
@@ -2546,7 +2555,10 @@ public static class TypeChecker
                     {
                         foreach (var variable in declaration.Variables)
                         {
-                            variable.Type = valueType;
+                            if (variable != null)
+                            {
+                                variable.Type = valueType;
+                            }
                         }
                     }
                     declaration.Type = valueType;
@@ -2582,7 +2594,7 @@ public static class TypeChecker
             {
                 if (countType.TypeKind != TypeKind.Integer)
                 {
-                    ErrorReporter.Report($"Expected count of variables '{string.Join(", ", declaration.Variables.Select(v => v.Name))}' to be a positive integer", declaration.TypeDefinition.Count);
+                    ErrorReporter.Report($"Expected count of variables '{string.Join(", ", declaration.Variables.Select(v => v?.Name))}' to be a positive integer", declaration.TypeDefinition.Count);
                 }
                 if (isConstant)
                 {
