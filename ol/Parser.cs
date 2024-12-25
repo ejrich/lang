@@ -2869,7 +2869,10 @@ public static class Parser
             case "if":
                 directive.Type = DirectiveType.If;
                 directive.Value = ParseConditional(enumerator, currentFunction);
-                currentFunction.Flags |= FunctionFlags.HasDirectives;
+                if (currentFunction != null)
+                {
+                    currentFunction.Flags |= FunctionFlags.HasDirectives;
+                }
                 break;
             case "assert":
                 directive.Type = DirectiveType.Assert;
@@ -2880,12 +2883,15 @@ public static class Parser
                     directive.StringValue = message.Value;
                     enumerator.MoveNext();
                 }
-                currentFunction.Flags |= FunctionFlags.HasDirectives;
+                if (currentFunction != null)
+                {
+                    currentFunction.Flags |= FunctionFlags.HasDirectives;
+                }
                 break;
             case "inline":
                 if (!enumerator.MoveNext() || enumerator.Current.Type != TokenType.Identifier)
                 {
-                    ErrorReporter.Report($"Expected funciton call following #inline directive", enumerator.FileIndex, token);
+                    ErrorReporter.Report($"Expected function call following #inline directive", enumerator.FileIndex, token);
                     return null;
                 }
                 var call = ParseCall(enumerator, currentFunction, true);
