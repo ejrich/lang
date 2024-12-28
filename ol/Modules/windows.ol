@@ -81,6 +81,11 @@ int GetEnvironmentVariableA(string lpName, u8* lpBuffer, int nSize) #extern "ker
 GetSystemTime(SYSTEMTIME* lpSystemTime) #extern "kernel32"
 GetLocalTime(SYSTEMTIME* lpSystemTime) #extern "kernel32"
 
+s32 CoInitializeEx(void* pvReserved, u32 dwCoInit) #extern "ole32"
+s32 CoCreateInstance(GUID* rclsid, void** pUnkOuter, u32 dwClsContext, void* riid, void** ppv) #extern "ole32"
+CoTaskMemFree(void* pv) #extern "ole32"
+Handle* CreateEventA(SECURITY_ATTRIBUTES* lpSecurityAttributes, bool bManualReset, bool bInitialState, string lpName) #extern "kernel32"
+
 STD_INPUT_HANDLE  := -10; #const
 STD_OUTPUT_HANDLE := -11; #const
 STD_ERROR_HANDLE  := -12; #const
