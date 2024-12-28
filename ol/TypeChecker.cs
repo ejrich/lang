@@ -3356,7 +3356,14 @@ public static class TypeChecker
             }
             if (call && field.Type is not InterfaceAst)
             {
-                ErrorReporter.Report($"Expected field to be an interface, but get '{field.Type.Name}'", ast);
+                if (field.Type == null)
+                {
+                    ErrorReporter.Report($"Expected field to be an interface", ast);
+                }
+                else
+                {
+                    ErrorReporter.Report($"Expected field to be an interface, but get '{field.Type.Name}'", ast);
+                }
                 return null;
             }
 
