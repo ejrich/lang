@@ -90,6 +90,13 @@ STD_INPUT_HANDLE  := -10; #const
 STD_OUTPUT_HANDLE := -11; #const
 STD_ERROR_HANDLE  := -12; #const
 
+struct GUID {
+    data1: u32;
+    data2: u16;
+    data3: u16;
+    data4: CArray<u8>[8];
+}
+
 home_environment_variable := "UserProfile"; #const
 
 struct Handle {}
