@@ -5114,6 +5114,12 @@ public static class TypeChecker
 
     private static IType VerifyExpressionType(ExpressionAst expression, IFunction currentFunction, IScope scope, out bool isConstant)
     {
+        if (expression.Children == null || expression.Children.Count == 0)
+        {
+            isConstant = false;
+            return null;
+        }
+
         // 1. Get the type of the initial child
         expression.Type = VerifyExpression(expression.Children[0], currentFunction, scope, out isConstant, out bool isType);
         if (expression.Type == null) return null;
