@@ -3276,7 +3276,7 @@ public static class TypeChecker
                 case CallAst call:
                     var callType = VerifyStructField(call.Name, refType, structField, i-1, call, true);
                     if (callType == null) return null;
-                    refType = VerifyCall(call, currentFunction, scope, (InterfaceAst)callType);
+                    refType = VerifyCall(call, currentFunction, scope, out _, (InterfaceAst)callType);
                     break;
                 default:
                     ErrorReporter.Report("Expected to have a reference to a variable, field, or pointer", structField.Children[i]);
@@ -3931,7 +3931,7 @@ public static class TypeChecker
                 }
             }
             case CallAst call:
-                return VerifyCall(call, currentFunction, scope);
+                return VerifyCall(call, currentFunction, scope, out isConstant);
             case ExpressionAst expression:
             {
                 var type = VerifyExpressionType(expression, currentFunction, scope, out isConstant);
@@ -4160,8 +4160,9 @@ public static class TypeChecker
         return enumAst;
     }
 
-    private static IType VerifyCall(CallAst call, IFunction currentFunction, IScope scope, IInterface function = null)
+    private static IType VerifyCall(CallAst call, IFunction currentFunction, IScope scope, out bool isConstant, IInterface function = null)
     {
+        isConstant = false;
         var argumentTypes = new IType[call.Arguments.Count];
         var argumentsError = false;
 
@@ -4264,6 +4265,10 @@ public static class TypeChecker
 
                 if (type.TypeKind != TypeKind.Type)
                 {
+                    if (call.Name == "size_of")
+                    {
+                        isConstant = true;
+                    }
                     call.TypeInfo = type;
                     return function.ReturnType;
                 }
