@@ -14,6 +14,8 @@ struct string {
     data: u8*;
 }
 
+empty_string := ""; #const
+
 bool string_is_null(string value) {
     return value.data == null;
 }

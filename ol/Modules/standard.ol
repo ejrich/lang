@@ -496,6 +496,20 @@ string allocate_string(string input, Allocate allocator = default_allocator) {
     return value;
 }
 
+string get_enum_name<T>(T value) {
+    enum_type := cast(EnumTypeInfo*, type_of(T));
+    assert(enum_type.type == TypeKind.Enum);
+
+    raw_value := cast(s64, value);
+    each enum_value in enum_type.values {
+        if enum_value.value == raw_value {
+            return enum_value.name;
+        }
+    }
+
+    return empty_string;
+}
+
 struct StringBuffer {
     length: s64;
     buffer: Array<u8>;
