@@ -510,6 +510,19 @@ string get_enum_name<T>(T value) {
     return empty_string;
 }
 
+bool, T get_enum_value<T>(string name) {
+    enum_type := cast(EnumTypeInfo*, type_of(T));
+    assert(enum_type.type == TypeKind.Enum);
+
+    each enum_value in enum_type.values {
+        if enum_value.name == name {
+            return true, cast(T, enum_value.value);
+        }
+    }
+
+    return false, cast(T, 0);
+}
+
 struct StringBuffer {
     length: s64;
     buffer: Array<u8>;
