@@ -1188,7 +1188,10 @@ public static class TypeChecker
                 if (!isGeneric)
                 {
                     var paramsArrayType = (StructAst)argument.Type;
-                    function.ParamsElementType = paramsArrayType.GenericTypes[0];
+                    if (paramsArrayType != null)
+                    {
+                        function.ParamsElementType = paramsArrayType.GenericTypes[0];
+                    }
                 }
             }
             else if (argument.Type == null && !isGeneric)
