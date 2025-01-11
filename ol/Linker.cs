@@ -45,7 +45,13 @@ public static class Linker
             if (File.Exists(outputPath))
             {
                 File.SetAttributes(outputPath, FileAttributes.Normal);
-                File.Delete(outputPath);
+                try {
+                    File.Delete(outputPath);
+                }
+                catch {
+                    Console.WriteLine($"Unable to copy file '{file}' to path '{outputPath}', file is either in use or path is invalid");
+                    Environment.Exit(ErrorCodes.LinkError);
+                }
             }
             file.CopyTo(outputPath, true);
         }
