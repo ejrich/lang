@@ -544,7 +544,7 @@ public static class TypeChecker
         }
         else
         {
-            var functions = GlobalScope.Functions.GetOrAdd(function.Name, _ => new List<FunctionAst>());
+            var functions = GlobalScope.Functions.GetOrAdd(name, _ => new List<FunctionAst>());
             functions.Add(function);
         }
 
