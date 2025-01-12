@@ -1540,9 +1540,8 @@ public static unsafe class LLVMBackend
                             arguments = stackalloc LLVMValueRef[assembly.OutValues.Count];
                             argumentTypes = stackalloc LLVMTypeRef[assembly.OutValues.Count];
                             Span<LLVMAttributeRef> argumentElementTypes = stackalloc LLVMAttributeRef[assembly.OutValues.Count];
-                            assemblyString = new StringBuilder();
-                            constraintString = new StringBuilder();
-                            var clobberedRegisters = new StringBuilder();
+                            assemblyString.Clear();
+                            constraintString.Clear();
                             for (i = 0; i < assembly.OutValues.Count; i++)
                             {
                                 var output = assembly.OutValues[i];

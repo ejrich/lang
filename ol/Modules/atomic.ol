@@ -54,7 +54,7 @@ T atomic_increment<T>(T* pointer) {
     #if size_of(T) == 1 {
         asm {
             in rax, pointer;
-            mov rcx, 1;
+            in rcx, 1;
             lock;
             xadd [rax], cl;
         }
@@ -62,7 +62,7 @@ T atomic_increment<T>(T* pointer) {
     else #if size_of(T) == 2 {
         asm {
             in rax, pointer;
-            mov rcx, 1;
+            in rcx, 1;
             lock;
             xadd [rax], cx;
         }
@@ -70,7 +70,7 @@ T atomic_increment<T>(T* pointer) {
     else #if size_of(T) == 4 {
         asm {
             in rax, pointer;
-            mov rcx, 1;
+            in rcx, 1;
             lock;
             xadd [rax], ecx;
         }
@@ -78,7 +78,7 @@ T atomic_increment<T>(T* pointer) {
     else {
         asm {
             in rax, pointer;
-            mov rcx, 1;
+            in rcx, 1;
             lock;
             xadd [rax], rcx;
         }
