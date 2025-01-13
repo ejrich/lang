@@ -284,8 +284,9 @@ void* reallocate_memory(void* pointer, u64 old_size, u64 new_size) {
         VirtualQuery(pointer, &memory_info, size_of(memory_info));
 
         if new_size > memory_info.RegionSize {
-            VirtualFree(pointer, 0, FreeType.MEM_RELEASE);
             new_pointer = VirtualAlloc(null, new_size, AllocationType.MEM_COMMIT | AllocationType.MEM_RESERVE, ProtectionType.PAGE_READWRITE);
+            memory_copy(new_pointer, pointer, old_size);
+            VirtualFree(pointer, 0, FreeType.MEM_RELEASE);
         }
         else {
             new_pointer = pointer;
@@ -351,12 +352,7 @@ void* default_reallocator(void* pointer, u64 old_size, u64 size) {
             // Try to reallocate the memory from the os
             new_pointer := reallocate_memory(pointer, allocation.size, size);
 
-            // If reallocation returns a new pointer:
-            // - Copy the data from the old pointer to the new pointer
-            // - and free the old pointer and clear out the old allocation
             if new_pointer != pointer {
-                // memory_copy(new_pointer, pointer, allocation.size);
-                // free_memory(pointer, allocation.size);
                 allocation.pointer = new_pointer;
             }
 
