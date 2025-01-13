@@ -2093,24 +2093,43 @@ public static class ProgramIRBuilder
                     };
                 }
                 break;
-            case ExpressionAst expression:
-                var expressionFunction = new FunctionIR {Instructions = new(), BasicBlocks = new(1)};
-                AddBasicBlock(expressionFunction);
-                var returnValue = EmitExpression(expressionFunction, expression, scope);
-                expressionFunction.Instructions.Add(new Instruction {Type = InstructionType.Return, Value1 = returnValue});
-
-                var result = ProgramRunner.ExecuteFunction(expressionFunction);
-
-                return new InstructionValue
+            case UnaryAst unary:
+                switch (unary.Operator)
                 {
-                    ValueType = InstructionValueType.Constant, Type = expression.Type,
-                    ConstantValue = new Constant {Integer = result.Long}
-                };
+                    case UnaryOperator.Not:
+                    case UnaryOperator.Negate:
+                        var result = GetConstantValueFromAst(unary, scope);
+                        return new InstructionValue
+                        {
+                            ValueType = InstructionValueType.Constant, Type = unary.Type,
+                            ConstantValue = new Constant {Integer = result.Long}
+                        };
+                }
+                break;
+            case ExpressionAst expression:
+                {
+                    var result = GetConstantValueFromAst(expression, scope);
+                    return new InstructionValue
+                    {
+                        ValueType = InstructionValueType.Constant, Type = expression.Type,
+                        ConstantValue = new Constant {Integer = result.Long}
+                    };
+                }
         }
         Debug.Assert(false, "Value is not constant");
         return null;
     }
 
+    private static Register GetConstantValueFromAst(IAst ast, IScope scope)
+    {
+        var expressionFunction = new FunctionIR {Instructions = new(), BasicBlocks = new(1)};
+        AddBasicBlock(expressionFunction);
+        var returnValue = EmitIR(expressionFunction, ast, scope);
+        expressionFunction.Instructions.Add(new Instruction {Type = InstructionType.Return, Value1 = returnValue});
+
+        var result = ProgramRunner.ExecuteFunction(expressionFunction);
+        return result;
+    }
 
     private static InstructionValue EmitConstantValue(Values values, IType type, IScope scope)
     {

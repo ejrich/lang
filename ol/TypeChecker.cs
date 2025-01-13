@@ -3896,7 +3896,7 @@ public static class TypeChecker
                     return unary.Type;
                 }
 
-                var valueType = VerifyExpression(unary.Value, currentFunction, scope);
+                var valueType = VerifyExpression(unary.Value, currentFunction, scope, out var valueConstant);
                 if (valueType == null)
                 {
                     return null;
@@ -3906,7 +3906,8 @@ public static class TypeChecker
                     case UnaryOperator.Not:
                         if (valueType.TypeKind == TypeKind.Boolean)
                         {
-                            return valueType;
+                            isConstant = valueConstant;
+                            return unary.Type = valueType;
                         }
 
                         ErrorReporter.Report($"Expected type 'bool', but got type '{valueType.Name}'", unary.Value);
@@ -3914,7 +3915,8 @@ public static class TypeChecker
                     case UnaryOperator.Negate:
                         if (valueType.TypeKind == TypeKind.Integer || valueType.TypeKind == TypeKind.Float)
                         {
-                            return valueType;
+                            isConstant = valueConstant;
+                            return unary.Type = valueType;
                         }
 
                         ErrorReporter.Report($"Negation not compatible with type '{valueType.Name}'", unary.Value);
