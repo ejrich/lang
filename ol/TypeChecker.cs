@@ -5409,7 +5409,11 @@ public static class TypeChecker
 
         // 2. Verify the count expression is an integer
         var indexValue = VerifyExpression(index.Index, currentFunction, scope);
-        if (indexValue != null && indexValue.TypeKind != TypeKind.Integer && indexValue.TypeKind != TypeKind.Type)
+        if (indexValue == null)
+        {
+            ErrorReporter.Report($"Expected index to be type 'int'", index);
+        }
+        else if (indexValue.TypeKind != TypeKind.Integer && indexValue.TypeKind != TypeKind.Type)
         {
             ErrorReporter.Report($"Expected index to be type 'int', but got '{indexValue.Name}'", index);
         }
