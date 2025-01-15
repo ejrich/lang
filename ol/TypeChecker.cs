@@ -1161,6 +1161,7 @@ public static class TypeChecker
         var argumentNames = new HashSet<string>();
         foreach (var argument in function.Arguments)
         {
+            argument.Verified = true;
             // 3a. Check if the argument has been previously defined
             if (!argumentNames.Add(argument.Name))
             {
@@ -1493,6 +1494,7 @@ public static class TypeChecker
         for (var i = 0; i < overload.Arguments.Count; i++)
         {
             var argument = overload.Arguments[i];
+            argument.Verified = true;
             // 2a. Check if the argument has been previously defined
             if (!argumentNames.Add(argument.Name))
             {
@@ -2256,7 +2258,6 @@ public static class TypeChecker
     private static void VerifyDeclaration(DeclarationAst declaration, IFunction currentFunction, IScope scope)
     {
         // 1. Verify the variable is already defined
-        declaration.Verified = true;
         if (GetScopeIdentifier(scope, declaration.Name, out _))
         {
             ErrorReporter.Report($"Identifier '{declaration.Name}' already defined", declaration);
@@ -2421,6 +2422,8 @@ public static class TypeChecker
                     break;
             }
         }
+
+        declaration.Verified = true;
     }
 
     private static void VerifyCompoundDeclaration(CompoundDeclarationAst declaration, IFunction currentFunction, IScope scope)
@@ -3187,9 +3190,16 @@ public static class TypeChecker
                 constant = true;
                 return enumAst;
             case DeclarationAst declaration:
-                if (declaration.Global && !declaration.Verified)
+                if (!declaration.Verified)
                 {
-                    VerifyGlobalVariable(declaration);
+                    if (declaration.Global)
+                    {
+                        VerifyGlobalVariable(declaration);
+                    }
+                    else
+                    {
+                        ErrorReporter.Report($"Attempting to access '{name}' before it has been declared", ast);
+                    }
                 }
                 constant = declaration.Constant;
                 return declaration.Type;
@@ -4686,6 +4696,7 @@ public static class TypeChecker
 
                 foreach (var argument in polymorphedFunction.Arguments)
                 {
+                    argument.Verified = true;
                     if (argument.Type == null)
                     {
                         argument.Type = VerifyType(argument.TypeDefinition, scope, out _, out _, out var isParams, allowParams: true);
@@ -5442,6 +5453,7 @@ public static class TypeChecker
             overloads[op] = polymorphedOverload;
             foreach (var argument in polymorphedOverload.Arguments)
             {
+                argument.Verified = true;
                 if (argument.Type == null)
                 {
                     argument.Type = VerifyType(argument.TypeDefinition, scope);
