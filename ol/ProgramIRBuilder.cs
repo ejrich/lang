@@ -443,7 +443,7 @@ public static class ProgramIRBuilder
 
     private static InstructionValue GetFieldConstant(StructFieldAst field, IScope scope)
     {
-        switch (field.Type.TypeKind)
+        switch (field?.Type?.TypeKind)
         {
             // Initialize arrays
             case TypeKind.Array:
@@ -462,6 +462,8 @@ public static class ProgramIRBuilder
             // Initialize unions to null
             case TypeKind.Union:
                 return new InstructionValue {ValueType = InstructionValueType.ConstantUnion, Type = field.Type};
+            case null:
+                return null;
             // Or initialize to default
             default:
                 return field.Value == null ? GetDefaultConstant(field.Type) : EmitConstantIR(field.Value, null, scope);

@@ -91,7 +91,7 @@ public static unsafe class ProgramRunner
 
     private static void InitializeGlobalVariable(IntPtr pointer, InstructionValue value)
     {
-        switch (value.ValueType)
+        switch (value?.ValueType)
         {
             case InstructionValueType.Value:
                 var globalPointer = Globals[value.ValueIndex];

@@ -2128,7 +2128,7 @@ public static class TypeChecker
             }
         }
 
-        if (errorCount == ErrorReporter.Errors.Count)
+        if (declaration.Type != null && errorCount == ErrorReporter.Errors.Count)
         {
             ProgramIRBuilder.EmitGlobalVariable(declaration, scope);
             Messages.Submit(MessageType.TypeCheckSuccessful, declaration);
