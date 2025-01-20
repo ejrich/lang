@@ -4280,10 +4280,7 @@ public static class TypeChecker
 
                 if (type.TypeKind != TypeKind.Type)
                 {
-                    if (call.Name == "size_of")
-                    {
-                        isConstant = true;
-                    }
+                    isConstant = true;
                     call.TypeInfo = type;
                     return function.ReturnType;
                 }

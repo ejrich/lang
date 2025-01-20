@@ -2157,6 +2157,8 @@ public static unsafe class LLVMBackend
                 return GetConstant(value);
             case InstructionValueType.Null:
                 return _null;
+            case InstructionValueType.TypeInfo:
+                return _typeInfos[value.ValueIndex];
             case InstructionValueType.Function:
                 return GetOrCreateFunctionDefinition(value.ValueIndex);
             case InstructionValueType.ConstantStruct:

@@ -2083,6 +2083,8 @@ public static class ProgramIRBuilder
                     return null;
                 }
                 break;
+            case CallAst call:
+                return call.Name == "type_of" ? GetTypeInfo(call.TypeInfo) : GetConstantInteger(call.TypeInfo.Size);
             case StructFieldRefAst structField:
                 if (structField.IsEnum)
                 {
