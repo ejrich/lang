@@ -3975,7 +3975,7 @@ public static class TypeChecker
             case CastAst cast:
             {
                 cast.TargetType = VerifyType(cast.TargetTypeDefinition, scope);
-                var valueType = VerifyExpression(cast.Value, currentFunction, scope);
+                var valueType = VerifyExpression(cast.Value, currentFunction, scope, out isConstant);
                 switch (cast.TargetType?.TypeKind)
                 {
                     case TypeKind.Integer:

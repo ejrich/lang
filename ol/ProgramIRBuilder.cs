@@ -2083,8 +2083,6 @@ public static class ProgramIRBuilder
                     return null;
                 }
                 break;
-            case CallAst call:
-                return call.Name == "type_of" ? GetTypeInfo(call.TypeInfo) : GetConstantInteger(call.TypeInfo.Size);
             case StructFieldRefAst structField:
                 if (structField.IsEnum)
                 {
@@ -2110,15 +2108,115 @@ public static class ProgramIRBuilder
                         };
                 }
                 break;
+            case CallAst call:
+                return call.Name == "type_of" ? GetTypeInfo(call.TypeInfo) : GetConstantInteger(call.TypeInfo.Size);
             case ExpressionAst expression:
+            {
+                var result = GetConstantValueFromAst(expression, scope);
+                return new InstructionValue
                 {
-                    var result = GetConstantValueFromAst(expression, scope);
-                    return new InstructionValue
+                    ValueType = InstructionValueType.Constant, Type = expression.Type,
+                    ConstantValue = new Constant {Integer = result.Long}
+                };
+            }
+            case CastAst cast:
+            {
+                var value = EmitConstantIR(cast.Value, function, scope);
+                var castValue = new InstructionValue { ValueType = InstructionValueType.Constant, Type = cast.TargetType };
+
+                switch (cast.TargetType?.TypeKind)
+                {
+                    case TypeKind.Integer:
                     {
-                        ValueType = InstructionValueType.Constant, Type = expression.Type,
-                        ConstantValue = new Constant {Integer = result.Long}
-                    };
+                        var targetIntegerType = (PrimitiveAst)cast.TargetType;
+                        switch (value.Type.TypeKind)
+                        {
+                            case TypeKind.Integer:
+                                var sourceIntegerType = (PrimitiveAst)value.Type;
+                                if (sourceIntegerType.Signed)
+                                {
+                                    if (targetIntegerType.Signed) castValue.ConstantValue = new Constant { Integer = value.ConstantValue.Integer };
+                                    else castValue.ConstantValue = new Constant { UnsignedInteger = (ulong)value.ConstantValue.Integer };
+                                }
+                                else
+                                {
+                                    if (targetIntegerType.Signed) castValue.ConstantValue = new Constant { Integer = (long)value.ConstantValue.UnsignedInteger };
+                                    else castValue.ConstantValue = new Constant { UnsignedInteger = value.ConstantValue.UnsignedInteger };
+                                }
+                                break;
+                            case TypeKind.Enum:
+                                var enumType = (EnumAst)value.Type;
+                                if (enumType.BaseType.Signed)
+                                {
+                                    if (targetIntegerType.Signed) castValue.ConstantValue = new Constant { Integer = value.ConstantValue.Integer };
+                                    else castValue.ConstantValue = new Constant { UnsignedInteger = (ulong)value.ConstantValue.Integer };
+                                }
+                                else
+                                {
+                                    if (targetIntegerType.Signed) castValue.ConstantValue = new Constant { Integer = (long)value.ConstantValue.UnsignedInteger };
+                                    else castValue.ConstantValue = new Constant { UnsignedInteger = value.ConstantValue.UnsignedInteger };
+                                }
+                                break;
+                            case TypeKind.Float:
+                                if (targetIntegerType.Signed) castValue.ConstantValue = new Constant { Integer = (long)value.ConstantValue.Double };
+                                else castValue.ConstantValue = new Constant { UnsignedInteger = (ulong)value.ConstantValue.Double };
+                                break;
+                        }
+                        break;
+                    }
+                    case TypeKind.Float:
+                        if (value.Type.TypeKind == TypeKind.Float)
+                        {
+                            castValue.ConstantValue = new Constant { Double = value.ConstantValue.Double };
+                        }
+                        else
+                        {
+                            var integerType = (PrimitiveAst)value.Type;
+                            if (integerType.Signed) castValue.ConstantValue = new Constant { Double = (double)value.ConstantValue.Integer };
+                            else castValue.ConstantValue = new Constant { Double = (double)value.ConstantValue.UnsignedInteger };
+                        }
+                        break;
+                    case TypeKind.Pointer:
+                        if (value.ValueType == InstructionValueType.TypeInfo)
+                        {
+                            castValue.ValueType = InstructionValueType.TypeInfo;
+                            castValue.ValueIndex = value.ValueIndex;
+                        }
+                        else
+                        {
+                            castValue.ConstantValue = new Constant { Integer = value.ConstantValue.Integer };
+                        }
+                        break;
+                    case TypeKind.Enum:
+                        var targetEnumType = (EnumAst)cast.TargetType;
+                        switch (value.Type.TypeKind)
+                        {
+                            case TypeKind.Integer:
+                                var sourceIntegerType = (PrimitiveAst)value.Type;
+                                if (sourceIntegerType == targetEnumType.BaseType)
+                                {
+                                    castValue.ConstantValue = new Constant { Integer = value.ConstantValue.Integer };
+                                }
+                                else
+                                {
+                                    if (sourceIntegerType.Signed)
+                                    {
+                                        if (targetEnumType.BaseType.Signed) castValue.ConstantValue = new Constant { Integer = value.ConstantValue.Integer };
+                                        else castValue.ConstantValue = new Constant { UnsignedInteger = (ulong)value.ConstantValue.Integer };
+                                    }
+                                    else
+                                    {
+                                        if (targetEnumType.BaseType.Signed) castValue.ConstantValue = new Constant { Integer = (long)value.ConstantValue.UnsignedInteger };
+                                        else castValue.ConstantValue = new Constant { UnsignedInteger = value.ConstantValue.UnsignedInteger };
+                                    }
+                                }
+                                break;
+                        }
+                        break;
                 }
+
+                return castValue;
+            }
         }
         Debug.Assert(false, "Value is not constant");
         return null;
