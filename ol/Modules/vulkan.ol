@@ -2163,8 +2163,8 @@ u32 vk_make_api_version(u32 variant, u32 major, u32 minor, u32 patch) {
     return (variant << 29) | (major << 22) | (minor << 12) | patch;
 }
 
-u32 vk_api_version_1_0() {
-    return vk_make_api_version(0, 1, 0, 0);
+u32 vk_api_version_1_1() {
+    return vk_make_api_version(0, 1, 1, 0);
 }
 
 u32 vk_api_version_variant(u32 version) {
