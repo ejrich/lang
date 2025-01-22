@@ -2490,6 +2490,8 @@ public static class Parser
 
     private static void SetOperatorPrecedence(ExpressionAst expression)
     {
+        if (expression.Operators.Count == 0) return;
+
         // 1. Set the initial operator precedence
         var operatorPrecedence = GetOperatorPrecedence(expression.Operators[0]);
         for (var i = 1; i < expression.Operators.Count; i++)
