@@ -179,9 +179,9 @@ public static class ProgramIRBuilder
 
         var blockIndex = 0;
         var instructionIndex = 0;
-        var functionFile = Path.GetFileName(BuildSettings.Files[function.Source.FileIndex]);
-        var line = function.Source.Line;
-        var column = function.Source.Column;
+        var functionFile = function.Source == null ? string.Empty : Path.GetFileName(BuildSettings.Files[function.Source.FileIndex]);
+        var line = function.Source?.Line ?? 0;
+        var column = function.Source?.Column ?? 0;
         while (blockIndex < function.BasicBlocks.Count)
         {
             var instructionToStopAt = blockIndex < function.BasicBlocks.Count - 1 ? function.BasicBlocks[blockIndex + 1].Location : function.Instructions.Count;
@@ -239,8 +239,8 @@ public static class ProgramIRBuilder
                     case InstructionType.InlineAssembly:
                         break;
                     case InstructionType.DebugSetLocation:
-                        line = instruction.Source.Line;
-                        column = instruction.Source.Column;
+                        line = instruction.Source?.Line ?? 0;
+                        column = instruction.Source?.Column ?? 0;
                         continue;
                     case InstructionType.DebugDeclareParameter:
                     case InstructionType.DebugDeclareVariable:
@@ -2100,11 +2100,11 @@ public static class ProgramIRBuilder
                 {
                     case UnaryOperator.Not:
                     case UnaryOperator.Negate:
-                        var result = GetConstantValueFromAst(unary, scope);
+                        var result = GetConstantValueFromAst(unary, unary.Type, scope);
                         return new InstructionValue
                         {
                             ValueType = InstructionValueType.Constant, Type = unary.Type,
-                            ConstantValue = new Constant {Integer = result.Long}
+                            ConstantValue = result
                         };
                 }
                 break;
@@ -2112,11 +2112,11 @@ public static class ProgramIRBuilder
                 return call.Name == "type_of" ? GetTypeInfo(call.TypeInfo) : GetConstantInteger(call.TypeInfo.Size);
             case ExpressionAst expression:
             {
-                var result = GetConstantValueFromAst(expression, scope);
+                var result = GetConstantValueFromAst(expression, expression.Type, scope);
                 return new InstructionValue
                 {
                     ValueType = InstructionValueType.Constant, Type = expression.Type,
-                    ConstantValue = new Constant {Integer = result.Long}
+                    ConstantValue = result
                 };
             }
             case CastAst cast:
@@ -2222,7 +2222,7 @@ public static class ProgramIRBuilder
         return null;
     }
 
-    private static Register GetConstantValueFromAst(IAst ast, IScope scope)
+    private static Constant GetConstantValueFromAst(IAst ast, IType type, IScope scope)
     {
         var expressionFunction = new FunctionIR {Instructions = new(), BasicBlocks = new(1)};
         AddBasicBlock(expressionFunction);
@@ -2230,7 +2230,107 @@ public static class ProgramIRBuilder
         expressionFunction.Instructions.Add(new Instruction {Type = InstructionType.Return, Value1 = returnValue});
 
         var result = ProgramRunner.ExecuteFunction(expressionFunction);
-        return result;
+
+        var value = new Constant();
+        switch (type.TypeKind)
+        {
+            case TypeKind.Boolean:
+                value = new Constant { UnsignedInteger = result.Byte };
+                break;
+            case TypeKind.Integer:
+                var integerType = (PrimitiveAst)type;
+                if (integerType.Signed)
+                {
+                    switch (type.Size)
+                    {
+                        case 1:
+                            value = new Constant { Integer = result.SByte };
+                            break;
+                        case 2:
+                            value = new Constant { Integer = result.Short };
+                            break;
+                        case 4:
+                            value = new Constant { Integer = result.Integer };
+                            break;
+                        case 8:
+                            value = new Constant { Integer = result.Long };
+                            break;
+                    }
+                }
+                else
+                {
+                    switch (type.Size)
+                    {
+                        case 1:
+                            value = new Constant { UnsignedInteger = result.Byte };
+                            break;
+                        case 2:
+                            value = new Constant { UnsignedInteger = result.UShort };
+                            break;
+                        case 4:
+                            value = new Constant { UnsignedInteger = result.UInteger };
+                            break;
+                        case 8:
+                            value = new Constant { UnsignedInteger = result.ULong };
+                            break;
+                    }
+                }
+                break;
+            case TypeKind.Float:
+                if (type.Size == 4)
+                {
+                    value = new Constant { Double = result.Float };
+                }
+                else
+                {
+                    value = new Constant { Double = result.Double };
+                }
+                break;
+            case TypeKind.Enum:
+                var enumType = (EnumAst)type;
+                if (enumType.BaseType.Signed)
+                {
+                    switch (type.Size)
+                    {
+                        case 1:
+                            value = new Constant { Integer = result.SByte };
+                            break;
+                        case 2:
+                            value = new Constant { Integer = result.Short };
+                            break;
+                        case 4:
+                            value = new Constant { Integer = result.Integer };
+                            break;
+                        case 8:
+                            value = new Constant { Integer = result.Long };
+                            break;
+                    }
+                }
+                else
+                {
+                    switch (type.Size)
+                    {
+                        case 1:
+                            value = new Constant { UnsignedInteger = result.Byte };
+                            break;
+                        case 2:
+                            value = new Constant { UnsignedInteger = result.UShort };
+                            break;
+                        case 4:
+                            value = new Constant { UnsignedInteger = result.UInteger };
+                            break;
+                        case 8:
+                            value = new Constant { UnsignedInteger = result.ULong };
+                            break;
+                    }
+                }
+                break;
+            default:
+                Debug.Assert(false, "Expression value type is not constant");
+                break;
+        }
+
+        return value;
     }
 
     private static InstructionValue EmitConstantValue(Values values, IType type, IScope scope)
