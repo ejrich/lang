@@ -323,6 +323,7 @@ XK_Control_R := 0xFFE4; #const
 XK_Caps_Lock := 0xFFE5; #const
 XK_Alt_L     := 0xFFE9; #const
 XK_Alt_R     := 0xFFEA; #const
+XK_Delete    := 0xFFFF; #const
 
 struct XKeyEvent {
     type: XEventType;
