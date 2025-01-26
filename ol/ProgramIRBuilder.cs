@@ -2510,9 +2510,8 @@ public static class ProgramIRBuilder
                 }
                 break;
             default:
-                // @Cleanup this branch shouldn't be hit
-                Console.WriteLine("Unexpected syntax tree in struct field ref");
-                Environment.Exit(ErrorCodes.BuildError);
+                value = EmitIR(function, structField.Children[0], scope);
+                skipPointer = true;
                 break;
         }
 
