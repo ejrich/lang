@@ -103,7 +103,7 @@ create_instance() {
         applicationVersion = version;
         pEngineName = engine_name.data;
         engineVersion = version;
-        apiVersion = vk_api_version_1_0();
+        apiVersion = vk_api_version_1_1();
     }
 
     extensions := get_required_extensions();
