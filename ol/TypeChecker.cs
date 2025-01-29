@@ -1273,9 +1273,9 @@ public static class TypeChecker
 
         if (function.Flags.HasFlag(FunctionFlags.PassCallLocation))
         {
-            function.Arguments.Add(new DeclarationAst { Name = "file", Type = TypeTable.StringType });
-            function.Arguments.Add(new DeclarationAst { Name = "line", Type = TypeTable.S32Type });
-            function.Arguments.Add(new DeclarationAst { Name = "column", Type = TypeTable.S32Type });
+            function.Arguments.Add(new DeclarationAst { Name = "file", Verified = true, Type = TypeTable.StringType });
+            function.Arguments.Add(new DeclarationAst { Name = "line", Verified = true, Type = TypeTable.S32Type });
+            function.Arguments.Add(new DeclarationAst { Name = "column", Verified = true, Type = TypeTable.S32Type });
         }
 
         if (function.Flags.HasFlag(FunctionFlags.Inline))
@@ -3791,9 +3791,16 @@ public static class TypeChecker
                 switch (identifier)
                 {
                     case DeclarationAst declaration:
-                        if (declaration.Global && !declaration.Verified)
+                        if (!declaration.Verified)
                         {
-                            VerifyGlobalVariable(declaration);
+                            if (declaration.Global)
+                            {
+                                VerifyGlobalVariable(declaration);
+                            }
+                            else
+                            {
+                                ErrorReporter.Report($"Attempting to access '{declaration.Name}' before it has been declared", ast);
+                            }
                         }
                         isConstant = declaration.Constant;
                         if (getArrayLength && isConstant && declaration.Type.TypeKind == TypeKind.Integer)
