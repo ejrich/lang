@@ -1134,6 +1134,24 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
     return true, file;
 }
 
+bool delete_file(string path) {
+    deleted: bool;
+
+    null_terminated_path: Array<u8>[path.length + 1];
+    memory_copy(null_terminated_path.data, path.data, path.length);
+    null_terminated_path[path.length] = 0;
+
+    #if os == OS.Linux {
+        success := unlink(null_terminated_path.data);
+        deleted = success == 0;
+    }
+    #if os == OS.Windows {
+        deleted = DeleteFileA(null_terminated_path.data);
+    }
+
+    return deleted;
+}
+
 struct FileEntry {
     type: FileType;
     name: string;

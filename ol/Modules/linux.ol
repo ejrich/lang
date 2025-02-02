@@ -41,6 +41,7 @@ int chdir(u8* path) #syscall 80
 int fchdir(int fd) #syscall 81
 int rename(u8* oldname, u8* newname) #syscall 82
 int mkdir(u8* pathname, int mode) #syscall 83
+int unlink(u8* path) #syscall 87
 int readlink(u8* path, u8* buf, int bufsize) #syscall 89
 int getdents64(int fd, Dirent* dirp, u32 count) #syscall 217
 int clock_gettime(ClockId clk_id, Timespec* tp) #syscall 228
