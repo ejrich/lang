@@ -3215,6 +3215,16 @@ public static class ProgramIRBuilder
     {
         switch (lhs.Type.TypeKind)
         {
+            case TypeKind.Boolean:
+                switch (op)
+                {
+                    case Operator.Equality:
+                        var xor = EmitInstruction(InstructionType.Xor, function, type, scope, lhs, rhs);
+                        return EmitInstruction(InstructionType.Not, function, type, scope, xor);
+                    case Operator.NotEqual:
+                        return EmitInstruction(InstructionType.Xor, function, type, scope, lhs, rhs);
+                }
+                break;
             case TypeKind.Integer:
                 switch (rhs.Type.TypeKind)
                 {

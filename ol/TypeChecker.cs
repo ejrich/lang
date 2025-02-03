@@ -5220,6 +5220,26 @@ public static class TypeChecker
                     // Requires same types and returns bool
                     case Operator.Equality:
                     case Operator.NotEqual:
+                        if ((type == TypeKind.Enum && nextType == TypeKind.Enum)
+                            || (type == TypeKind.Type && nextType == TypeKind.Type)
+                            || (type == TypeKind.Interface && nextType == TypeKind.Interface))
+                        {
+                            if (!TypeEquals(expression.Type, nextExpressionType))
+                            {
+                                ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
+                            }
+                        }
+                        else if (!(
+                            (type == TypeKind.Boolean && nextType == TypeKind.Boolean) ||
+                            (type == TypeKind.Integer && (nextType == TypeKind.Integer || nextType == TypeKind.Float)) ||
+                            (type == TypeKind.Float && (nextType == TypeKind.Integer || nextType == TypeKind.Float)) ||
+                            (type == TypeKind.Pointer && nextType == TypeKind.Pointer))
+                        )
+                        {
+                            ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
+                        }
+                        expression.Type = TypeTable.BoolType;
+                        break;
                     case Operator.GreaterThan:
                     case Operator.LessThan:
                     case Operator.GreaterThanEqual:
@@ -5228,7 +5248,7 @@ public static class TypeChecker
                             || (type == TypeKind.Type && nextType == TypeKind.Type)
                             || (type == TypeKind.Interface && nextType == TypeKind.Interface))
                         {
-                            if ((op != Operator.Equality && op != Operator.NotEqual) || !TypeEquals(expression.Type, nextExpressionType))
+                            if (!TypeEquals(expression.Type, nextExpressionType))
                             {
                                 ErrorReporter.Report($"Operator {PrintOperator(op)} not applicable to types '{expression.Type.Name}' and '{nextExpressionType.Name}'", expression.Children[i]);
                             }
