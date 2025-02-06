@@ -6,10 +6,6 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="LLVMSharp" Version="16.0.0" />
-  </ItemGroup>
-
   <ItemGroup Condition="'$(Configuration)' == 'Release'">
     <None Remove="Modules/**/*" />
     <Content Include="Modules/**/*">

@@ -1,0 +1,7 @@
+NOTE:
+
+This folder contains code that is taken from https://github.com/dotnet/LLVMSharp.
+
+To better handle updates to LLVM, I am keeping this folder up-to-date using https://github.com/dotnet/clangsharp to generate the LLVM bindings.
+
+All credit go to Microsoft for initially creating these repos.

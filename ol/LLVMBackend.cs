@@ -2581,7 +2581,7 @@ public static unsafe class LLVMBackend
         {
             using var valueName = new MarshaledString(name);
 
-            enumValues[value.Index] = LLVM.DIBuilderCreateEnumerator(_debugBuilder, valueName.Value, (UIntPtr)valueName.Length, value.Value, isUnsigned);
+            enumValues[value.Index] = LLVM.DIBuilderCreateEnumerator(_debugBuilder, valueName.Value, (UIntPtr)valueName.Length, (nint)value.Value, isUnsigned);
         }
 
         fixed (LLVMMetadataRef* enumValuesPointer = enumValues)
