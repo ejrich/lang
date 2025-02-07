@@ -45,8 +45,9 @@ public static unsafe partial class LLVM
                 || NativeLibrary.TryLoad("libLLVM-19", assembly, searchPath, out nativeLibrary)
                 || NativeLibrary.TryLoad("libLLVM.so.1", assembly, searchPath, out nativeLibrary);
         }
-        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
+            // TODO Add LLVM-C.dll and lld-link.exe to the project
             return NativeLibrary.TryLoad("LLVM-C.dll", assembly, searchPath, out nativeLibrary);
         }
 

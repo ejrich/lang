@@ -2035,7 +2035,7 @@ public static unsafe class LLVMBackend
                         var debugVariable = LLVM.DIBuilderCreateParameterVariable(_debugBuilder, debugBlock, argName.Value, (UIntPtr)argName.Length, (uint)instruction.Index+1, file, functionArg.Line, debugType, 0, LLVMDIFlags.LLVMDIFlagZero);
                         var location = LLVM.DIBuilderCreateDebugLocation(_context, functionArg.Line, functionArg.Column, debugBlock, null);
 
-                        LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, allocations[instruction.Index], debugVariable, expression, location, basicBlocks[blockIndex]);
+                        LLVM.DIBuilderInsertDeclareRecordAtEnd(_debugBuilder, allocations[instruction.Index], debugVariable, expression, location, basicBlocks[blockIndex]);
                         break;
                     }
                     case InstructionType.DebugDeclareVariable when _emitDebug:
@@ -2047,7 +2047,7 @@ public static unsafe class LLVMBackend
                         var location = LLVM.GetCurrentDebugLocation2(_builder);
                         var variable = GetValue(instruction.Value1, values, allocations, functionPointer);
 
-                        LLVM.DIBuilderInsertDeclareAtEnd(_debugBuilder, variable, debugVariable, expression, location, _builder.InsertBlock);
+                        LLVM.DIBuilderInsertDeclareRecordAtEnd(_debugBuilder, variable, debugVariable, expression, location, _builder.InsertBlock);
                         break;
                     }
                 }

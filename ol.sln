@@ -9,7 +9,6 @@ ProjectSection(SolutionItems) = preProject
 	LICENSE = LICENSE
 	README.md = README.md
 	.gitignore = .gitignore
-	.svnignore = .svnignore
 	.editorconfig = .editorconfig
 EndProjectSection
 EndProject

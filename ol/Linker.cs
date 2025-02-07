@@ -109,7 +109,7 @@ public static class Linker
         #if _LINUX
         return new("/usr/lib");
         #elif _WINDOWS
-        var windowsKits = new DirectoryInfo("C:\\Program Files (x86)\\Windows Kits");
+        var windowsKits = new DirectoryInfo(@"C:\Program Files (x86)\Windows Kits");
 
         if (!windowsKits.Exists)
         {
