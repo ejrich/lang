@@ -88,10 +88,19 @@ public static class Linker
 
         var linkerArguments = $"/entry:_start {debug}/out:\"{executableFile}.exe\" \"{objectFile}\" \"{defaultObjects}\" /libpath:\"{libDirectory.FullName}\" {libraryDirectories} {libraries} {dependencies} /subsystem:{subsystem}";
 
-        Console.WriteLine($"Linking: lld-link {linkerArguments}\n");
+        Console.WriteLine($"Linking: lld-link.exe {linkerArguments}\n");
         #endif
 
-        var buildProcess = new Process {StartInfo = {FileName = LinkerName, Arguments = linkerArguments}};
+        var buildProcess = new Process
+        {
+            StartInfo =
+            {
+                FileName = LinkerName,
+                Arguments = linkerArguments,
+                WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory
+            }
+        };
+
         buildProcess.Start();
         buildProcess.WaitForExit();
 
