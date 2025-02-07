@@ -16,7 +16,7 @@ public unsafe partial struct LLVMNamedMDNodeRef(IntPtr handle) : IEquatable<LLVM
 
     public static bool operator !=(LLVMNamedMDNodeRef left, LLVMNamedMDNodeRef right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMNamedMDNodeRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMNamedMDNodeRef other) && Equals(other);
 
     public readonly bool Equals(LLVMNamedMDNodeRef other) => this == other;
 

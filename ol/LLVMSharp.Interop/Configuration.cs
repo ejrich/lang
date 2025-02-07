@@ -15,7 +15,7 @@ internal static class Configuration
 
     private static bool GetAppContextData(string name, bool defaultValue)
     {
-        object? data = AppContext.GetData(name);
+        object data = AppContext.GetData(name);
 
         if (data is bool value)
         {

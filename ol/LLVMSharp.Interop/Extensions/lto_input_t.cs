@@ -16,7 +16,7 @@ public unsafe partial struct lto_input_t(IntPtr handle) : IEquatable<lto_input_t
 
     public static bool operator !=(lto_input_t left, lto_input_t right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is lto_input_t other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is lto_input_t other) && Equals(other);
 
     public readonly bool Equals(lto_input_t other) => this == other;
 

@@ -16,7 +16,7 @@ public unsafe partial struct LLVMMetadataRef(IntPtr handle) : IEquatable<LLVMMet
 
     public static bool operator !=(LLVMMetadataRef left, LLVMMetadataRef right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMMetadataRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMMetadataRef other) && Equals(other);
 
     public readonly bool Equals(LLVMMetadataRef other) => this == other;
 

@@ -16,7 +16,7 @@ public unsafe partial struct LLVMModuleFlagEntry(IntPtr handle) : IEquatable<LLV
 
     public static bool operator !=(LLVMModuleFlagEntry left, LLVMModuleFlagEntry right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMModuleFlagEntry other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMModuleFlagEntry other) && Equals(other);
 
     public readonly bool Equals(LLVMModuleFlagEntry other) => this == other;
 

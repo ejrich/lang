@@ -738,7 +738,7 @@ public unsafe partial struct LLVMValueRef(IntPtr handle) : IEquatable<LLVMValueR
 
     public static LLVMValueRef CreateConstNUWMul(LLVMValueRef LHSConstant, LLVMValueRef RHSConstant) => LLVM.ConstNUWMul(LHSConstant, RHSConstant);
 
-    public static LLVMValueRef CreateConstNUWNeg(LLVMValueRef ConstantVal) => LLVM.ConstNUWNeg(ConstantVal);
+    public static LLVMValueRef CreateConstNUWNeg(LLVMValueRef ConstantVal) => LLVM.ConstNull(LLVM.TypeOf(ConstantVal));
 
     public static LLVMValueRef CreateConstNUWSub(LLVMValueRef LHSConstant, LLVMValueRef RHSConstant) => LLVM.ConstNUWSub(LHSConstant, RHSConstant);
 
@@ -848,7 +848,7 @@ public unsafe partial struct LLVMValueRef(IntPtr handle) : IEquatable<LLVMValueR
 
     public readonly void Dump() => LLVM.DumpValue(this);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMValueRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMValueRef other) && Equals(other);
 
     public readonly bool Equals(LLVMValueRef other) => this == other;
 

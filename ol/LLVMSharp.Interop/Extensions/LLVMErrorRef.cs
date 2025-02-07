@@ -16,7 +16,7 @@ public unsafe partial struct LLVMErrorRef(IntPtr handle) : IEquatable<LLVMErrorR
 
     public static bool operator !=(LLVMErrorRef left, LLVMErrorRef right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMErrorRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMErrorRef other) && Equals(other);
 
     public readonly bool Equals(LLVMErrorRef other) => this == other;
 

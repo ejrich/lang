@@ -16,7 +16,7 @@ public unsafe partial struct LLVMJITEventListenerRef(IntPtr handle) : IEquatable
 
     public static bool operator !=(LLVMJITEventListenerRef left, LLVMJITEventListenerRef right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMJITEventListenerRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMJITEventListenerRef other) && Equals(other);
 
     public readonly bool Equals(LLVMJITEventListenerRef other) => this == other;
 

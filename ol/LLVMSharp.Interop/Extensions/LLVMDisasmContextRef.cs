@@ -16,7 +16,7 @@ public unsafe partial struct LLVMDisasmContextRef(IntPtr handle) : IEquatable<LL
 
     public static bool operator !=(LLVMDisasmContextRef left, LLVMDisasmContextRef right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMDisasmContextRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMDisasmContextRef other) && Equals(other);
 
     public readonly bool Equals(LLVMDisasmContextRef other) => this == other;
 

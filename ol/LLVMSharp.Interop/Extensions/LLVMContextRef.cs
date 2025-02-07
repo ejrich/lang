@@ -95,7 +95,7 @@ public unsafe partial struct LLVMContextRef(IntPtr handle) : IDisposable, IEquat
         }
     }
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMContextRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMContextRef other) && Equals(other);
 
     public readonly bool Equals(LLVMContextRef other) => this == other;
 

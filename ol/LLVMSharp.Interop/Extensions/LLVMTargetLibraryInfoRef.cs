@@ -16,7 +16,7 @@ public unsafe partial struct LLVMTargetLibraryInfoRef(IntPtr handle) : IEquatabl
 
     public static bool operator !=(LLVMTargetLibraryInfoRef left, LLVMTargetLibraryInfoRef right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMTargetLibraryInfoRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMTargetLibraryInfoRef other) && Equals(other);
 
     public readonly bool Equals(LLVMTargetLibraryInfoRef other) => this == other;
 

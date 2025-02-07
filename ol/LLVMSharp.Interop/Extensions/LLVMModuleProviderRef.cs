@@ -18,7 +18,7 @@ public unsafe partial struct LLVMModuleProviderRef(IntPtr handle) : IEquatable<L
 
     public readonly LLVMPassManagerRef CreateFunctionPassManager() => LLVM.CreateFunctionPassManager(this);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMModuleProviderRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMModuleProviderRef other) && Equals(other);
 
     public readonly bool Equals(LLVMModuleProviderRef other) => this == other;
 

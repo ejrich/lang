@@ -16,7 +16,7 @@ public unsafe partial struct LLVMSymbolIteratorRef(IntPtr handle) : IEquatable<L
 
     public static bool operator !=(LLVMSymbolIteratorRef left, LLVMSymbolIteratorRef right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMSymbolIteratorRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMSymbolIteratorRef other) && Equals(other);
 
     public readonly bool Equals(LLVMSymbolIteratorRef other) => this == other;
 

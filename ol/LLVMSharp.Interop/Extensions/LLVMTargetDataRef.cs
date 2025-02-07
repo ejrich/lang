@@ -18,7 +18,7 @@ public unsafe partial struct LLVMTargetDataRef(IntPtr handle) : IEquatable<LLVMT
 
     public static LLVMTargetDataRef FromStringRepresentation(ReadOnlySpan<char> stringRep) => LLVM.CreateTargetData(new MarshaledString(stringRep));
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMTargetDataRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMTargetDataRef other) && Equals(other);
 
     public readonly bool Equals(LLVMTargetDataRef other) => this == other;
 

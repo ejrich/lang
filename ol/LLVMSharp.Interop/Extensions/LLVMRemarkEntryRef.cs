@@ -16,7 +16,7 @@ public unsafe partial struct LLVMRemarkEntryRef(IntPtr handle) : IEquatable<LLVM
 
     public static bool operator !=(LLVMRemarkEntryRef left, LLVMRemarkEntryRef right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMRemarkEntryRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMRemarkEntryRef other) && Equals(other);
 
     public readonly bool Equals(LLVMRemarkEntryRef other) => this == other;
 

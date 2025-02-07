@@ -29,7 +29,7 @@ public unsafe partial struct LLVMTargetMachineRef(IntPtr handle) : IEquatable<LL
         }
     }
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMTargetMachineRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMTargetMachineRef other) && Equals(other);
 
     public readonly bool Equals(LLVMTargetMachineRef other) => this == other;
 

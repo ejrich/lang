@@ -69,7 +69,7 @@ public class InputVariable
     public bool Used { get; set; }
 }
 
-public static class ol
+public static class Ol
 {
     public static void Main(string[] args)
     {

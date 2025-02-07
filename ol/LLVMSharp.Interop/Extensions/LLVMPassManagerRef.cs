@@ -27,7 +27,7 @@ public unsafe partial struct LLVMPassManagerRef(IntPtr handle) : IDisposable, IE
         }
     }
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMPassManagerRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMPassManagerRef other) && Equals(other);
 
     public readonly bool Equals(LLVMPassManagerRef other) => this == other;
 

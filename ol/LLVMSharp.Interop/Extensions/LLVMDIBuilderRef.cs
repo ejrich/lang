@@ -108,7 +108,7 @@ public unsafe partial struct LLVMDIBuilderRef(IntPtr handle) : IEquatable<LLVMDI
 
     public readonly void DIBuilderFinalize() => LLVM.DIBuilderFinalize(this);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMDIBuilderRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMDIBuilderRef other) && Equals(other);
 
     public readonly bool Equals(LLVMDIBuilderRef other) => this == other;
 

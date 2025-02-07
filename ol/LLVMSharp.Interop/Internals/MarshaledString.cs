@@ -8,7 +8,7 @@ namespace LLVMSharp.Interop;
 
 public unsafe struct MarshaledString : IDisposable
 {
-    public MarshaledString(string? input)
+    public MarshaledString(string input)
     {
         int valueLength;
         sbyte* pValue;

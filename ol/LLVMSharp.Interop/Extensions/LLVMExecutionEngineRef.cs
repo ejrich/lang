@@ -34,7 +34,7 @@ public unsafe partial struct LLVMExecutionEngineRef(IntPtr handle) : IDisposable
         }
     }
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMExecutionEngineRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMExecutionEngineRef other) && Equals(other);
 
     public readonly bool Equals(LLVMExecutionEngineRef other) => this == other;
 
@@ -60,7 +60,7 @@ public unsafe partial struct LLVMExecutionEngineRef(IntPtr handle) : IDisposable
         return LLVM.GetFunctionAddress(this, marshaledName);
     }
 
-    public readonly ulong GetGlobalValueAddress(string Name) => GetGlobalValueAddress(Name.AsSpan()); 
+    public readonly ulong GetGlobalValueAddress(string Name) => GetGlobalValueAddress(Name.AsSpan());
 
     public readonly ulong GetGlobalValueAddress(ReadOnlySpan<char> Name)
     {

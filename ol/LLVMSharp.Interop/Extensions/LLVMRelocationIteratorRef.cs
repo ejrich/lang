@@ -16,7 +16,7 @@ public unsafe partial struct LLVMRelocationIteratorRef(IntPtr handle) : IEquatab
 
     public static bool operator !=(LLVMRelocationIteratorRef left, LLVMRelocationIteratorRef right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMRelocationIteratorRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMRelocationIteratorRef other) && Equals(other);
 
     public readonly bool Equals(LLVMRelocationIteratorRef other) => this == other;
 

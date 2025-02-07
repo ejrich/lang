@@ -20,7 +20,7 @@ public unsafe partial struct LLVMGenericValueRef(IntPtr handle) : IEquatable<LLV
 
     public static LLVMGenericValueRef CreateFloat(LLVMTypeRef Ty, double N) => LLVM.CreateGenericValueOfFloat(Ty, N);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMGenericValueRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMGenericValueRef other) && Equals(other);
 
     public readonly bool Equals(LLVMGenericValueRef other) => this == other;
 

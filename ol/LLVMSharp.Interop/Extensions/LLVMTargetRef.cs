@@ -103,7 +103,7 @@ public unsafe partial struct LLVMTargetRef(IntPtr handle) : IEquatable<LLVMTarge
 
     public static bool operator !=(LLVMTargetRef left, LLVMTargetRef right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMTargetRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMTargetRef other) && Equals(other);
 
     public readonly bool Equals(LLVMTargetRef other) => this == other;
 

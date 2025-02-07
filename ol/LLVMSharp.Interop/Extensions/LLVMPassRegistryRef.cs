@@ -16,7 +16,7 @@ public unsafe partial struct LLVMPassRegistryRef(IntPtr handle) : IEquatable<LLV
 
     public static bool operator !=(LLVMPassRegistryRef left, LLVMPassRegistryRef right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMPassRegistryRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMPassRegistryRef other) && Equals(other);
 
     public readonly bool Equals(LLVMPassRegistryRef other) => this == other;
 

@@ -16,7 +16,7 @@ public unsafe partial struct thinlto_code_gen_t(IntPtr handle) : IEquatable<thin
 
     public static bool operator !=(thinlto_code_gen_t left, thinlto_code_gen_t right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is thinlto_code_gen_t other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is thinlto_code_gen_t other) && Equals(other);
 
     public readonly bool Equals(thinlto_code_gen_t other) => this == other;
 

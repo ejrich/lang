@@ -16,7 +16,7 @@ public unsafe partial struct LLVMObjectFileRef(IntPtr handle) : IEquatable<LLVMO
 
     public static bool operator !=(LLVMObjectFileRef left, LLVMObjectFileRef right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMObjectFileRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMObjectFileRef other) && Equals(other);
 
     public readonly bool Equals(LLVMObjectFileRef other) => this == other;
 

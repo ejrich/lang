@@ -20,7 +20,7 @@ public unsafe partial struct LLVMAttributeRef(IntPtr handle) : IEquatable<LLVMAt
 
     public static bool operator !=(LLVMAttributeRef left, LLVMAttributeRef right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMAttributeRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMAttributeRef other) && Equals(other);
 
     public readonly bool Equals(LLVMAttributeRef other) => this == other;
 

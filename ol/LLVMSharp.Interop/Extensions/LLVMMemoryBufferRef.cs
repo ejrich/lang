@@ -16,7 +16,7 @@ public unsafe partial struct LLVMMemoryBufferRef(IntPtr handle) : IEquatable<LLV
 
     public static bool operator !=(LLVMMemoryBufferRef left, LLVMMemoryBufferRef right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMMemoryBufferRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMMemoryBufferRef other) && Equals(other);
 
     public readonly bool Equals(LLVMMemoryBufferRef other) => this == other;
 

@@ -16,7 +16,7 @@ public unsafe partial struct LLVMUseRef(IntPtr handle) : IEquatable<LLVMUseRef>
 
     public static bool operator !=(LLVMUseRef left, LLVMUseRef right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMUseRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMUseRef other) && Equals(other);
 
     public readonly bool Equals(LLVMUseRef other) => this == other;
 

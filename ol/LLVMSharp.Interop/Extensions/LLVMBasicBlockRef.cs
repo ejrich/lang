@@ -62,7 +62,7 @@ public unsafe partial struct LLVMBasicBlockRef(IntPtr handle) : IEquatable<LLVMB
 
     public readonly void Dump() => LLVM.DumpValue(this);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMBasicBlockRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMBasicBlockRef other) && Equals(other);
 
     public readonly bool Equals(LLVMBasicBlockRef other) => this == other;
 

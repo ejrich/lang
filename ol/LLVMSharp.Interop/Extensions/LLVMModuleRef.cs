@@ -218,7 +218,7 @@ public unsafe partial struct LLVMModuleRef(IntPtr handle) : IDisposable, IEquata
 
     public readonly void Dump() => LLVM.DumpModule(this);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMModuleRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMModuleRef other) && Equals(other);
 
     public readonly bool Equals(LLVMModuleRef other) => this == other;
 

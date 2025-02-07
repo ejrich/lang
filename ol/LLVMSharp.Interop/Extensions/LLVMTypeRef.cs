@@ -146,7 +146,7 @@ public unsafe partial struct LLVMTypeRef(IntPtr handle) : IEquatable<LLVMTypeRef
 
     public readonly void Dump() => LLVM.DumpType(this);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMTypeRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMTypeRef other) && Equals(other);
 
     public readonly bool Equals(LLVMTypeRef other) => this == other;
 

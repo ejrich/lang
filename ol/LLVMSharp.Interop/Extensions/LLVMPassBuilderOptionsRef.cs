@@ -27,7 +27,7 @@ public unsafe partial struct LLVMPassBuilderOptionsRef(IntPtr handle) : IEquatab
         }
     }
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMPassBuilderOptionsRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMPassBuilderOptionsRef other) && Equals(other);
 
     public readonly bool Equals(LLVMPassBuilderOptionsRef other) => this == other;
 

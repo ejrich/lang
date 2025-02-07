@@ -16,7 +16,7 @@ public unsafe partial struct LLVMMCJITMemoryManagerRef(IntPtr handle) : IEquatab
 
     public static bool operator !=(LLVMMCJITMemoryManagerRef left, LLVMMCJITMemoryManagerRef right) => !(left == right);
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMMCJITMemoryManagerRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMMCJITMemoryManagerRef other) && Equals(other);
 
     public readonly bool Equals(LLVMMCJITMemoryManagerRef other) => this == other;
 

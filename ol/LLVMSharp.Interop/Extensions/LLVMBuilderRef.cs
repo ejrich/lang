@@ -496,7 +496,9 @@ public unsafe partial struct LLVMBuilderRef(IntPtr handle) : IDisposable, IEquat
     public readonly LLVMValueRef BuildNUWNeg(LLVMValueRef V, ReadOnlySpan<char> Name)
     {
         using var marshaledName = new MarshaledString(Name);
-        return LLVM.BuildNUWNeg(this, V, marshaledName);
+        var neg = LLVM.BuildNeg(this, V, marshaledName);
+        LLVM.SetNUW(neg, 1);
+        return neg;
     }
 
     public readonly LLVMValueRef BuildNUWSub(LLVMValueRef LHS, LLVMValueRef RHS, string Name = "") => BuildNUWSub(LHS, RHS, Name.AsSpan());
@@ -721,7 +723,7 @@ public unsafe partial struct LLVMBuilderRef(IntPtr handle) : IDisposable, IEquat
         }
     }
 
-    public override readonly bool Equals(object? obj) => (obj is LLVMBuilderRef other) && Equals(other);
+    public override readonly bool Equals(object obj) => (obj is LLVMBuilderRef other) && Equals(other);
 
     public readonly bool Equals(LLVMBuilderRef other) => this == other;
 
