@@ -1,6 +1,7 @@
 // Copyright (c) .NET Foundation and Contributors. All Rights Reserved. Licensed under the MIT License (MIT). See License.md in the repository root for more information.
 
 using System;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -24,12 +25,12 @@ public static unsafe partial class LLVM
 
     private static IntPtr OnDllImport(string libraryName, Assembly assembly, DllImportSearchPath? searchPath)
     {
-        if (TryResolveLibrary(libraryName, assembly, searchPath, out var nativeLibrary))
+        if (libraryName.Equals("libLLVM", StringComparison.Ordinal) && TryResolveLLVM(assembly, searchPath, out var nativeLibrary))
         {
             return nativeLibrary;
         }
 
-        if (libraryName.Equals("libLLVM", StringComparison.Ordinal) && TryResolveLLVM(assembly, searchPath, out nativeLibrary))
+        if (TryResolveLibrary(libraryName, assembly, searchPath, out nativeLibrary))
         {
             return nativeLibrary;
         }
@@ -41,12 +42,14 @@ public static unsafe partial class LLVM
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
-            return NativeLibrary.TryLoad("libLLVM.so.19.1", assembly, searchPath, out nativeLibrary);
+            var llvmPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "libLLVM.so.19.1");
+            return NativeLibrary.TryLoad(llvmPath, out nativeLibrary);
         }
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
             // TODO Add LLVM-C.dll and lld-link.exe to the project
-            return NativeLibrary.TryLoad("LLVM-C.dll", assembly, searchPath, out nativeLibrary);
+            var llvmPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "LLVM-C.dll");
+            return NativeLibrary.TryLoad(llvmPath, out nativeLibrary);
         }
 
         nativeLibrary = IntPtr.Zero;
