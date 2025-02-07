@@ -20,15 +20,29 @@
     </Content>
   </ItemGroup>
 
-  <PropertyGroup Condition="'$(OS)' == 'Windows_NT' ">
+  <PropertyGroup Condition="'$(OS)' == 'Windows_NT'">
     <DefineConstants>_WINDOWS</DefineConstants>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(OS)' == 'Unix' ">
+  <ItemGroup Condition="'$(OS)' == 'Windows_NT'">
+    <None Update="dist\windows\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>%(Filename)%(Extension)</Link>
+    </None>
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(OS)' == 'Unix'">
     <DefineConstants>_LINUX</DefineConstants>
   </PropertyGroup>
 
-  <PropertyGroup Condition="'$(OS)' == 'OSX' ">
+  <ItemGroup Condition="'$(OS)' == 'Unix'">
+    <None Update="dist\linux\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>%(Filename)%(Extension)</Link>
+    </None>
+  </ItemGroup>
+
+  <PropertyGroup Condition="'$(OS)' == 'OSX'">
     <DefineConstants>_MAC</DefineConstants>
   </PropertyGroup>
 
