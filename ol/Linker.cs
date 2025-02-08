@@ -12,7 +12,7 @@ public static class Linker
     #if _LINUX
     private const string LinkerName = "ld";
     #elif _WINDOWS
-    private const string LinkerName = "lld-link";
+    private const string LinkerName = "lld-link.exe";
 
     public enum WindowsSubsystem
     {
