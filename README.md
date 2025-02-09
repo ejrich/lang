@@ -26,6 +26,12 @@
     * If using vim, this can be run using `<leader><F8>`
 * The executable can be found in `ol/bin/{Debug|Release}/net8.0/ol`
 
+#### GitHub users
+
+* The GitHub repo does not contain all of the binaries necessary to run the project.
+    * Linux - Download version 19.1 of [LLVM](https://github.com/llvm/llvm-project/releases/tag/llvmorg-19.1.0) and copy `libLLVM.so` to `ol/dist/linux/libLLVM.so.19.1` and rebuild.
+    * Windows - Download version 19.1 of [LLVM](https://github.com/llvm/llvm-project/releases/tag/llvmorg-19.1.0) and copy `LLVM-C.dll` and `lld-link.exe` to `ol/dist/windows` and rebuild.
+
 ### Syntax
 
 Examples for syntax can be found in the `Example` and `Tests` folders.
