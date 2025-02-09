@@ -1710,6 +1710,18 @@ public static unsafe class ProgramRunner
                     break;
                 }
                 #endif
+                case "get_current_optimizations":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    Marshal.StructureToPtr<ReleaseOptimizations>(BuildSettings.Optimizations, value.Pointer, false);
+                    break;
+                }
+                case "set_optimizations":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    BuildSettings.Optimizations = Marshal.PtrToStructure<ReleaseOptimizations>(value.Pointer);
+                    break;
+                }
                 case "add_source_file":
                 {
                     if (Messages.Intercepting)

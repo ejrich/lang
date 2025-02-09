@@ -51,6 +51,31 @@ set_output_architecture(OutputArchitecture arch) #compiler
     set_windows_subsystem(WindowsSubsystem subsystem) #compiler
 }
 
+struct ReleaseOptimizations {
+    loop_interleaving: bool;
+    loop_vectorization: bool;
+    loop_unrolling: bool;
+    forget_scalar_evolution_in_loop_unrolling: bool;
+    instruction_vectorization: bool;
+    profile_call_graph: bool;
+    merge_functions: bool;
+    inline_threshold: InlineThreshold;
+    global_value_numbering: bool;
+    combine_redudant_instruction: bool;
+    promote_memory_to_register: bool;
+    simplify_control_flow: bool;
+}
+
+enum InlineThreshold : u8 {
+    Default = 0;
+    Small   = 1;
+    Minimum = 2;
+}
+
+get_current_optimizations(ReleaseOptimizations* optimizations) #compiler
+
+set_optimizations(ReleaseOptimizations* optimizations) #compiler
+
 
 ///// Metaprogramming features for code exploration and generation
 

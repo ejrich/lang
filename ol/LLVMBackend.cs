@@ -2383,12 +2383,36 @@ public static unsafe class LLVMBackend
         if (BuildSettings.Release)
         {
             var passBuilderOptions = LLVM.CreatePassBuilderOptions();
-            LLVM.PassBuilderOptionsSetLoopInterleaving(passBuilderOptions, 1);
-            LLVM.PassBuilderOptionsSetLoopVectorization(passBuilderOptions, 1);
-            LLVM.PassBuilderOptionsSetSLPVectorization(passBuilderOptions, 1);
-            LLVM.PassBuilderOptionsSetLoopUnrolling(passBuilderOptions, 1);
 
-            using var passes = new MarshaledString("gvn,instcombine,mem2reg,simplifycfg");
+            LLVM.PassBuilderOptionsSetLoopInterleaving(passBuilderOptions, BuildSettings.Optimizations.LoopInterleaving);
+            LLVM.PassBuilderOptionsSetLoopVectorization(passBuilderOptions, BuildSettings.Optimizations.LoopVectorization);
+            LLVM.PassBuilderOptionsSetLoopUnrolling(passBuilderOptions, BuildSettings.Optimizations.LoopUnrolling);
+            LLVM.PassBuilderOptionsSetForgetAllSCEVInLoopUnroll(passBuilderOptions, BuildSettings.Optimizations.ForgetScalarEvolutionInLoopUnrolling);
+            LLVM.PassBuilderOptionsSetSLPVectorization(passBuilderOptions, BuildSettings.Optimizations.InstructionVectorization);
+            LLVM.PassBuilderOptionsSetCallGraphProfile(passBuilderOptions, BuildSettings.Optimizations.ProfileCallGraph);
+            LLVM.PassBuilderOptionsSetMergeFunctions(passBuilderOptions, BuildSettings.Optimizations.MergeFunctions);
+            LLVM.PassBuilderOptionsSetInlinerThreshold(passBuilderOptions, BuildSettings.Optimizations.InlineThreshold switch
+            {
+                InlineThreshold.Small => 50,
+                InlineThreshold.Minimum => 5,
+                _ => 225
+            });
+
+            var passArray = new List<string>();
+            if (BuildSettings.Optimizations.GlobalValueNumbering == 1)
+                passArray.Add("gvn");
+
+            if (BuildSettings.Optimizations.CombineRedudantInstruction == 1)
+                passArray.Add("instcombine");
+
+            if (BuildSettings.Optimizations.PromoteMemoryToRegister == 1)
+                passArray.Add("mem2reg");
+
+            if (BuildSettings.Optimizations.SimplifyControlFlow == 1)
+                passArray.Add("simplifycfg");
+
+            var passString = string.Join(',', passArray);
+            using var passes = new MarshaledString(passString);
             var errors = LLVM.RunPasses(_module, passes.Value, targetMachine, passBuilderOptions);
 
             LLVM.DisposePassBuilderOptions(passBuilderOptions);

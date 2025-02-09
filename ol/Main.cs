@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace ol;
 
@@ -12,6 +13,7 @@ public static class BuildSettings
     public static OutputTypeTableConfiguration OutputTypeTable { get; set; }
     public static OutputArchitecture OutputArchitecture { get; set; }
     public static bool Release { get; set; }
+    public static ReleaseOptimizations Optimizations { get; set; } = new();
     public static bool EmitDebug { get; set; } = true;
     public static bool OutputAssembly { get; set; }
     public static string Path { get; set; }
@@ -61,6 +63,45 @@ public enum OutputArchitecture : byte
     None,
     X64,
     Arm64
+}
+
+[StructLayout(LayoutKind.Explicit, Size=12)]
+public struct ReleaseOptimizations
+{
+    public ReleaseOptimizations()
+    {
+        LoopInterleaving = 1;
+        LoopVectorization = 1;
+        LoopUnrolling = 1;
+        ForgetScalarEvolutionInLoopUnrolling = 0;
+        InstructionVectorization = 1;
+        ProfileCallGraph = 0;
+        MergeFunctions = 1;
+        InlineThreshold = InlineThreshold.Default;
+        GlobalValueNumbering = 1;
+        CombineRedudantInstruction = 1;
+        PromoteMemoryToRegister = 1;
+        SimplifyControlFlow = 1;
+    }
+
+    [FieldOffset(0)] public byte LoopInterleaving;
+    [FieldOffset(1)] public byte LoopVectorization;
+    [FieldOffset(2)] public byte LoopUnrolling;
+    [FieldOffset(3)] public byte ForgetScalarEvolutionInLoopUnrolling;
+    [FieldOffset(4)] public byte InstructionVectorization;
+    [FieldOffset(5)] public byte ProfileCallGraph;
+    [FieldOffset(6)] public byte MergeFunctions;
+    [FieldOffset(7)] public InlineThreshold InlineThreshold;
+    [FieldOffset(8)] public byte GlobalValueNumbering;
+    [FieldOffset(9)] public byte CombineRedudantInstruction;
+    [FieldOffset(10)] public byte PromoteMemoryToRegister;
+    [FieldOffset(11)] public byte SimplifyControlFlow;
+}
+
+public enum InlineThreshold : byte {
+    Default,
+    Small,
+    Minimum
 }
 
 public class InputVariable
