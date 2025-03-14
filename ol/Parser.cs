@@ -257,33 +257,36 @@ public static class Parser
                     break;
                 case TokenType.Struct:
                     var structAst = ParseStruct(enumerator, attributes);
-                    if (structAst.Generics != null)
+                    if (structAst != null)
                     {
-                        if (TypeChecker.AddPolymorphicStruct(structAst) && structAst.Name == "Array")
+                        if (structAst.Generics != null)
                         {
-                            TypeChecker.BaseArrayType = structAst;
+                            if (TypeChecker.AddPolymorphicStruct(structAst) && structAst.Name == "Array")
+                            {
+                                TypeChecker.BaseArrayType = structAst;
+                            }
                         }
-                    }
-                    else
-                    {
-                        if (TypeChecker.AddStruct(structAst))
+                        else
                         {
-                            if (structAst.Name == "string")
+                            if (TypeChecker.AddStruct(structAst))
                             {
-                                TypeTable.StringType = structAst;
-                                structAst.TypeKind = TypeKind.String;
-                                structAst.Used = true;
-                            }
-                            else if (structAst.Name == "Any")
-                            {
-                                TypeTable.AnyType = structAst;
-                                structAst.TypeKind = TypeKind.Any;
-                                structAst.Used = true;
-                            }
-                            else
-                            {
-                                structAst.TypeKind = TypeKind.Struct;
-                                Asts.Enqueue(structAst);
+                                if (structAst.Name == "string")
+                                {
+                                    TypeTable.StringType = structAst;
+                                    structAst.TypeKind = TypeKind.String;
+                                    structAst.Used = true;
+                                }
+                                else if (structAst.Name == "Any")
+                                {
+                                    TypeTable.AnyType = structAst;
+                                    structAst.TypeKind = TypeKind.Any;
+                                    structAst.Used = true;
+                                }
+                                else
+                                {
+                                    structAst.TypeKind = TypeKind.Struct;
+                                    Asts.Enqueue(structAst);
+                                }
                             }
                         }
                     }
