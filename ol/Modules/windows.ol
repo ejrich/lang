@@ -59,6 +59,7 @@ bool CloseWindow(Handle* hWnd) #extern "user32"
 bool GetWindowRect(Handle* hWnd, RECT* lpRect) #extern "user32"
 bool SetWindowPos(Handle* hWnd, Handle* hWndInsertAfter, int X, int Y, int cx, int cy, SWPFlags uFlags) #extern "user32"
 bool SetProcessDPIAware() #extern "user32"
+s32 DwmExtendFrameIntoClientArea(Handle* hWnd, MARGINS* pMarInset) #extern "dwmapi"
 
 bool GetMessage(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax) #extern "user32"
 bool PeekMessageA(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax, RemoveMsg wRemoveMsg) #extern "user32"
@@ -1395,10 +1396,10 @@ enum RemoveMsg {
 }
 
 struct RECT {
-    left: s64;
-    top: s64;
-    right: s64;
-    bottom: s64;
+    left: s32;
+    top: s32;
+    right: s32;
+    bottom: s32;
 }
 
 enum SWPFlags {
@@ -1417,6 +1418,28 @@ enum SWPFlags {
     SWP_NOSENDCHANGING = 0x400;
     SWP_DEFERASE       = 0x2000;
     SWP_ASYNCWINDOWPOS = 0x4000;
+}
+
+struct MARGINS {
+    cxLeftWidth: s32;
+    cxRightWidth: s32;
+    cyTopHeight: s32;
+    cyBottomHeight: s32;
+}
+
+struct NCCALCSIZE_PARAMS {
+    rgrc: CArray<RECT>[3];
+    lppos: WINDOWPOS;
+}
+
+struct WINDOWPOS {
+    hwnd: Handle*;
+    hwndInsertAfter: Handle*;
+    x: s32;
+    y: s32;
+    cx: s32;
+    cy: s32;
+    flags: SWPFlags;
 }
 
 enum NtStatus : u32 {
