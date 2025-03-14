@@ -250,7 +250,7 @@ public static unsafe class ProgramRunner
 
         if (!Directory.Exists(BuildSettings.OutputDirectory))
         {
-            ErrorReporter.Report($"Directory '{directoryPath}' not found, unable to set as output directory", fileIndex, line, column);
+            Directory.CreateDirectory(BuildSettings.OutputDirectory);
         }
     }
 
