@@ -3809,6 +3809,11 @@ public static class TypeChecker
                             {
                                 arrayLength = (uint)constValue.Value.UnsignedInteger;
                             }
+                            else
+                            {
+                                var constantValue = ProgramIRBuilder.EmitConstantIR(declaration.Value, null, scope);
+                                arrayLength = (uint)constantValue.ConstantValue.UnsignedInteger;
+                            }
                         }
                         return declaration.Type;
                     case VariableAst variable:

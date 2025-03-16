@@ -2169,7 +2169,7 @@ public static unsafe class LLVMBackend
                 }
                 return LLVMValueRef.CreateConstNamedStruct(_types[value.Type.TypeIndex], fieldValues);
             case InstructionValueType.ConstantArray:
-                Span<LLVMValueRef> values = stackalloc LLVMValueRef[(int)value.ArrayLength];
+                var values = new LLVMValueRef[(int)value.ArrayLength];
                 if (value.Values == null)
                 {
                     var defaultValue = GetDefaultValue(value.Type);

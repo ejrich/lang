@@ -2102,8 +2102,7 @@ public static unsafe class ProgramRunner
     {
         if (length <= 0) return;
 
-        Span<byte> bytes = stackalloc byte[length];
-        bytes.Fill(0);
+        var bytes = new byte[length];
         fixed (byte* bytePointer = &bytes[0])
         {
             Buffer.MemoryCopy(bytePointer, pointer.ToPointer(), length, length);
