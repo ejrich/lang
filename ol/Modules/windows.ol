@@ -51,7 +51,7 @@ Handle* LoadCursorA(Handle* hInstance, u64 lpCursorName) #extern "user32"
 Handle* CreateSolidBrush(u32 color) #extern "Gdi32"
 int GetSystemMetrics(int nIndex) #extern "user32"
 s64 DefWindowProcA(Handle* hWnd, MessageType uMsg, u64 wParam, s64 lParam) #extern "user32"
-Handle* CreateWindowExA(int dwExStyle, string lpClassName, string lpWindowName, WindowStyle dwStyle, u32 x, u32 y, u32 nWidth, u32 nWeight, Handle* hWndParent, Handle* hMenu, Handle* hInstance, void* lpParam) #extern "user32"
+Handle* CreateWindowExA(ExtendedWindowStyle dwExStyle, string lpClassName, string lpWindowName, WindowStyle dwStyle, u32 x, u32 y, u32 nWidth, u32 nWeight, Handle* hWndParent, Handle* hMenu, Handle* hInstance, void* lpParam) #extern "user32"
 s32 SetWindowLongA(Handle* hWnd, s32 nIndex, s64 dwNewLong) #extern "user32"
 bool ShowWindow(Handle* hWnd, WindowShow nCmdShow) #extern "user32"
 bool UpdateWindow(Handle* hWnd) #extern "user32"
@@ -288,6 +288,36 @@ enum WindowClassStyle {
 }
 
 CW_USEDEFAULT: u32 = 0x80000000; #const
+
+enum ExtendedWindowStyle : u32 {
+    WS_EX_LEFT                = 0x0;
+    WS_EX_LTRREADING          = 0x0;
+    WS_EX_RIGHTSCROLLBAR      = 0x0;
+    WS_EX_DLGMODALFRAME       = 0x1;
+    WS_EX_NOPARENTNOTIFY      = 0x4;
+    WS_EX_TOPMOST             = 0x8;
+    WS_EX_ACCEPTFILES         = 0x10;
+    WS_EX_TRANSPARENT         = 0x20;
+    WS_EX_MDICHILD            = 0x40;
+    WS_EX_TOOLWINDOW          = 0x80;
+    WS_EX_WINDOWEDGE          = 0x100;
+    WS_EX_CLIENTEDGE          = 0x200;
+    WS_EX_CONTEXTHELP         = 0x400;
+    WS_EX_RIGHT               = 0x1000;
+    WS_EX_RTLREADING          = 0x2000;
+    WS_EX_LEFTSCROLLBAR       = 0x4000;
+    WS_EX_CONTROLPARENT       = 0x10000;
+    WS_EX_STATICEDGE          = 0x20000;
+    WS_EX_APPWINDOW           = 0x40000;
+    WS_EX_LAYERED             = 0x80000;
+    WS_EX_NOINHERITLAYOUT     = 0x100000;
+    WS_EX_NOREDIRECTIONBITMAP = 0x200000;
+    WS_EX_LAYOUTRTL           = 0x400000;
+    WS_EX_COMPOSITED          = 0x2000000;
+    WS_EX_NOACTIVATE          = 0x8000000;
+    WS_EX_OVERLAPPEDWINDOW    = 0x300;
+    WS_EX_PALETTEWINDOW       = 0x188;
+}
 
 enum WindowStyle : u32 {
     WS_OVERLAPPED       = 0x0;

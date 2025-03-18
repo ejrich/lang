@@ -502,7 +502,7 @@ create_window() {
         window_class: WNDCLASSEXA = { cbSize = size_of(WNDCLASSEXA); style = WindowClassStyle.CS_VREDRAW | WindowClassStyle.CS_HREDRAW; lpfnWndProc = handle_window_inputs; hInstance = hinstance; lpszClassName = class_name.data; }
         RegisterClassExA(&window_class);
 
-        window.handle = CreateWindowExA(0, class_name, window_name, WindowStyle.WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, window.width, window.height, null, null, hinstance, null);
+        window.handle = CreateWindowExA(ExtendedWindowStyle.WS_EX_LEFT, class_name, window_name, WindowStyle.WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, window.width, window.height, null, null, hinstance, null);
         ShowWindow(window.handle, WindowShow.SW_NORMAL);
         UpdateWindow(window.handle);
     }
