@@ -5241,10 +5241,10 @@ struct VkSurfaceCapabilitiesKHR {
     minImageExtent: VkExtent2D;
     maxImageExtent: VkExtent2D;
     maxImageArrayLayers: u32;
-    supportedTransforms: u32;
+    supportedTransforms: VkSurfaceTransformFlagBitsKHR;
     currentTransform: VkSurfaceTransformFlagBitsKHR;
-    supportedCompositeAlpha: u32;
-    supportedUsageFlags: u32;
+    supportedCompositeAlpha: VkCompositeAlphaFlagBitsKHR;
+    supportedUsageFlags: VkImageUsageFlagBits;
 }
 
 struct VkSurfaceFormatKHR {
