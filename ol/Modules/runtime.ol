@@ -208,9 +208,84 @@ struct Any {
 
 // Runtime functions
 void __start(int argc, u8** argv) {
+    #if os == OS.Windows {
+        command_line := GetCommandLineA();
+        arg_string := convert_c_string(command_line);
+        argc = 0;
+        index := 0;
+        while index < arg_string.length {
+            // If arg starts with ", move to the next non-escaped quote
+            if arg_string[index] == '"' {
+                index++;
+                while index < arg_string.length {
+                    if arg_string[index++] == '"' && arg_string[index - 2] != '\\' {
+                        break;
+                    }
+                }
+            }
+            // Otherwise move to the next space
+            else {
+                while index < arg_string.length {
+                    if arg_string[index++] == ' ' {
+                        break;
+                    }
+                }
+            }
+
+            argc++;
+
+            // Move to the next character
+            while index < arg_string.length {
+                if arg_string[index++] != ' ' {
+                    break;
+                }
+            }
+        }
+    }
+
     args: Array<string>[argc-1];
-    each i in 1..argc-1 {
-        args[i-1] = convert_c_string(argv[i]);
+
+    #if os == OS.Windows {
+        index = 0;
+        arg_index := 0;
+        while index < arg_string.length {
+            arg_start_index := index;
+            // If arg starts with ", move to the next non-escaped quote
+            if arg_string[index] == '"' {
+                index++;
+                while index < arg_string.length {
+                    if arg_string[index++] == '"' && arg_string[index - 2] != '\\' {
+                        break;
+                    }
+                }
+            }
+            // Otherwise move to the next space
+            else {
+                while index < arg_string.length {
+                    if arg_string[index++] == ' ' {
+                        break;
+                    }
+                }
+            }
+
+            if arg_index > 0 {
+                args[arg_index - 1] = { length = index - arg_start_index; data = arg_string.data + arg_start_index; }
+            }
+            arg_index++;
+
+            // Move to the next character
+            while index < arg_string.length {
+                if arg_string[index] != ' ' {
+                    break;
+                }
+                index++;
+            }
+        }
+    }
+    else {
+        each i in 1..argc-1 {
+            args[i-1] = convert_c_string(argv[i]);
+        }
     }
 
     __command_line_arguments = args;

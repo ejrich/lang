@@ -15,6 +15,7 @@ YieldProcessor() #extern "kernel32"
 bool QueryPerformanceCounter(u64* lpPerformanceCount) #extern "kernel32"
 bool QueryPerformanceFrequency(u64* lpFrequency) #extern "kernel32"
 
+u8* GetCommandLineA() #extern "kernel32"
 Handle* GetStdHandle(int nStdHandle) #extern "kernel32"
 bool WriteConsoleA(Handle* hConsoleOutput, void* lpBuffer, int nNumberOfCharsToWrite, int* lpNumberOfCharsWritten, void* lpReserved) #extern "kernel32"
 OutputDebugStringA(string lpOutputString) #extern "kernel32"
@@ -70,6 +71,10 @@ s16 GetKeyState(int nVirtKey) #extern "user32"
 bool GetKeyboardState(u8* lpKeyState) #extern "user32"
 int ToAscii(u32 uVirtKey, u32 uScanCode, u8* lpKeyState, u8* lpChar, u32 uFlags) #extern "user32"
 bool GetCursorPos(POINT* lpPoint) #extern "user32"
+
+Handle* BeginPaint(Handle* hWnd, PAINTSTRUCT* lpPaint) #extern "user32"
+bool EndPaint(Handle* hWnd, PAINTSTRUCT* lpPaint) #extern "user32"
+bool InvalidateRect(Handle* hWnd, RECT* lpRect, bool bErase) #extern "user32"
 
 NtStatus BCryptOpenAlgorithmProvider(Handle** phAlgorithm, u16* pszAlgId, u16* pszImplementation, u64 dwFlags) #extern "bcrypt"
 NtStatus BCryptCloseAlgorithmProvider(Handle* phAlgorithm, u64 dwFlags) #extern "bcrypt"
@@ -378,6 +383,15 @@ struct MSG {
 struct POINT {
     x: s32;
     y: s32;
+}
+
+struct PAINTSTRUCT {
+    hdc: Handle*;
+    fErase: s32;
+    rcPaint: RECT;
+    fRestore: s32;
+    fIncUpdate: s32;
+    rgbReserved: CArray<u8>[32];
 }
 
 enum MessageType {
