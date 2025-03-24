@@ -136,7 +136,7 @@ struct UnionTypeInfo : TypeInfo {
 }
 
 struct CompoundTypeInfo : TypeInfo {
-    types: Array<TypeInfo>;
+    types: Array<TypeInfo*>;
 }
 
 struct InterfaceTypeInfo : TypeInfo {
