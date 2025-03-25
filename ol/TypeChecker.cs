@@ -5861,6 +5861,8 @@ public static class TypeChecker
                     }
                     return typeValue;
                 }
+
+                ErrorReporter.Report($"No type found with name '{type.Name}'", type);
                 return null;
         }
     }
