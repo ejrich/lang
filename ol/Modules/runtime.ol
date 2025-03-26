@@ -236,9 +236,10 @@ void __start(int argc, u8** argv) {
 
             // Move to the next character
             while index < arg_string.length {
-                if arg_string[index++] != ' ' {
+                if arg_string[index] != ' ' {
                     break;
                 }
+                index++;
             }
         }
     }
