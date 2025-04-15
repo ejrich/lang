@@ -2295,6 +2295,7 @@ public static class TypeChecker
         }
 
         // 2. Verify the null values
+        var declarationIsConstant = false;
         if (declaration.Value is NullAst nullAst)
         {
             // 2a. Verify null can be assigned
@@ -2315,7 +2316,7 @@ public static class TypeChecker
         // 3. Verify declaration values
         else if (declaration.Value != null)
         {
-            var valueType = VerifyExpression(declaration.Value, currentFunction, scope);
+            var valueType = VerifyExpression(declaration.Value, currentFunction, scope, out declarationIsConstant);
 
             // Verify the assignment value matches the type definition if it has been defined
             if (declaration.Type == null)
@@ -2412,14 +2413,9 @@ public static class TypeChecker
         if (declaration.Constant)
         {
             declaration.ConstantIndex = currentFunction.ConstantCount++;
-            switch (declaration.Value)
+            if (!declarationIsConstant)
             {
-                case ConstantAst:
-                case StructFieldRefAst { IsEnum: true }:
-                    break;
-                default:
-                    ErrorReporter.Report($"Constant variable '{declaration.Name}' should be assigned a constant value", declaration);
-                    break;
+                ErrorReporter.Report($"Constant variable '{declaration.Name}' should be assigned a constant value", declaration);
             }
         }
 
