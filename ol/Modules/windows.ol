@@ -95,6 +95,17 @@ s32 CoCreateInstance(GUID* rclsid, void** pUnkOuter, u32 dwClsContext, void* rii
 CoTaskMemFree(void* pv) #extern "ole32"
 Handle* CreateEventA(SECURITY_ATTRIBUTES* lpSecurityAttributes, bool bManualReset, bool bInitialState, string lpName) #extern "kernel32"
 
+bool AddClipboardFormatListener(Handle* hwnd) #extern "user32"
+bool OpenClipboard(Handle* hWndNewOwner) #extern "user32"
+bool CloseClipboard() #extern "user32"
+Handle* GetClipboardData(ClipboardFormat uFormat) #extern "user32"
+Handle* SetClipboardData(ClipboardFormat uFormat, Handle* hMem) #extern "user32"
+bool EmptyClipboard() #extern "user32"
+
+Handle* GlobalAlloc(u32 uFlags, u32 dwBytes) #extern "kernel32"
+void* GlobalLock(Handle* hMem) #extern "kernel32"
+bool GlobalUnlock(Handle* hMem) #extern "kernel32"
+
 STD_INPUT_HANDLE  := -10; #const
 STD_OUTPUT_HANDLE := -11; #const
 STD_ERROR_HANDLE  := -12; #const
@@ -710,6 +721,7 @@ enum MessageType {
     WM_PRINT = 791;
     WM_PRINTCLIENT = 792;
     WM_APPCOMMAND = 793;
+    WM_CLIPBOARDUPDATE = 797;
     WM_HANDHELDFIRST = 856;
     WM_HANDHELDLAST = 863;
     WM_AFXFIRST = 864;
@@ -1531,6 +1543,23 @@ struct SYSTEMTIME {
 }
 
 INFINITE := -1; #const
+
+enum ClipboardFormat : u32 {
+    CF_TEXT         = 1;
+    CF_BITMAP       = 2;
+    CF_METAFILEPICT = 3;
+    CF_SYLK         = 4;
+    CF_DIF          = 5;
+    CF_TIFF         = 6;
+    CF_OEMTEXT      = 7;
+    CF_DIB          = 8;
+    CF_PALETTE      = 9;
+    CF_PENDATA      = 10;
+    CF_RIFF         = 11;
+    CF_WAVE         = 12;
+    CF_UNICODETEXT  = 13;
+    CF_ENHMETAFILE  = 14;
+}
 
 
 // Virtual key codes
