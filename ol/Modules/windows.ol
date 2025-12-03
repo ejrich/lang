@@ -36,6 +36,7 @@ bool GetFileTime(Handle* hFile, FILETIME* lpCreationTime,  FILETIME* lpLastAcces
 bool CreatePipe(Handle** hReadPipe, Handle** hWritePipe, SECURITY_ATTRIBUTES* lpPipeAttributes, int nSize) #extern "kernel32"
 bool SetHandleInformation(Handle* hObject, HandleFlags dwMask, HandleFlags dwFlags) #extern "kernel32"
 bool CreateProcessA(string lpApplicationName, string lpCommandLine, SECURITY_ATTRIBUTES* lpProcessAttributes, SECURITY_ATTRIBUTES* lpThreadAttributes, bool bInheritHandles, int dwCreationFlags, void* lpEnvironment, string lpCurrentDirectory, STARTUPINFOA* lpStartupInfo, PROCESS_INFORMATION* lpProcessInformation) #extern "kernel32"
+bool TerminateProcess(Handle* hProcess, int dwExitCode) #extern "kernel32"
 bool GetExitCodeProcess(Handle* hProcess, int* lpExitCode) #extern "kernel32"
 
 Handle* FindFirstFileA(string lpFileName, WIN32_FIND_DATAA* lpFindFileData) #extern "kernel32"
@@ -82,6 +83,7 @@ NtStatus BCryptGenRandom(Handle* hProv, void* pbBuffer, u64 cbBuffer, u64 dwFlag
 
 GetSystemInfo(SYSTEM_INFO* lpSystemInfo) #extern "kernel32"
 Handle* CreateThread(SECURITY_ATTRIBUTES* lpThreadAttributes, u64 dwStackSize, ThreadProcedure lpStartAddress, void* lpParameter, int dwCreationFlags, int* lpThreadId) #extern "kernel32"
+bool TerminateThread(Handle* hThread, int dwExitCode) #extern "kernel32"
 Handle* CreateSemaphoreA(SECURITY_ATTRIBUTES* lpSemaphoreAttributes, u64 lInitialCount, u64 lMaximumCount, string lpName) #extern "kernel32"
 bool ReleaseSemaphore(Handle* hSemaphore, u64 lReleaseCount, u64* lpPreviousCount) #extern "kernel32"
 int WaitForSingleObject(Handle* hHandle, int dwMilliseconds) #extern "kernel32"
