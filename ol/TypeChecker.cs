@@ -2093,7 +2093,12 @@ public static class TypeChecker
             }
         }
 
-        // 8. Check if the variable was set from input variables
+        // Structs with 0 size cannot be declared as global variables
+        if (declaration.Type?.TypeKind == TypeKind.Struct && declaration.Type.Size == 0) {
+            ErrorReporter.Report($"Cannot declare global variable '{declaration.Name}' with an empty struct type '{declaration.Type.Name}'", declaration);
+        }
+
+        // Check if the variable was set from input variables
         if (BuildSettings.InputVariables.TryGetValue(declaration.Name, out var inputVariable))
         {
             if (!declaration.Constant)
@@ -2119,7 +2124,7 @@ public static class TypeChecker
             }
         }
 
-        // 9. Verify constant values
+        // Verify constant values
         if (declaration.Constant)
         {
             if (declaration.Value == null)
