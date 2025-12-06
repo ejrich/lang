@@ -577,22 +577,18 @@ format_string_arguments(StringBuffer* buffer, string format, Array<Any> args) {
     }
 }
 
+con: Handle*;
+
 write_buffer_to_standard_out(u8* buffer, s64 length) {
     #if os == OS.Linux {
         write(stdout, buffer, length);
     }
     #if os == OS.Windows {
         std_out := GetStdHandle(STD_OUTPUT_HANDLE);
-        if std_out == null {
-            AttachConsole(-1);
-            std_out = GetStdHandle(STD_OUTPUT_HANDLE);
-
-            // Fail out here since the handle wasn't able to be created
-            if std_out == null return;
+        if std_out {
+            written: int;
+            WriteFile(std_out, buffer, length, &written, null);
         }
-
-        written: int;
-        WriteConsoleA(std_out, buffer, length, &written, null);
     }
 }
 
