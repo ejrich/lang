@@ -4992,7 +4992,7 @@ public static class TypeChecker
         }
         if (argumentAst is NullAst)
         {
-            if (argumentType.TypeKind != TypeKind.Pointer)
+            if (argumentType.TypeKind != TypeKind.Pointer && argumentType.TypeKind != TypeKind.Interface)
             {
                 return false;
             }
