@@ -45,7 +45,7 @@ bool FindNextFileA(Handle* hFindHandle, WIN32_FIND_DATAA* lpFindFileData) #exter
 bool FindClose(Handle* hFindFile) #extern "kernel32"
 
 int GetModuleFileNameA(Handle* hModule, u8* lpFileName, int nSize) #extern "kernel32"
-bool GetCurrentDirectoryA(int nBufferLength, u8* lpBuffer) #extern "kernel32"
+int GetCurrentDirectoryA(int nBufferLength, u8* lpBuffer) #extern "kernel32"
 bool SetCurrentDirectoryA(string lpPathName) #extern "kernel32"
 
 Handle* GetModuleHandleA(string lpModuleName) #extern "kernel32"
