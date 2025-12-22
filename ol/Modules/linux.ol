@@ -37,7 +37,7 @@ int vfork() #syscall 58
 int execve(u8* pathname, u8** argv, u8** envp) #syscall 59
 exit(int status) #syscall 60
 int wait4(int pid, int* status, int options, void* rusage) #syscall 61
-int getcwd(u8* buf, u64 size) #syscall 79
+u8* getcwd(u8* buf, u64 size) #syscall 79
 int chdir(u8* path) #syscall 80
 int fchdir(int fd) #syscall 81
 int rename(u8* oldname, u8* newname) #syscall 82

@@ -577,8 +577,6 @@ format_string_arguments(StringBuffer* buffer, string format, Array<Any> args) {
     }
 }
 
-con: Handle*;
-
 write_buffer_to_standard_out(u8* buffer, s64 length) {
     #if os == OS.Linux {
         write(stdout, buffer, length);
