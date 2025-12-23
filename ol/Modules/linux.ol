@@ -32,11 +32,14 @@ sched_yield() #syscall 24
 void* mremap(void* old_address, u64 old_size, u64 new_size, MremapFlags flags) #syscall 25
 int pause() #syscall 34
 int nanosleep(Timespec* req, Timespec* rem) #syscall 35
+int getpid() #syscall 39
+int clone(CloneFlags clone_flags, void* newsp, int* parent_tidptr, int* child_tidptr, u64 tls) #syscall 56
 int fork() #syscall 57
 int vfork() #syscall 58
 int execve(u8* pathname, u8** argv, u8** envp) #syscall 59
 exit(int status) #syscall 60
 int wait4(int pid, int* status, int options, void* rusage) #syscall 61
+int kill(int pid, int sig) #syscall 62
 u8* getcwd(u8* buf, u64 size) #syscall 79
 int chdir(u8* path) #syscall 80
 int fchdir(int fd) #syscall 81
@@ -47,8 +50,10 @@ int readlink(u8* path, u8* buf, int bufsize) #syscall 89
 int getdents64(int fd, Dirent* dirp, u32 count) #syscall 217
 int clock_gettime(ClockId clk_id, Timespec* tp) #syscall 228
 exit_group(int status) #syscall 231
+int pipe2(int* pipefd, int flags) #syscall 293
 int getcpu(u32* cpu, u32* node) #syscall 309
 s64 getrandom(void* buf, u64 buflen, RandomFlags flags) #syscall 318
+int clone3(clone_args* cl_args, u64 size) #syscall 435
 // @Future Add additional syscalls when necessary
 
 stdin  := 0; #const
@@ -262,5 +267,46 @@ struct tm {
 
 u64 time(u64* second) #extern "c"
 tm* localtime(u64* timer) #extern "c"
+
+enum CloneFlags : u64 {
+    CLONE_VM             = 0x00000100;
+    CLONE_FS             = 0x00000200;
+    CLONE_FILES          = 0x00000400;
+    CLONE_SIGHAND        = 0x00000800;
+    CLONE_PIDFD          = 0x00001000;
+    CLONE_PTRACE         = 0x00002000;
+    CLONE_VFORK          = 0x00004000;
+    CLONE_PARENT         = 0x00008000;
+    CLONE_THREAD         = 0x00010000;
+    CLONE_NEWNS          = 0x00020000;
+    CLONE_SYSVSEM        = 0x00040000;
+    CLONE_SETTLS         = 0x00080000;
+    CLONE_PARENT_SETTID  = 0x00100000;
+    CLONE_CHILD_CLEARTID = 0x00200000;
+    CLONE_DETACHED       = 0x00400000;
+    CLONE_UNTRACED       = 0x00800000;
+    CLONE_CHILD_SETTID   = 0x01000000;
+    CLONE_NEWCGROUP      = 0x02000000;
+    CLONE_NEWUTS         = 0x04000000;
+    CLONE_NEWIPC         = 0x08000000;
+    CLONE_NEWUSER        = 0x10000000;
+    CLONE_NEWPID         = 0x20000000;
+    CLONE_NEWNET         = 0x40000000;
+    CLONE_IO             = 0x08000000;
+}
+
+struct clone_args {
+  flags: CloneFlags;
+  pidfd: int*;
+  child_tid: int*;
+  parent_tid: int*;
+  exit_signal: u64;
+  stack: void*;
+  stack_size: u64;
+  tls: u64;
+  set_tid: int*;
+  set_tid_size: u64;
+  cgroup: int*;
+}
 
 home_environment_variable := "HOME"; #const
