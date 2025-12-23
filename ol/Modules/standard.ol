@@ -1374,7 +1374,7 @@ string get_environment_variable(string name, Allocate allocator = default_alloca
         }
 
         if !string_is_empty(variable) {
-            result = { length = variable_string.length; data = allocator(variable_string.length); }
+            result = { length = variable.length; data = allocator(variable.length); }
             memory_copy(result.data, variable.data, result.length);
         }
     }

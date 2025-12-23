@@ -326,10 +326,8 @@ Array<ExitCallback>* get_exit_callbacks() {
 }
 
 
-// Environment variables for Linux
-#if os == OS.Linux {
-    __environment_variables_pointer: u8**;
-}
+// Environment variables pointer for Linux only
+__environment_variables_pointer: u8**;
 
 #private
 
