@@ -1347,11 +1347,35 @@ int get_processors() {
 string get_environment_variable(string name, Allocate allocator = default_allocator) {
     result: string;
     #if os == OS.Linux {
-        variable := getenv(name);
-        if variable {
-            variable_string := convert_c_string(variable);
+        variable: string;
+
+        variable_index := 0;
+        while true {
+            variable_pointer := *(__environment_variables_pointer + variable_index++);
+            if variable_pointer == null break;
+
+            variable_string := convert_c_string(htns);
+            variable_name: string = { data = variable_string.data; }
+            variable_value: string;
+            each i in variable_string.length {
+                if variable_string[i] == '=' {
+                    variable_name.length = i;
+                    variable_value = {
+                        length = variable_string.length - i - 1;
+                        data = variable_string.data + i + 1;
+                    }
+                }
+            }
+
+            if variable_name == name {
+                variable = variable_value;
+                break;
+            }
+        }
+
+        if !string_is_empty(variable) {
             result = { length = variable_string.length; data = allocator(variable_string.length); }
-            memory_copy(result.data, variable_string.data, result.length);
+            memory_copy(result.data, variable.data, result.length);
         }
     }
     #if os == OS.Windows {

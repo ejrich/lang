@@ -287,6 +287,8 @@ void __start(int argc, u8** argv) {
         each i in 1..argc-1 {
             args[i-1] = convert_c_string(argv[i]);
         }
+
+        __enviroment_variables_pointer = argv + (argc + 1);
     }
 
     __command_line_arguments = args;
@@ -321,6 +323,12 @@ interface ExitCallback()
 
 Array<ExitCallback>* get_exit_callbacks() {
     return &__exit_callbacks;
+}
+
+
+// Environment variables for Linux
+#if os == OS.Linux {
+    __environment_variables_pointer: u8**;
 }
 
 #private

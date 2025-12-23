@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -34,6 +35,9 @@ public static unsafe class ProgramRunner
     private static readonly Dictionary<string, IntPtr> LibraryPointers = new();
     private static readonly Dictionary<string, Dictionary<string, IntPtr>> LibraryFunctionPointers = new();
     private static readonly List<IntPtr> Globals = new();
+    #if _LINUX
+    private static readonly byte*[] EnvironmentVariablePointers;
+    #endif
 
     private static int _typeCount;
     private static int _typeTableIndex;
@@ -42,11 +46,24 @@ public static unsafe class ProgramRunner
     private static int _assemblyDataLength;
     private static IntPtr _assemblyDataPointer;
 
+
     static ProgramRunner()
     {
         var assemblyName = new AssemblyName("Runner");
         var assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(assemblyName, AssemblyBuilderAccess.RunAndCollect);
         ModuleBuilder = assemblyBuilder.DefineDynamicModule("Runner");
+
+        #if _LINUX
+        var environmentVariables = Environment.GetEnvironmentVariables();
+        EnvironmentVariablePointers = new byte*[environmentVariables.Count + 1];
+        var i = 0;
+        foreach (DictionaryEntry variable in environmentVariables)
+        {
+            var value = $"{variable.Key}={variable.Value}";
+            EnvironmentVariablePointers[i++] = (byte*)Allocator.AllocateString(value).ToPointer();
+        }
+        EnvironmentVariablePointers[^1] = null;
+        #endif
     }
 
     private static void UpdateTypeTable()
@@ -83,6 +100,15 @@ public static unsafe class ProgramRunner
             _typeTablePointer = pointer;
             _typeTableIndex = index;
         }
+        #if _LINUX
+        else if (variable.Name == "__environment_variables_pointer")
+        {
+            fixed (byte** p = EnvironmentVariablePointers)
+            {
+                Buffer.MemoryCopy(&p, pointer.ToPointer(), 8, 8);
+            }
+        }
+        #endif
         else if (variable.InitialValue != null)
         {
             InitializeGlobalVariable(pointer, variable.InitialValue);
