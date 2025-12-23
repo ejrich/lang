@@ -1354,7 +1354,7 @@ string get_environment_variable(string name, Allocate allocator = default_alloca
             variable_pointer := *(__environment_variables_pointer + variable_index++);
             if variable_pointer == null break;
 
-            variable_string := convert_c_string(htns);
+            variable_string := convert_c_string(variable_pointer);
             variable_name: string = { data = variable_string.data; }
             variable_value: string;
             each i in variable_string.length {
