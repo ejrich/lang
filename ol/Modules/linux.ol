@@ -296,17 +296,17 @@ enum CloneFlags : u64 {
 }
 
 struct clone_args {
-  flags: CloneFlags;
-  pidfd: int*;
-  child_tid: int*;
-  parent_tid: int*;
-  exit_signal: u64;
-  stack: void*;
-  stack_size: u64;
-  tls: u64;
-  set_tid: int*;
-  set_tid_size: u64;
-  cgroup: int*;
+    flags: CloneFlags;
+    pidfd: int*;
+    child_tid: int*;
+    parent_tid: int*;
+    exit_signal: u64;
+    stack: void*;
+    stack_size: u64;
+    tls: u64;
+    set_tid: int*;
+    set_tid_size: u64;
+    cgroup: int*;
 }
 
 home_environment_variable := "HOME"; #const

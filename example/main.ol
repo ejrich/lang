@@ -3,7 +3,39 @@
 #import "import.ol"
 #import "import2.ol"
 
-main() { //#print_ir {
+main() { // #print_ir {
+    /*
+    snth := 9;
+    stack := allocate_memory(5000);
+
+    args: clone_args = {
+        flags = CloneFlags.CLONE_VM;
+        exit_signal = 17;
+        stack = stack;
+        stack_size = 5000;
+    }
+    pid := clone3(&args, size_of(args));
+    if pid < 0 {
+        print("Error creating new process\n");
+        return;
+    }
+
+    if pid == 0 {
+        snthsnthsnth := 987;
+        print("In child process with pid %\n", getpid());
+        sleep(2000);
+        print("In child process %, %\n", snth, snthsnthsnth);
+        exit(88);
+    }
+
+    print("In parent process with child pid %\n", pid);
+    status: int;
+    ffff := wait4(pid, &status, 0, null);
+    print("Child process exited with code %, %\n", (status & 0xFF00) >> 8, ffff);
+
+    return;
+    */
+
     // Return positive exit code
     /*
         Multi line comment
