@@ -5,7 +5,6 @@
 
 main() { // #print_ir {
     /*
-    snth := 9;
     stack := allocate_memory(5000);
 
     args: clone_args = {
@@ -14,7 +13,28 @@ main() { // #print_ir {
         stack = stack;
         stack_size = 5000;
     }
-    pid := clone3(&args, size_of(args));
+    test := 8;
+    // test_value, test_value_2: int;
+    pid: int;
+    asm {
+        in rdi, &args;
+        in rsi, size_of(args);
+        in rax, 435;
+        in r8, 8;
+        in r9, 9999;
+        syscall;
+        out pid, eax;
+        // out test_value, r8;
+        // out test_value_2, r9;
+    }
+
+    test_value, test_value_2: int;
+
+    // asm {
+    //     out test_value, r8;
+    //     out test_value_2, r9;
+    // }
+    // pid := clone3(&args, size_of(args));
     if pid < 0 {
         print("Error creating new process\n");
         return;
@@ -23,8 +43,8 @@ main() { // #print_ir {
     if pid == 0 {
         snthsnthsnth := 987;
         print("In child process with pid %\n", getpid());
-        sleep(2000);
-        print("In child process %, %\n", snth, snthsnthsnth);
+        sleep(5000);
+        print("In child process %, %, %\n", test_value, test_value_2, snthsnthsnth);
         exit(88);
     }
 

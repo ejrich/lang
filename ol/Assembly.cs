@@ -149,7 +149,10 @@ public static class Assembly
         {"popcnt", new InstructionDefinition[]{
             new() {Prefix = 0xF3, OF = true, Opcode = 0xB8, Value1 = new(size: 4), Value2 = new(size: 4)},
             new() {Prefix = 0xF3, Rex = 0x48, OF = true, Opcode = 0xB8, Value1 = new(), Value2 = new()}
-        }}
+        }},
+        {"syscall", new InstructionDefinition[]{
+            new() {OF = true, Opcode = 0x05}
+        }},
         // TODO Add more
     };
 }
