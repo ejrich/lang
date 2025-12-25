@@ -234,8 +234,6 @@ enum RandomFlags {
     GRND_INSECURE = 4;
 }
 
-string realpath(string file_name, string resolved_name) #extern "c"
-
 struct sem_t {
     a: u64;
     b: u64;
@@ -260,7 +258,6 @@ struct tm {
     tm_isdst: int;
 }
 
-u64 time(u64* second) #extern "c"
 tm* localtime(u64* timer) #extern "c"
 
 [flags]
