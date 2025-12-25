@@ -22,16 +22,16 @@ u64 create_thread(ThreadProcedure proc, void* arg, Allocate stack_allocator) {
         asm {
             in rdi, &args;
             in rsi, size_of(args);
-            in rax, 435;
+            in rax, 435; // clone3
             in r8, &handler_args;
             syscall;
 
-            // Set arguments for clone_handler
+            // Set arguments for __clone_handler
             mov rdi, rax;
             mov rsi, r8;
         }
 
-        clone_handler();
+        __clone_handler();
         thread_id = tid;
     }
     #if os == OS.Windows {
@@ -81,46 +81,5 @@ semaphore_release(Semaphore* semaphore) {
     }
     #if os == OS.Windows {
         ReleaseSemaphore(semaphore.handle, 1, null);
-    }
-}
-
-#private
-
-#if os == OS.Linux {
-    struct CloneArguments {
-        command: string;
-        procedure: ThreadProcedure;
-        arg: void*;
-    }
-
-    int clone_handler() {
-        pid: int;
-        arguments_pointer: CloneArguments*;
-
-        asm {
-            out pid, edi;
-            out arguments_pointer, rsi;
-        }
-
-        arguments := *arguments_pointer;
-
-        // Return the pid to the child process
-        if pid != 0 return pid;
-
-        if arguments.procedure != null {
-            arguments.procedure(arguments.arg);
-        }
-        else if !string_is_empty(arguments.command) {
-            exec_args: Array<u8*>[5];
-            exec_args[0] = "sh".data;
-            exec_args[1] = "-c".data;
-            exec_args[2] = "--".data;
-            exec_args[3] = arguments.command.data;
-            exec_args[4] = null;
-            execve("/bin/sh".data, exec_args.data, __environment_variables_pointer);
-        }
-
-        exit(0);
-        return 0;
     }
 }

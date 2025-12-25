@@ -247,8 +247,6 @@ int sem_init(sem_t* sem, int pshared, int value) #extern "c"
 int sem_wait(sem_t* sem) #extern "c"
 int sem_post(sem_t* sem) #extern "c"
 
-int system(string command) #extern "c"
-
 struct tm {
     tm_sec: int;
     tm_min: int;
@@ -266,30 +264,31 @@ tm* localtime(u64* timer) #extern "c"
 
 [flags]
 enum CloneFlags : u64 {
-    CLONE_VM             = 0x00000100;
-    CLONE_FS             = 0x00000200;
-    CLONE_FILES          = 0x00000400;
-    CLONE_SIGHAND        = 0x00000800;
-    CLONE_PIDFD          = 0x00001000;
-    CLONE_PTRACE         = 0x00002000;
-    CLONE_VFORK          = 0x00004000;
-    CLONE_PARENT         = 0x00008000;
-    CLONE_THREAD         = 0x00010000;
-    CLONE_NEWNS          = 0x00020000;
-    CLONE_SYSVSEM        = 0x00040000;
-    CLONE_SETTLS         = 0x00080000;
-    CLONE_PARENT_SETTID  = 0x00100000;
-    CLONE_CHILD_CLEARTID = 0x00200000;
-    CLONE_DETACHED       = 0x00400000;
-    CLONE_UNTRACED       = 0x00800000;
-    CLONE_CHILD_SETTID   = 0x01000000;
-    CLONE_NEWCGROUP      = 0x02000000;
-    CLONE_NEWUTS         = 0x04000000;
-    CLONE_NEWIPC         = 0x08000000;
-    CLONE_NEWUSER        = 0x10000000;
-    CLONE_NEWPID         = 0x20000000;
-    CLONE_NEWNET         = 0x40000000;
-    CLONE_IO             = 0x08000000;
+    CLONE_VM             = 0x000000100;
+    CLONE_FS             = 0x000000200;
+    CLONE_FILES          = 0x000000400;
+    CLONE_SIGHAND        = 0x000000800;
+    CLONE_PIDFD          = 0x000001000;
+    CLONE_PTRACE         = 0x000002000;
+    CLONE_VFORK          = 0x000004000;
+    CLONE_PARENT         = 0x000008000;
+    CLONE_THREAD         = 0x000010000;
+    CLONE_NEWNS          = 0x000020000;
+    CLONE_SYSVSEM        = 0x000040000;
+    CLONE_SETTLS         = 0x000080000;
+    CLONE_PARENT_SETTID  = 0x000100000;
+    CLONE_CHILD_CLEARTID = 0x000200000;
+    CLONE_DETACHED       = 0x000400000;
+    CLONE_UNTRACED       = 0x000800000;
+    CLONE_CHILD_SETTID   = 0x001000000;
+    CLONE_NEWCGROUP      = 0x002000000;
+    CLONE_NEWUTS         = 0x004000000;
+    CLONE_NEWIPC         = 0x008000000;
+    CLONE_NEWUSER        = 0x010000000;
+    CLONE_NEWPID         = 0x020000000;
+    CLONE_NEWNET         = 0x040000000;
+    CLONE_IO             = 0x008000000;
+    CLONE_CLEAR_SIGHAND  = 0x100000000;
 }
 
 struct clone_args {
@@ -307,3 +306,40 @@ struct clone_args {
 }
 
 home_environment_variable := "HOME"; #const
+
+struct CloneArguments {
+    command: string;
+    procedure: ThreadProcedure;
+    arg: void*;
+}
+
+int __clone_handler() {
+    pid: int;
+    arguments_pointer: CloneArguments*;
+
+    asm {
+        out pid, edi;
+        out arguments_pointer, rsi;
+    }
+
+    arguments := *arguments_pointer;
+
+    // Return the pid to the child process
+    if pid != 0 return pid;
+
+    if arguments.procedure != null {
+        arguments.procedure(arguments.arg);
+    }
+    else if !string_is_empty(arguments.command) {
+        exec_args: Array<u8*>[5];
+        exec_args[0] = "sh".data;
+        exec_args[1] = "-c".data;
+        exec_args[2] = "--".data;
+        exec_args[3] = arguments.command.data;
+        exec_args[4] = null;
+        execve("/bin/sh".data, exec_args.data, __environment_variables_pointer);
+    }
+
+    exit(0);
+    return 0;
+}
