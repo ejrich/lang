@@ -235,10 +235,6 @@ enum RandomFlags {
 int get_nprocs() #extern "c"
 string realpath(string file_name, string resolved_name) #extern "c"
 
-
-int pthread_create(u64* thread, pthread_attr_t* attr, ThreadProcedure start_routine, void* arg) #extern "c"
-struct pthread_attr_t {}
-
 struct sem_t {
     a: u64;
     b: u64;
@@ -268,6 +264,7 @@ struct tm {
 u64 time(u64* second) #extern "c"
 tm* localtime(u64* timer) #extern "c"
 
+[flags]
 enum CloneFlags : u64 {
     CLONE_VM             = 0x00000100;
     CLONE_FS             = 0x00000200;

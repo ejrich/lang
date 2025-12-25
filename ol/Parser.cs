@@ -2978,7 +2978,6 @@ public static class Parser
                         {
                             parsingInRegisters = false;
                             parsingOutRegisters = true;
-                            ErrorReporter.Report("Expected instructions before out registers", enumerator.FileIndex, token);
                         }
                         else if (!parsingOutRegisters)
                         {

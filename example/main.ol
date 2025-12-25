@@ -4,58 +4,6 @@
 #import "import2.ol"
 
 main() { // #print_ir {
-    /*
-    stack := allocate_memory(5000);
-
-    args: clone_args = {
-        flags = CloneFlags.CLONE_VM;
-        exit_signal = 17;
-        stack = stack;
-        stack_size = 5000;
-    }
-    test := 8;
-    // test_value, test_value_2: int;
-    pid: int;
-    asm {
-        in rdi, &args;
-        in rsi, size_of(args);
-        in rax, 435;
-        in r8, 8;
-        in r9, 9999;
-        syscall;
-        out pid, eax;
-        // out test_value, r8;
-        // out test_value_2, r9;
-    }
-
-    test_value, test_value_2: int;
-
-    // asm {
-    //     out test_value, r8;
-    //     out test_value_2, r9;
-    // }
-    // pid := clone3(&args, size_of(args));
-    if pid < 0 {
-        print("Error creating new process\n");
-        return;
-    }
-
-    if pid == 0 {
-        snthsnthsnth := 987;
-        print("In child process with pid %\n", getpid());
-        sleep(5000);
-        print("In child process %, %, %\n", test_value, test_value_2, snthsnthsnth);
-        exit(88);
-    }
-
-    print("In parent process with child pid %\n", pid);
-    status: int;
-    ffff := wait4(pid, &status, 0, null);
-    print("Child process exited with code %, %\n", (status & 0xFF00) >> 8, ffff);
-
-    return;
-    */
-
     // Return positive exit code
     /*
         Multi line comment
@@ -385,7 +333,7 @@ int SDL_Init(u32 flags) #extern "SDL2"
 SDL_CreateWindow(string title, int x, int y, int w, int h, u32 flags) #extern "SDL2"
 
 #run {
-    main();
+    // main();
 
     build();
 }

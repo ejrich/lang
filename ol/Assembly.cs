@@ -117,7 +117,8 @@ public static class Assembly
         {"lock",   new InstructionDefinition[]{ new() {Opcode = 0xF0} }},
         {"mov",    new InstructionDefinition[]{
             new() {Rex = 0x48, Opcode = 0xB8, AddRegisterToOpcode = true, RMFirst = true, Value1 = new(), Value2 = new(constant: true)},
-            new() {Rex = 0x48, Opcode = 0x89, RMFirst = true, Value1 = new(true), Value2 = new()}
+            new() {Rex = 0x48, Opcode = 0x89, RMFirst = true, Value1 = new(true), Value2 = new()},
+            new() {Rex = 0x48, Opcode = 0x89, RMFirst = true, Value1 = new(), Value2 = new()}
         }},
         {"movsd",  new InstructionDefinition[]{
             new() {Prefix = 0xF2, OF = true, Opcode = 0x11, RMFirst = true, Value1 = new(true), Value2 = new(type: RegisterType.SSE)},

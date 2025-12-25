@@ -1489,50 +1489,53 @@ public static unsafe class LLVMBackend
                             constraintString.Remove(constraintString.Length-1, 1);
                         }
 
-                        foreach (var instr in assembly.Instructions)
+                        if (assembly.Instructions.Count > 0)
                         {
-                            assemblyString.Append(instr.Instruction);
-                            if (instr.Value1 != null)
+                            foreach (var instr in assembly.Instructions)
                             {
-                                if (instr.Value1.Dereference)
+                                assemblyString.Append(instr.Instruction);
+                                if (instr.Value1 != null)
                                 {
-                                    assemblyString.Append(' ');
-                                    assemblyString.Append(GetAddressSpace(instr.Definition.AddressSpace));
-                                    assemblyString.Append(instr.Value1.Register);
-                                    assemblyString.Append(']');
+                                    if (instr.Value1.Dereference)
+                                    {
+                                        assemblyString.Append(' ');
+                                        assemblyString.Append(GetAddressSpace(instr.Definition.AddressSpace));
+                                        assemblyString.Append(instr.Value1.Register);
+                                        assemblyString.Append(']');
+                                    }
+                                    else if (instr.Value1.Register != null)
+                                    {
+                                        assemblyString.AppendFormat(" {0}", instr.Value1.Register);
+                                    }
+                                    else
+                                    {
+                                        assemblyString.AppendFormat(" 0x{0:x}", instr.Value1.Constant.Value.UnsignedInteger);
+                                    }
                                 }
-                                else if (instr.Value1.Register != null)
+                                if (instr.Value2 != null)
                                 {
-                                    assemblyString.AppendFormat(" {0}", instr.Value1.Register);
+                                    if (instr.Value2.Dereference)
+                                    {
+                                        assemblyString.Append(", ");
+                                        assemblyString.Append(GetAddressSpace(instr.Definition.AddressSpace));
+                                        assemblyString.Append(instr.Value2.Register);
+                                        assemblyString.Append(']');
+                                    }
+                                    else if (instr.Value2.Register != null)
+                                    {
+                                        assemblyString.AppendFormat(", {0}", instr.Value2.Register);
+                                    }
+                                    else
+                                    {
+                                        assemblyString.AppendFormat(", 0x{0:x}", instr.Value2.Constant.Value.UnsignedInteger);
+                                    }
                                 }
-                                else
-                                {
-                                    assemblyString.AppendFormat(" 0x{0:x}", instr.Value1.Constant.Value.UnsignedInteger);
-                                }
+                                assemblyString.Append(";\n");
                             }
-                            if (instr.Value2 != null)
-                            {
-                                if (instr.Value2.Dereference)
-                                {
-                                    assemblyString.Append(", ");
-                                    assemblyString.Append(GetAddressSpace(instr.Definition.AddressSpace));
-                                    assemblyString.Append(instr.Value2.Register);
-                                    assemblyString.Append(']');
-                                }
-                                else if (instr.Value2.Register != null)
-                                {
-                                    assemblyString.AppendFormat(", {0}", instr.Value2.Register);
-                                }
-                                else
-                                {
-                                    assemblyString.AppendFormat(", 0x{0:x}", instr.Value2.Constant.Value.UnsignedInteger);
-                                }
-                            }
-                            assemblyString.Append(";\n");
-                        }
 
-                        var assemblyBodyType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), argumentTypes, false);
-                        BuildAssemblyCall(assemblyString.ToString(), constraintString.ToString(), assemblyBodyType, arguments);
+                            var assemblyBodyType = LLVMTypeRef.CreateFunction(LLVM.VoidType(), argumentTypes, false);
+                            BuildAssemblyCall(assemblyString.ToString(), constraintString.ToString(), assemblyBodyType, arguments);
+                        }
 
                         // Capture the output registers if necessary
                         if (assembly.OutValues.Count > 0)
