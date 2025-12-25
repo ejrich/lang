@@ -30,6 +30,8 @@ int pipe(int* fildes) #syscall 22
 int select(int nfds, Fd_Set* inp, Fd_Set outp, Fd_Set* exp, Timeval* tvp) #syscall 23
 sched_yield() #syscall 24
 void* mremap(void* old_address, u64 old_size, u64 new_size, MremapFlags flags) #syscall 25
+int dup(int oldfd) #syscall 32
+int dup2(int oldfd, int newfd) #syscall 32
 int pause() #syscall 34
 int nanosleep(Timespec* req, Timespec* rem) #syscall 35
 int getpid() #syscall 39
@@ -309,11 +311,15 @@ home_environment_variable := "HOME"; #const
 
 struct CloneArguments {
     command: string;
+    pipes: int*;
     procedure: ThreadProcedure;
     arg: void*;
 }
 
 int __clone_handler() {
+    read_pipe := 0; #const
+    write_pipe := 1; #const
+
     pid: int;
     arguments_pointer: CloneArguments*;
 
@@ -325,12 +331,22 @@ int __clone_handler() {
     arguments := *arguments_pointer;
 
     // Return the pid to the child process
-    if pid != 0 return pid;
+    if pid != 0 {
+        if pid > 0 && arguments.pipes != null {
+            close(arguments.pipes[write_pipe]);
+        }
+        return pid;
+    }
 
     if arguments.procedure != null {
         arguments.procedure(arguments.arg);
     }
     else if !string_is_empty(arguments.command) {
+        if arguments.pipes {
+            close(arguments.pipes[read_pipe]);
+            dup2(arguments.pipes[write_pipe], stdout);
+        }
+
         exec_args: Array<u8*>[5];
         exec_args[0] = "sh".data;
         exec_args[1] = "-c".data;
