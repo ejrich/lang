@@ -234,7 +234,6 @@ enum RandomFlags {
     GRND_INSECURE = 4;
 }
 
-int get_nprocs() #extern "c"
 string realpath(string file_name, string resolved_name) #extern "c"
 
 struct sem_t {

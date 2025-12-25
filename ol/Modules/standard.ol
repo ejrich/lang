@@ -1333,7 +1333,36 @@ u64 file_get_last_modified(string file) {
 int get_processors() {
     result: int;
     #if os == OS.Linux {
-        result = get_nprocs();
+        found, file := open_file("/sys/devices/system/cpu/online");
+        if found {
+            buffer: CArray<u8>[100];
+            size := read(file.handle, &buffer, buffer.length);
+
+            if size > 0 {
+                file_contents: string = { length = size - 1; data = &buffer; }
+
+                first, last: int;
+                parsing_first := true;
+                each i in file_contents.length {
+                    char := file_contents[i];
+                    if char == '-' {
+                        parsing_first = false;
+                    }
+                    else if char >= '0' || char <= '9' {
+                        if parsing_first {
+                            first *= 10;
+                            first += char - '0';
+                        }
+                        else {
+                            last *= 10;
+                            last += char - '0';
+                        }
+                    }
+                }
+
+                result = last - first + 1;
+            }
+        }
     }
     #if os == OS.Windows {
         info: SYSTEM_INFO;
