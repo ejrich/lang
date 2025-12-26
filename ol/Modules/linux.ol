@@ -49,6 +49,7 @@ int rename(u8* oldname, u8* newname) #syscall 82
 int mkdir(u8* pathname, int mode) #syscall 83
 int unlink(u8* path) #syscall 87
 int readlink(u8* path, u8* buf, int bufsize) #syscall 89
+int futex(u32* uaddr, FutexOperation op, u32 val, Timespec* timeout, u32* uaddr2, u32 val3) #syscall 202
 int getdents64(int fd, Dirent* dirp, u32 count) #syscall 217
 int clock_gettime(ClockId clk_id, Timespec* tp) #syscall 228
 exit_group(int status) #syscall 231
@@ -190,6 +191,24 @@ enum MremapFlags {
     MREMAP_DONTUNMAP = 4;
 }
 
+enum FutexOperation {
+    FUTEX_WAIT            = 0;
+    FUTEX_WAKE            = 1;
+    FUTEX_REQUEUE         = 3;
+    FUTEX_CMP_REQUEUE     = 4;
+    FUTEX_WAKE_OP         = 5;
+    FUTEX_LOCK_PI         = 6;
+    FUTEX_UNLOCK_PI       = 7;
+    FUTEX_TRYLOCK_PI      = 8;
+    FUTEX_WAIT_BITSET     = 9;
+    FUTEX_WAKE_BITSET     = 10;
+    FUTEX_WAIT_REQUEUE_PI = 11;
+    FUTEX_CMP_REQUEUE_PI  = 12;
+    FUTEX_LOCK_PI2        = 13;
+    FUTEX_PRIVATE_FLAG    = 128;
+    FUTEX_CLOCK_REALTIME  = 256;
+}
+
 struct Dirent {
     d_ino: u64;
     d_off: u64;
@@ -233,18 +252,6 @@ enum RandomFlags {
     GRND_RANDOM   = 2;
     GRND_INSECURE = 4;
 }
-
-struct sem_t {
-    a: u64;
-    b: u64;
-    c: u64;
-    d: u64;
-    // __size: CArray<u8>[32];
-}
-
-int sem_init(sem_t* sem, int pshared, int value) #extern "c"
-int sem_wait(sem_t* sem) #extern "c"
-int sem_post(sem_t* sem) #extern "c"
 
 struct tm {
     tm_sec: int;

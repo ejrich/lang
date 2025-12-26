@@ -47,7 +47,6 @@ public static unsafe partial class LLVM
         }
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            // TODO Add LLVM-C.dll and lld-link.exe to the project
             var llvmPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "LLVM-C.dll");
             return NativeLibrary.TryLoad(llvmPath, out nativeLibrary);
         }

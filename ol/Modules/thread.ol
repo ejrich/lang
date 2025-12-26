@@ -1,5 +1,9 @@
 // Module for sync objects and handling threads
 
+#if os == OS.Linux {
+    #import atomic
+}
+
 u64 create_thread(ThreadProcedure proc, void* arg, Allocate stack_allocator) {
     thread_id: u64;
     #if os == OS.Linux {
@@ -44,7 +48,9 @@ u64 create_thread(ThreadProcedure proc, void* arg, Allocate stack_allocator) {
 
 #if os == OS.Linux {
     struct Semaphore {
-        sem: sem_t;
+        value: u32;
+        futex: u32;
+        // sem: sem_t;
     }
 }
 #if os == OS.Windows {
@@ -56,7 +62,8 @@ u64 create_thread(ThreadProcedure proc, void* arg, Allocate stack_allocator) {
 bool create_semaphore(Semaphore* semaphore, int allowed = 1, int initial_value = 0) {
     success: bool;
     #if os == OS.Linux {
-        success = sem_init(&semaphore.sem, 0, initial_value) == 0;
+        semaphore.value = initial_value;
+        success = true;
     }
     #if os == OS.Windows {
         semaphore.handle = CreateSemaphoreA(null, initial_value, allowed, null);
@@ -68,7 +75,14 @@ bool create_semaphore(Semaphore* semaphore, int allowed = 1, int initial_value =
 
 semaphore_wait(Semaphore* semaphore) {
     #if os == OS.Linux {
-        sem_wait(&semaphore.sem);
+        while true {
+            value := semaphore.value;
+            if value > 0 && compare_exchange(&semaphore.value, value - 1, value) == value {
+                break;
+            }
+
+            futex(&semaphore.futex, FutexOperation.FUTEX_WAIT, 0, null, null, 0);
+        }
     }
     #if os == OS.Windows {
         WaitForSingleObject(semaphore.handle, INFINITE);
@@ -77,7 +91,8 @@ semaphore_wait(Semaphore* semaphore) {
 
 semaphore_release(Semaphore* semaphore) {
     #if os == OS.Linux {
-        sem_post(&semaphore.sem);
+        atomic_increment(&semaphore.value);
+        futex(&semaphore.futex, FutexOperation.FUTEX_WAKE, 1, null, null, 0);
     }
     #if os == OS.Windows {
         ReleaseSemaphore(semaphore.handle, 1, null);
