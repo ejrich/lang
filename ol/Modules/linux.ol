@@ -31,7 +31,7 @@ int select(int nfds, Fd_Set* inp, Fd_Set outp, Fd_Set* exp, Timeval* tvp) #sysca
 sched_yield() #syscall 24
 void* mremap(void* old_address, u64 old_size, u64 new_size, MremapFlags flags) #syscall 25
 int dup(int oldfd) #syscall 32
-int dup2(int oldfd, int newfd) #syscall 32
+int dup2(int oldfd, int newfd) #syscall 33
 int pause() #syscall 34
 int nanosleep(Timespec* req, Timespec* rem) #syscall 35
 int getpid() #syscall 39
