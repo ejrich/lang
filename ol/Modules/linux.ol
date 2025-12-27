@@ -49,6 +49,7 @@ int rename(u8* oldname, u8* newname) #syscall 82
 int mkdir(u8* pathname, int mode) #syscall 83
 int unlink(u8* path) #syscall 87
 int readlink(u8* path, u8* buf, int bufsize) #syscall 89
+int setpgid(int pid, int pgid) #syscall 109
 int futex(u32* uaddr, FutexOperation op, u32 val, Timespec* timeout, u32* uaddr2, u32 val3) #syscall 202
 int getdents64(int fd, Dirent* dirp, u32 count) #syscall 217
 int clock_gettime(ClockId clk_id, Timespec* tp) #syscall 228
@@ -58,6 +59,8 @@ int getcpu(u32* cpu, u32* node) #syscall 309
 s64 getrandom(void* buf, u64 buflen, RandomFlags flags) #syscall 318
 int clone3(clone_args* cl_args, u64 size) #syscall 435
 // @Future Add additional syscalls when necessary
+
+home_environment_variable := "HOME"; #const
 
 stdin  := 0; #const
 stdout := 1; #const
@@ -253,20 +256,6 @@ enum RandomFlags {
     GRND_INSECURE = 4;
 }
 
-struct tm {
-    tm_sec: int;
-    tm_min: int;
-    tm_hour: int;
-    tm_mday: int;
-    tm_mon: int;
-    tm_year: int;
-    tm_wday: int;
-    tm_yday: int;
-    tm_isdst: int;
-}
-
-tm* localtime(u64* timer) #extern "c"
-
 [flags]
 enum CloneFlags : u64 {
     CLONE_VM             = 0x000000100;
@@ -309,8 +298,6 @@ struct clone_args {
     set_tid_size: u64;
     cgroup: int*;
 }
-
-home_environment_variable := "HOME"; #const
 
 struct CloneArguments {
     command: string;
@@ -362,3 +349,6 @@ int __clone_handler() {
     exit(0);
     return 0;
 }
+
+int pthread_create(u64* thread, pthread_attr_t* attr, ThreadProcedure start_routine, void* arg) #extern "c"
+struct pthread_attr_t {}

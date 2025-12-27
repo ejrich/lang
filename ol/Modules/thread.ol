@@ -4,39 +4,10 @@
     #import atomic
 }
 
-u64 create_thread(ThreadProcedure proc, void* arg, Allocate stack_allocator) {
+u64 create_thread(ThreadProcedure proc, void* arg) {
     thread_id: u64;
     #if os == OS.Linux {
-        stack_size := 2 * 1024 * 1024; #const
-        stack := stack_allocator(stack_size);
-        tid: int;
-
-        args: clone_args = {
-            flags = CloneFlags.CLONE_VM | CloneFlags.CLONE_FS | CloneFlags.CLONE_FILES | CloneFlags.CLONE_SYSVSEM | CloneFlags.CLONE_SIGHAND | CloneFlags.CLONE_THREAD | CloneFlags.CLONE_PARENT_SETTID;
-            parent_tid = &tid;
-            stack = stack;
-            stack_size = stack_size;
-        }
-
-        handler_args: CloneArguments = {
-            procedure = proc;
-            arg = arg;
-        }
-
-        asm {
-            in rdi, &args;
-            in rsi, size_of(args);
-            in rax, 435; // clone3
-            in r8, &handler_args;
-            syscall;
-
-            // Set arguments for __clone_handler
-            mov rdi, rax;
-            mov rsi, r8;
-        }
-
-        __clone_handler();
-        thread_id = tid;
+        pthread_create(&thread_id, null, proc, arg);
     }
     #if os == OS.Windows {
         handle := CreateThread(null, 0, proc, arg, 0, null);
