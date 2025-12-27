@@ -1418,7 +1418,7 @@ string get_environment_variable(string name, Allocate allocator = default_alloca
     return result;
 }
 
-int execute_command(string command, bool silent = false, bool print = false, Allocate stack_allocator = default_allocator, Free stack_free = default_free) {
+int execute_command(string command, bool silent = false, bool print = false) {
     if print print("%\n", command);
 
     status: int;
@@ -1488,36 +1488,21 @@ int execute_command(string command, bool silent = false, bool print = false, All
             command.data = null_terminated_data.data;
         }
 
-        stack_size := 2 * 1024 * 1024; #const
-        stack := stack_allocator(stack_size);
-        defer stack_free(stack);
+        pid := fork();
 
-        args: clone_args = {
-            flags = CloneFlags.CLONE_VM | CloneFlags.CLONE_FS | CloneFlags.CLONE_FILES | CloneFlags.CLONE_SYSVSEM | CloneFlags.CLONE_CLEAR_SIGHAND;
-            exit_signal = 17;
-            stack = stack;
-            stack_size = stack_size;
-        }
-
-        handler_args: CloneArguments = {
-            command = command;
-        }
-
-        asm {
-            in rdi, &args;
-            in rsi, size_of(args);
-            in rax, 435; // clone3
-            in r8, &handler_args;
-            syscall;
-
-            // Set arguments for __clone_handler
-            mov rdi, rax;
-            mov rsi, r8;
-        }
-
-        pid := __clone_handler();
         if pid < 0 {
             return -1;
+        }
+
+        if pid == 0 {
+            exec_args: Array<u8*>[5];
+            exec_args[0] = "sh".data;
+            exec_args[1] = "-c".data;
+            exec_args[2] = "--".data;
+            exec_args[3] = command.data;
+            exec_args[4] = null;
+            execve("/bin/sh".data, exec_args.data, __environment_variables_pointer);
+            exit(-1);
         }
 
         wait4(pid, &status, 0, null);
