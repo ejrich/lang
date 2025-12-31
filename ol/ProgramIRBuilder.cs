@@ -1402,7 +1402,10 @@ public static class ProgramIRBuilder
     {
         var (conditionBlock, afterBlock) = BeginWhile(function, whileAst.Condition, scope);
         EmitScope(function, whileAst.Body, returnType, afterBlock, conditionBlock);
-        EmitJump(function, scope, conditionBlock);
+        if (!whileAst.Body.Returns)
+        {
+            EmitJump(function, scope, conditionBlock);
+        }
         AddBasicBlock(function, afterBlock);
     }
 
