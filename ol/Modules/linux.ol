@@ -110,7 +110,7 @@ struct Stat {
     st_dev: u64;
     st_ino: u64;
     st_nlink: u64;
-    st_mode: int;
+    st_mode: StatMode;
     st_uid: int;
     st_gid: int;
     __pad0: int;
@@ -122,6 +122,20 @@ struct Stat {
     st_mtim: Timespec;
     st_ctim: Timespec;
     __reserved: CArray<u64>[3];
+}
+
+enum StatMode : u32 {
+    S_ISVTX  = 0x200;
+    S_ISGID  = 0x400;
+    S_ISUID  = 0x800;
+    S_IFIFO  = 0x1000;
+    S_IFCHR  = 0x2000;
+    S_IFDIR  = 0x4000;
+    S_IFBLK  = 0x6000;
+    S_IFREG  = 0x8000;
+    S_IFLNK	 = 0xA000;
+    S_IFSOCK = 0xC000;
+    S_IFMT   = 0xF000;
 }
 
 struct PollFd {

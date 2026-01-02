@@ -1000,6 +1000,28 @@ bool file_exists(string path) {
     return exists;
 }
 
+bool is_directory(string path) {
+    null_terminated_path: Array<u8>[path.length + 1];
+    memory_copy(null_terminated_path.data, path.data, path.length);
+    null_terminated_path[path.length] = 0;
+
+    result: bool;
+
+    #if os == OS.Linux {
+        stat_buf: Stat;
+        exists := stat(null_terminated_path.data, &stat_buf) == 0;
+        if exists {
+            result = (stat_buf.st_mode & StatMode.S_IFMT) == StatMode.S_IFDIR;
+        }
+    }
+    #if os == OS.Windows {
+        attr := PathIsDirectoryA(null_terminated_path.data);
+        result = attr == FileAttribute.FILE_ATTRIBUTE_DIRECTORY;
+    }
+
+    return result;
+}
+
 bool create_directory(string path) {
     null_terminated_path: Array<u8>[path.length + 1];
     memory_copy(null_terminated_path.data, path.data, path.length);

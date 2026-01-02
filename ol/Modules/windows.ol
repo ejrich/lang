@@ -22,6 +22,7 @@ OutputDebugStringA(string lpOutputString) #extern "kernel32"
 bool AttachConsole(int dwProcessId) #extern "kernel32"
 
 bool PathFileExistsA(string pszPath) #extern "shlwapi"
+FileAttribute PathIsDirectoryA(string pszPath) #extern "shlwapi"
 int GetFullPathNameA(string lpFileName, int nBufferLength, u8* lpBuffer, u8** lpFilePart) #extern "kernel32"
 Handle* OpenFile(string lpFileName, OFSTRUCT* lpReOpenBuff, OpenFileType uStyle) #extern "kernel32"
 Handle* CreateFileA(string lpFileName, int dwDesiredAccess, int dwShareMode, SECURITY_ATTRIBUTES* lpSecurityAttributes, int dwCreationDisposition, int dwFlagsAndAttributes, Handle* hTemplateFile) #extern "kernel32"
