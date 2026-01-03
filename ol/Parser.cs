@@ -1846,7 +1846,7 @@ public static class Parser
         }
     }
 
-    private static bool ParseValue(IValues values, TokenEnumerator enumerator, IFunction currentFunction, bool arrayValue = false)
+    private static bool ParseValue(IValues values, TokenEnumerator enumerator, IFunction currentFunction)
     {
         // 1. Step over '=' sign
         if (!enumerator.MoveNext())
@@ -1917,6 +1917,10 @@ public static class Parser
                 break;
             default:
                 values.Value = ParseExpression(enumerator, currentFunction);
+                if (enumerator.Current.Type != TokenType.SemiColon)
+                {
+                    ErrorReporter.Report("Expected ';'", enumerator.FileIndex, enumerator.Current);
+                }
                 break;
         }
 

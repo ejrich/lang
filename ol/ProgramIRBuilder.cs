@@ -426,10 +426,6 @@ public static class ProgramIRBuilder
                             constantStruct.Values[i] = InitializeGlobalCArray(field, scope, assignment.ArrayValues);
                         }
                     }
-                    else
-                    {
-                        Debug.Assert(false, "Expected assignment to have value");
-                    }
                 }
                 else
                 {
