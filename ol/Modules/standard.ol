@@ -1462,7 +1462,7 @@ int execute_command(string command, bool silent = false, bool print = false) {
         memory_copy(null_terminated_data.data, command.data, command.length);
         command.data = null_terminated_data.data;
 
-        if !CreateProcessA(null, command, null, null, true, 0, null, null, &si, &pi) {
+        if !CreateProcessA(null, command, null, null, true, ProcessCreationFlags.NONE, null, null, &si, &pi) {
             CloseHandle(stdOutRd);
             CloseHandle(stdOutWr);
             return -1;

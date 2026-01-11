@@ -37,9 +37,13 @@ bool GetFileTime(Handle* hFile, FILETIME* lpCreationTime,  FILETIME* lpLastAcces
 
 bool CreatePipe(Handle** hReadPipe, Handle** hWritePipe, SECURITY_ATTRIBUTES* lpPipeAttributes, int nSize) #extern "kernel32"
 bool SetHandleInformation(Handle* hObject, HandleFlags dwMask, HandleFlags dwFlags) #extern "kernel32"
-bool CreateProcessA(string lpApplicationName, string lpCommandLine, SECURITY_ATTRIBUTES* lpProcessAttributes, SECURITY_ATTRIBUTES* lpThreadAttributes, bool bInheritHandles, int dwCreationFlags, void* lpEnvironment, string lpCurrentDirectory, STARTUPINFOA* lpStartupInfo, PROCESS_INFORMATION* lpProcessInformation) #extern "kernel32"
+bool CreateProcessA(string lpApplicationName, string lpCommandLine, SECURITY_ATTRIBUTES* lpProcessAttributes, SECURITY_ATTRIBUTES* lpThreadAttributes, bool bInheritHandles, ProcessCreationFlags dwCreationFlags, void* lpEnvironment, string lpCurrentDirectory, STARTUPINFOA* lpStartupInfo, PROCESS_INFORMATION* lpProcessInformation) #extern "kernel32"
 bool TerminateProcess(Handle* hProcess, int dwExitCode) #extern "kernel32"
 bool GetExitCodeProcess(Handle* hProcess, int* lpExitCode) #extern "kernel32"
+
+Handle* CreateJobObjectA(SECURITY_ATTRIBUTES* lpSecurityAttributes, string lpName) #extern "kernel32"
+bool TerminateJobObject(Handle* hJob, u32 uExitCode) #extern "kernel32"
+bool AssignProcessToJobObject(Handle* hJob, Handle* hProcess) #extern "kernel32"
 
 Handle* FindFirstFileA(string lpFileName, WIN32_FIND_DATAA* lpFindFileData) #extern "kernel32"
 bool FindNextFileA(Handle* hFindHandle, WIN32_FIND_DATAA* lpFindFileData) #extern "kernel32"
@@ -85,6 +89,7 @@ NtStatus BCryptGenRandom(Handle* hProv, void* pbBuffer, u64 cbBuffer, u64 dwFlag
 
 GetSystemInfo(SYSTEM_INFO* lpSystemInfo) #extern "kernel32"
 Handle* CreateThread(SECURITY_ATTRIBUTES* lpThreadAttributes, u64 dwStackSize, ThreadProcedure lpStartAddress, void* lpParameter, int dwCreationFlags, int* lpThreadId) #extern "kernel32"
+int ResumeThread(Handle* hThread) #extern "kernel32"
 bool TerminateThread(Handle* hThread, int dwExitCode) #extern "kernel32"
 Handle* CreateSemaphoreA(SECURITY_ATTRIBUTES* lpSemaphoreAttributes, u64 lInitialCount, u64 lMaximumCount, string lpName) #extern "kernel32"
 bool ReleaseSemaphore(Handle* hSemaphore, u64 lReleaseCount, u64* lpPreviousCount) #extern "kernel32"
@@ -234,6 +239,27 @@ struct PROCESS_INFORMATION {
     hThread: Handle*;
     dwProcessId: int;
     dwThreadId: int;
+}
+
+enum ProcessCreationFlags {
+    NONE                             = 0x00000000;
+    DEBUG_PROCESS                    = 0x00000001;
+    DEBUG_ONLY_THIS_PROCESS          = 0x00000002;
+    CREATE_SUSPENDED                 = 0x00000004;
+    DETACHED_PROCESS                 = 0x00000008;
+    CREATE_NEW_CONSOLE               = 0x00000010;
+    CREATE_NEW_PROCESS_GROUP         = 0x00000200;
+    CREATE_UNICODE_ENVIRONMENT       = 0x00000400;
+    CREATE_SEPARATE_WOW_VDM          = 0x00000800;
+    CREATE_SHARED_WOW_VDM            = 0x00001000;
+    INHERIT_PARENT_AFFINITY          = 0x00010000;
+    CREATE_PROTECTED_PROCESS         = 0x00040000;
+    EXTENDED_STARTUPINFO_PRESENT     = 0x00080000;
+    CREATE_SECURE_PROCESS            = 0x00400000;
+    CREATE_BREAKAWAY_FROM_JOB        = 0x01000000;
+    CREATE_PRESERVE_CODE_AUTHZ_LEVEL = 0x02000000;
+    CREATE_DEFAULT_ERROR_MODE        = 0x04000000;
+    CREATE_NO_WINDOW                 = 0x08000000;
 }
 
 struct WIN32_FIND_DATAA {
