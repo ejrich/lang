@@ -27,7 +27,7 @@ int readv(int fd, Iovec* vec, u64 vlen) #syscall 19
 int writev(int fd, Iovec* vec, u64 vlen) #syscall 20
 int access(u8* filename, int mode) #syscall 21
 int pipe(int* fildes) #syscall 22
-int select(int nfds, Fd_Set* inp, Fd_Set outp, Fd_Set* exp, Timeval* tvp) #syscall 23
+int select(int nfds, Fd_Set* inp, Fd_Set* outp, Fd_Set* exp, Timeval* tvp) #syscall 23
 sched_yield() #syscall 24
 void* mremap(void* old_address, u64 old_size, u64 new_size, MremapFlags flags) #syscall 25
 int dup(int oldfd) #syscall 32
@@ -194,7 +194,7 @@ struct Iovec {
 }
 
 struct Fd_Set {
-    // @Incomplete Add fields before using
+    __fds_bits: CArray<u64>[16];
 }
 
 struct Timeval {

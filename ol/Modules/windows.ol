@@ -71,6 +71,8 @@ bool SetProcessDPIAware() #extern "user32"
 s32 DwmExtendFrameIntoClientArea(Handle* hWnd, MARGINS* pMarInset) #extern "dwmapi"
 
 bool WaitMessage() #extern "user32"
+s64 SendMessage(Handle* hWnd, MessageType Msg, u64 wParam, s64 lParam) #extern "user32"
+bool SendNotifyMessageA(Handle* hWnd, MessageType Msg, u64 wParam, s64 lParam) #extern "user32"
 bool GetMessage(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax) #extern "user32"
 bool PeekMessageA(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax, RemoveMsg wRemoveMsg) #extern "user32"
 bool TranslateMessage(MSG* lpMsg) #extern "user32"
