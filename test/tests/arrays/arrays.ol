@@ -8,6 +8,8 @@ main() {
     dynamic_arrays();
 
     array_literals();
+
+    structs_with_arrays();
 }
 
 constant_size_arrays() {
@@ -73,6 +75,18 @@ array_literals() {
     a: Array<int> = [1, 2, 3, 4]
 
     print_array("Array<int> = [1, 2, 3, 4]", a);
+}
+
+structs_with_arrays() {
+    a: StructWithArray = {
+        array = [1, 2, 4, 8, 16]
+    }
+
+    print_array("Array<int> = [1, 2, 4, 8, 16]", a.array);
+}
+
+struct StructWithArray {
+    array: Array<int>;
 }
 
 print_array(string name, Array<int> array) {

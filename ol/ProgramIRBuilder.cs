@@ -471,6 +471,11 @@ public static class ProgramIRBuilder
         var arrayStruct = (StructAst)declaration.Type;
         if (declaration.TypeDefinition.ConstCount == null)
         {
+            if (arrayValues != null)
+            {
+                return AddGlobalArray(arrayStruct, declaration.ArrayElementType, (uint)arrayValues.Count, arrayValues, scope);
+            }
+
             return new InstructionValue
             {
                 ValueType = InstructionValueType.ConstantStruct, Type = arrayStruct,
@@ -933,7 +938,7 @@ public static class ProgramIRBuilder
             var index = GetConstantInteger(i);
             var pointer = EmitGetPointer(function, arrayPointer, index, elementType, scope);
 
-            EmitSetValues(function, arrayValues[i], elementType, pointer, scope);
+            EmitSetValues(function, arrayValues[i], elementType, pointer, scope, true);
         }
     }
 
@@ -972,7 +977,7 @@ public static class ProgramIRBuilder
                     }
                     else if (assignment.ArrayValues != null)
                     {
-                        EmitArrayAssignments(function, assignment.ArrayValues, field.Type, fieldPointer, scope);
+                        EmitArrayAssignments(function, assignment.ArrayValues, field.Type, fieldPointer, scope, true);
                     }
                     else
                     {
@@ -1138,11 +1143,11 @@ public static class ProgramIRBuilder
                 type = pointerType.PointedType;
             }
 
-            EmitAssignments(function, assignment, scope, pointer, type);
+            EmitAssignments(function, assignment, scope, pointer, type, false);
         }
     }
 
-    private static void EmitAssignments(FunctionIR function, AssignmentAst assignment, IScope scope, InstructionValue pointer, IType type)
+    private static void EmitAssignments(FunctionIR function, AssignmentAst assignment, IScope scope, InstructionValue pointer, IType type, bool initializing)
     {
         if (assignment.Value != null)
         {
@@ -1167,13 +1172,13 @@ public static class ProgramIRBuilder
                 {
                     var fieldPointer = EmitGetStructPointer(function, pointer, scope, structDef, i, field);
 
-                    EmitAssignments(function, assignmentValue, scope, fieldPointer, field.Type);
+                    EmitAssignments(function, assignmentValue, scope, fieldPointer, field.Type, initializing);
                 }
             }
         }
         else if (assignment.ArrayValues != null)
         {
-            EmitArrayAssignments(function, assignment.ArrayValues, type, pointer, scope);
+            EmitArrayAssignments(function, assignment.ArrayValues, type, pointer, scope, initializing);
         }
         else
         {
@@ -1181,20 +1186,28 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static void EmitArrayAssignments(FunctionIR function, List<Values> arrayValues, IType type, InstructionValue pointer, IScope scope)
+    private static void EmitArrayAssignments(FunctionIR function, List<Values> arrayValues, IType type, InstructionValue pointer, IScope scope, bool initializing)
     {
         if (type is StructAst arrayStruct)
         {
-            var dataPointer = EmitGetStructPointer(function, pointer, scope, arrayStruct, 1);
-            var arrayPointer = EmitLoadPointer(function, dataPointer.Type, dataPointer, scope);
-
+            InstructionValue arrayPointer;
             var elementType = arrayStruct.GenericTypes[0];
+            if (initializing && arrayValues.Any())
+            {
+                arrayPointer = InitializeConstArray(function, pointer, arrayStruct, (uint)arrayValues.Count, elementType, scope);
+            }
+            else
+            {
+                var dataPointer = EmitGetStructPointer(function, pointer, scope, arrayStruct, 1);
+                arrayPointer = EmitLoadPointer(function, dataPointer.Type, dataPointer, scope);
+            }
+
             for (var i = 0; i < arrayValues.Count; i++)
             {
                 var index = GetConstantInteger(i);
                 var elementPointer = EmitGetPointer(function, arrayPointer, index, elementType, scope);
 
-                EmitSetValues(function, arrayValues[i], elementType, elementPointer, scope);
+                EmitSetValues(function, arrayValues[i], elementType, elementPointer, scope, initializing);
             }
         }
         else if (type is ArrayType arrayType)
@@ -1203,7 +1216,7 @@ public static class ProgramIRBuilder
         }
     }
 
-    private static void EmitSetValues(FunctionIR function, Values values, IType type, InstructionValue pointer, IScope scope)
+    private static void EmitSetValues(FunctionIR function, Values values, IType type, InstructionValue pointer, IScope scope, bool initializing)
     {
         if (values.Value != null)
         {
@@ -1220,13 +1233,13 @@ public static class ProgramIRBuilder
                 {
                     var fieldPointer = EmitGetStructPointer(function, pointer, scope, structDef, i, field);
 
-                    EmitAssignments(function, assignmentValue, scope, fieldPointer, field.Type);
+                    EmitAssignments(function, assignmentValue, scope, fieldPointer, field.Type, initializing);
                 }
             }
         }
         else if (values.ArrayValues != null)
         {
-            EmitArrayAssignments(function, values.ArrayValues, type, pointer, scope);
+            EmitArrayAssignments(function, values.ArrayValues, type, pointer, scope, initializing);
         }
         else
         {
@@ -2338,11 +2351,13 @@ public static class ProgramIRBuilder
         {
             return EmitConstantIR(values.Value, null, scope);
         }
-        else if (values.Assignments != null)
+
+        if (values.Assignments != null)
         {
             return GetConstantStruct((StructAst)type, scope, values.Assignments);
         }
-        else if (values.ArrayValues != null)
+
+        if (values.ArrayValues != null)
         {
             if (type is ArrayType arrayType)
             {
