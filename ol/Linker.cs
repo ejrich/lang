@@ -78,6 +78,7 @@ public static class Linker
         var libraries = string.Join(' ', BuildSettings.LibraryNames.Select(lib => $"{lib}.lib"));
         var libraryDirectories = string.Join(' ', BuildSettings.LibraryDirectories.Select(d => $"/libpath:\"{d}\""));
         var dependencies = string.Join(' ', BuildSettings.Libraries.Select(lib => GetLibraryName(lib, "lib")));
+        var resources = string.Join(' ', BuildSettings.ResourceFiles.Select(r => $"\"{r}\""));
 
         var subsystem = Subsystem switch
         {
@@ -86,7 +87,7 @@ public static class Linker
             _ => "console"
         };
 
-        var linkerArguments = $"/entry:_start {debug}/out:\"{executableFile}.exe\" \"{objectFile}\" \"{defaultObjects}\" /libpath:\"{libDirectory.FullName}\" {libraryDirectories} {libraries} {dependencies} /subsystem:{subsystem}";
+        var linkerArguments = $"/entry:_start {debug}/out:\"{executableFile}.exe\" \"{objectFile}\" \"{defaultObjects}\" {resources} /libpath:\"{libDirectory.FullName}\" {libraryDirectories} {libraries} {dependencies} /subsystem:{subsystem}";
 
         Console.WriteLine($"Linking: lld-link.exe {linkerArguments}\n");
         #endif

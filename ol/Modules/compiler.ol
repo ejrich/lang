@@ -49,6 +49,8 @@ set_output_architecture(OutputArchitecture arch) #compiler
     }
 
     set_windows_subsystem(WindowsSubsystem subsystem) #compiler
+
+    add_windows_resource_file(string file) #compiler
 }
 
 struct ReleaseOptimizations {

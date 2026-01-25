@@ -29,6 +29,8 @@ public static class BuildSettings
     public static HashSet<string> LibraryDirectories { get; } = new();
     // These are additional dependencies that need to be linked with the executable
     public static HashSet<Library> Libraries { get; } = new();
+    // These are Windows resource files that are bundled into the exe
+    public static HashSet<string> ResourceFiles { get; } = new();
     public static Dictionary<string, InputVariable> InputVariables { get; } = new();
 
     public static string FileName(int index) => GetFileName(BuildSettings.Files[index]);

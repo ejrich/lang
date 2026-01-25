@@ -328,6 +328,82 @@ public static unsafe class ProgramRunner
         BuildSettings.OutputArchitecture = (OutputArchitecture)arch;
     }
 
+    #if _WINDOWS
+    private static void AddWindowsResourceFile(String file, int fileIndex, uint line, uint column)
+    {
+        var fileString = Marshal.PtrToStringAnsi(file.Data, (int)file.Length);
+        var filePath = Path.Combine(BuildSettings.Path, fileString);
+        var resourceFile = Path.ChangeExtension(filePath, ".res");
+
+        BuildSettings.ResourceFiles.Add(resourceFile);
+
+        // Check if the resource file needs to be regenerated
+        if (File.Exists(resourceFile) && File.GetLastWriteTime(resourceFile) > File.GetLastWriteTime(filePath))
+        {
+            return;
+        }
+
+        var windowsKits = new DirectoryInfo(@"C:\Program Files (x86)\Windows Kits");
+
+        if (!windowsKits.Exists)
+        {
+            ErrorReporter.Report($"Cannot find 'Windows Kits' directory '{windowsKits.FullName}'");
+            return;
+        }
+
+        var latestVersion = windowsKits.GetDirectories().FirstOrDefault();
+
+        if (latestVersion == null)
+        {
+            ErrorReporter.Report($"Cannot find Windows SDK version in directory '{windowsKits.FullName}'");
+            return;
+        }
+
+        var binDirectory = latestVersion.GetDirectories("bin").FirstOrDefault();
+
+        if (binDirectory == null)
+        {
+            ErrorReporter.Report($"Cannot find 'bin' directory in '{latestVersion.FullName}'");
+            return;
+        }
+
+        latestVersion = binDirectory.GetDirectories($"{latestVersion.Name}*").LastOrDefault();
+
+        if (latestVersion == null)
+        {
+            ErrorReporter.Report($"Cannot find Windows SDK version in directory '{binDirectory.FullName}'");
+            return;
+        }
+
+        var x64LibDirectory = latestVersion.GetDirectories("x64").FirstOrDefault();
+
+        if (x64LibDirectory == null)
+        {
+            ErrorReporter.Report($"Cannot find 'x64' directory in '{latestVersion.FullName}'");
+            return;
+        }
+
+        var rc = Path.Combine(x64LibDirectory.FullName, "rc.exe");
+
+        var rcProcess = new Process
+        {
+            StartInfo =
+            {
+                FileName = rc,
+                Arguments = $"/nologo {filePath}",
+            }
+        };
+
+        rcProcess.Start();
+        rcProcess.WaitForExit();
+
+        if (rcProcess.ExitCode != 0)
+        {
+            ErrorReporter.Report($"Unable to generate .res file for '{fileString}'", fileIndex, line, column);
+        }
+    }
+    #endif
+
     private static IntPtr GetFunction(String name)
     {
         var functionName = Marshal.PtrToStringAnsi(name.Data, (int)name.Length);
@@ -1733,6 +1809,13 @@ public static unsafe class ProgramRunner
                 {
                     var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
                     Linker.Subsystem = (Linker.WindowsSubsystem)value.Integer;
+                    break;
+                }
+                case "add_windows_resource_file":
+                {
+                    var value = GetValue(arguments[0], registers, stackPointer, function, functionArgs);
+                    var file = Marshal.PtrToStructure<String>(value.Pointer);
+                    AddWindowsResourceFile(file, fileIndex, line, column);
                     break;
                 }
                 #endif
