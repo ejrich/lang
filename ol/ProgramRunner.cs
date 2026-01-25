@@ -384,6 +384,8 @@ public static unsafe class ProgramRunner
         }
 
         var rc = Path.Combine(x64LibDirectory.FullName, "rc.exe");
+        Console.WriteLine(rc);
+        Console.WriteLine(filePath);
 
         var rcProcess = new Process
         {
