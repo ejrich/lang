@@ -392,7 +392,8 @@ public static unsafe class ProgramRunner
             StartInfo =
             {
                 FileName = rc,
-                Arguments = $"/nologo {filePath}",
+                /* Arguments = $"/nologo {filePath}", */
+                Arguments = filePath,
             }
         };
 
