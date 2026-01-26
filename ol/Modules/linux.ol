@@ -197,6 +197,19 @@ struct Fd_Set {
     __fds_bits: CArray<u64>[16];
 }
 
+clear_fd_set(Fd_Set* fd_set) {
+    each i in fd_set.__fds_bits.length {
+        fd_set.__fds_bits[i] = 0;
+    }
+}
+
+set_fd_set(Fd_Set* fd_set, int fd) {
+    u64_bits := 64; #const
+    index := fd / u64_bits;
+    bit: u64 = cast(u64, 1) << (fd % u64_bits);
+    fd_set.__fds_bits[index] |= bit;
+}
+
 struct Timeval {
     tv_sec: u64;
     tv_usec: u64;
