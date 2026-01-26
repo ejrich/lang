@@ -210,6 +210,13 @@ set_fd_set(Fd_Set* fd_set, int fd) {
     fd_set.__fds_bits[index] |= bit;
 }
 
+bool is_fd_set(Fd_Set* fd_set, int fd) {
+    u64_bits := 64; #const
+    index := fd / u64_bits;
+    bit: u64 = cast(u64, 1) << (fd % u64_bits);
+    return (fd_set.__fds_bits[index] & bit) != 0;
+}
+
 struct Timeval {
     tv_sec: u64;
     tv_usec: u64;
