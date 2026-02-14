@@ -1411,7 +1411,7 @@ public static class ProgramIRBuilder
     {
         var (conditionBlock, afterBlock) = BeginWhile(function, whileAst.Condition, scope);
         EmitScope(function, whileAst.Body, returnType, afterBlock, conditionBlock);
-        if (!whileAst.Body.Returns)
+        if (!whileAst.Body.Returns && !whileAst.Body.Breaks)
         {
             EmitJump(function, scope, conditionBlock);
         }
