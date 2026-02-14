@@ -581,10 +581,12 @@ public static class ProgramIRBuilder
                     EmitSwitch(function, switchAst, scope, returnType, breakBlock, continueBlock);
                     break;
                 case BreakAst:
+                    EmitDeferredStatements(function, scope, false);
                     SetDebugLocation(function, ast, scope);
                     EmitJump(function, scope, breakBlock);
                     return;
                 case ContinueAst:
+                    EmitDeferredStatements(function, scope, false);
                     SetDebugLocation(function, ast, scope);
                     EmitJump(function, scope, continueBlock);
                     return;
@@ -2998,10 +3000,12 @@ public static class ProgramIRBuilder
                     EmitInlineSwitch(function, switchAst, scope, returnType, returnAllocation, returnBlock, breakBlock, continueBlock);
                     break;
                 case BreakAst:
+                    EmitInlineDeferredStatements(function, scope, false);
                     SetDebugLocation(function, ast, scope);
                     EmitJump(function, scope, breakBlock);
                     return;
                 case ContinueAst:
+                    EmitInlineDeferredStatements(function, scope, false);
                     SetDebugLocation(function, ast, scope);
                     EmitJump(function, scope, continueBlock);
                     return;
