@@ -94,6 +94,8 @@ public static class TypeChecker
             }
         }
 
+        ClearSizeResolveQueue();
+
         // 3. Verify the rest of the asts
         while (Parser.Asts.TryDequeue(out var ast))
         {
@@ -183,15 +185,34 @@ public static class TypeChecker
 
     private static void ClearSizeResolveQueue()
     {
+        var queueSize = _sizeResolveQueue.Count;
         while (_sizeResolveQueue.TryDequeue(out var ast))
         {
             if (ast is StructAst structAst)
             {
-                // TODO Implement set the size if able, requeue if not
+                if (CanStructSizeBeDetermined(structAst))
+                {
+                    DetermineStructSize(structAst);
+                    structAst.QueuedForSizeResolve = false;
+                    structAst.Verified = true;
+                }
+                else
+                {
+                    _sizeResolveQueue.Enqueue(structAst);
+                }
             }
             else if (ast is UnionAst union)
             {
-                // TODO Implement set the size if able, requeue if not
+                if (CanUnionSizeBeDetermined(union))
+                {
+                    DetermineUnionSize(union);
+                    union.QueuedForSizeResolve = false;
+                    union.Verified = true;
+                }
+                else
+                {
+                    _sizeResolveQueue.Enqueue(union);
+                }
             }
         }
     }
@@ -762,7 +783,7 @@ public static class TypeChecker
 
     private static void VerifyStruct(StructAst structAst)
     {
-        if (structAst.QueuedForSizeResolve) return;
+        if (structAst.QueuedForSizeResolve || structAst.Verified) return;
 
         // Verify struct fields have valid types
         var fieldNames = new HashSet<string>();
@@ -1008,44 +1029,72 @@ public static class TypeChecker
                 return;
             }
 
-            foreach (var field in structAst.Fields)
-            {
-                if (field.Type.Alignment > 0)
-                {
-                    if (field.Type.Alignment > structAst.Alignment)
-                    {
-                        structAst.Alignment = field.Type.Alignment;
-                    }
-
-                    var alignmentOffset = structAst.Size % field.Type.Alignment;
-                    if (alignmentOffset > 0)
-                    {
-                        structAst.Size += field.Type.Alignment - alignmentOffset;
-                    }
-                }
-
-                field.Offset = structAst.Size;
-                structAst.Size += field.Type.Size;
-            }
-
-            if (structAst.Size > 0)
-            {
-                var alignmentOffset = structAst.Size % structAst.Alignment;
-                if (alignmentOffset > 0)
-                {
-                    structAst.Size += structAst.Alignment - alignmentOffset;
-                }
-            }
-
-            TypeTable.CreateTypeInfo(structAst);
-            Messages.Submit(MessageType.TypeCheckSuccessful, structAst);
+            DetermineStructSize(structAst);
         }
         structAst.Verified = true;
     }
 
+    private static void DetermineStructSize(StructAst structAst)
+    {
+        foreach (var field in structAst.Fields)
+        {
+            if (field.Type.Alignment > 0)
+            {
+                if (field.Type.Alignment > structAst.Alignment)
+                {
+                    structAst.Alignment = field.Type.Alignment;
+                }
+
+                var alignmentOffset = structAst.Size % field.Type.Alignment;
+                if (alignmentOffset > 0)
+                {
+                    structAst.Size += field.Type.Alignment - alignmentOffset;
+                }
+            }
+
+            field.Offset = structAst.Size;
+            structAst.Size += field.Type.Size;
+        }
+
+        if (structAst.Size > 0)
+        {
+            var alignmentOffset = structAst.Size % structAst.Alignment;
+            if (alignmentOffset > 0)
+            {
+                structAst.Size += structAst.Alignment - alignmentOffset;
+            }
+        }
+
+        TypeTable.CreateTypeInfo(structAst);
+        Messages.Submit(MessageType.TypeCheckSuccessful, structAst);
+    }
+
+    private static bool CanStructSizeBeDetermined(StructAst structAst)
+    {
+        foreach (var field in structAst.Fields)
+        {
+            if (field.Type is StructAst fieldStruct)
+            {
+                if (!fieldStruct.Verified)
+                {
+                    return false;
+                }
+            }
+            else if (field.Type is UnionAst fieldUnion)
+            {
+                if (!fieldUnion.Verified)
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     private static void VerifyUnion(UnionAst union)
     {
-        if (union.QueuedForSizeResolve) return;
+        if (union.QueuedForSizeResolve || union.Verified) return;
 
         var fieldNames = new HashSet<string>();
         union.Verifying = true;
@@ -1140,31 +1189,59 @@ public static class TypeChecker
                 return;
             }
 
-            foreach (var field in union.Fields)
-            {
-                if (field.Type.Alignment > union.Alignment)
-                {
-                    union.Alignment = field.Type.Alignment;
-                }
-                if (field.Type.Size > union.Size)
-                {
-                    union.Size = field.Type.Size;
-                }
-            }
-
-            if (union.Size > 0)
-            {
-                var alignmentOffset = union.Size % union.Alignment;
-                if (alignmentOffset > 0)
-                {
-                    union.Size += union.Alignment - alignmentOffset;
-                }
-            }
-
-            TypeTable.CreateTypeInfo(union);
-            Messages.Submit(MessageType.TypeCheckSuccessful, union);
+            DetermineUnionSize(union);
         }
         union.Verified = true;
+    }
+
+    private static void DetermineUnionSize(UnionAst union)
+    {
+        foreach (var field in union.Fields)
+        {
+            if (field.Type.Alignment > union.Alignment)
+            {
+                union.Alignment = field.Type.Alignment;
+            }
+            if (field.Type.Size > union.Size)
+            {
+                union.Size = field.Type.Size;
+            }
+        }
+
+        if (union.Size > 0)
+        {
+            var alignmentOffset = union.Size % union.Alignment;
+            if (alignmentOffset > 0)
+            {
+                union.Size += union.Alignment - alignmentOffset;
+            }
+        }
+
+        TypeTable.CreateTypeInfo(union);
+        Messages.Submit(MessageType.TypeCheckSuccessful, union);
+    }
+
+    private static bool CanUnionSizeBeDetermined(UnionAst union)
+    {
+        foreach (var field in union.Fields)
+        {
+            if (field.Type is StructAst fieldStruct)
+            {
+                if (!fieldStruct.Verified)
+                {
+                    return false;
+                }
+            }
+            else if (field.Type is UnionAst fieldUnion)
+            {
+                if (!fieldUnion.Verified)
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     private static bool VerifyFunctionDefinition(FunctionAst function)
@@ -2135,7 +2212,8 @@ public static class TypeChecker
         }
 
         // Structs with 0 size cannot be declared as global variables
-        if (declaration.Type?.TypeKind == TypeKind.Struct && declaration.Type.Size == 0) {
+        if (declaration.Type?.TypeKind == TypeKind.Struct && declaration.Type.Size == 0)
+        {
             ErrorReporter.Report($"Cannot declare global variable '{declaration.Name}' with an empty struct type '{declaration.Type.Name}'", declaration);
         }
 
