@@ -177,6 +177,7 @@ public class StructAst : IAst, IType
     public StructAst BaseStruct { get; set; }
     public bool Verified { get; set; }
     public bool Verifying { get; set; }
+    public bool QueuedForSizeResolve { get; set; }
     public List<string> Generics { get; set; }
     public IType[] GenericTypes { get; set; }
     public List<StructFieldAst> Fields { get; } = new();
@@ -305,6 +306,7 @@ public class UnionAst : IAst, IType
     public bool Private { get; set; }
     public bool Verified { get; set; }
     public bool Verifying { get; set; }
+    public bool QueuedForSizeResolve { get; set; }
     public List<UnionFieldAst> Fields { get; } = new();
     public IntPtr MessagePointer { get; set; }
 }
