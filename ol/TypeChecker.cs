@@ -186,13 +186,14 @@ public static class TypeChecker
     private static void ClearSizeResolveQueue()
     {
         var queueSize = _sizeResolveQueue.Count;
-        while (_sizeResolveQueue.TryDequeue(out var ast))
+        while (_sizeResolveQueue.TryDequeue(out var ast) && queueSize-- > 0)
         {
             if (ast is StructAst structAst)
             {
                 if (CanStructSizeBeDetermined(structAst))
                 {
                     DetermineStructSize(structAst);
+                    SubmitStruct(structAst);
                     structAst.QueuedForSizeResolve = false;
                     structAst.Verified = true;
                 }
@@ -206,6 +207,7 @@ public static class TypeChecker
                 if (CanUnionSizeBeDetermined(union))
                 {
                     DetermineUnionSize(union);
+                    SubmitUnion(union);
                     union.QueuedForSizeResolve = false;
                     union.Verified = true;
                 }
@@ -790,6 +792,7 @@ public static class TypeChecker
         structAst.Verifying = true;
         var i = 0;
         var scope = GetFileScope(structAst);
+        var unableToDetermineSize = false;
 
         if (structAst.BaseTypeDefinition != null)
         {
@@ -1019,17 +1022,26 @@ public static class TypeChecker
                     }
                 }
             }
+            else
+            {
+                unableToDetermineSize = true;
+            }
         }
 
-        if (!ErrorReporter.Errors.Any())
+        if (!unableToDetermineSize)
         {
-            if (structAst.QueuedForSizeResolve)
+            if (structAst.QueuedForSizeResolve && !ErrorReporter.Errors.Any())
             {
                 _sizeResolveQueue.Enqueue(structAst);
                 return;
             }
 
             DetermineStructSize(structAst);
+        }
+
+        if (!ErrorReporter.Errors.Any())
+        {
+            SubmitStruct(structAst);
         }
         structAst.Verified = true;
     }
@@ -1064,7 +1076,10 @@ public static class TypeChecker
                 structAst.Size += structAst.Alignment - alignmentOffset;
             }
         }
+    }
 
+    private static void SubmitStruct(StructAst structAst)
+    {
         TypeTable.CreateTypeInfo(structAst);
         Messages.Submit(MessageType.TypeCheckSuccessful, structAst);
     }
@@ -1099,6 +1114,7 @@ public static class TypeChecker
         var fieldNames = new HashSet<string>();
         union.Verifying = true;
         var scope = GetFileScope(union);
+        var unableToDetermineSize = false;
 
         if (union.Fields.Count == 0)
         {
@@ -1178,18 +1194,27 @@ public static class TypeChecker
                         }
                     }
                 }
+                else
+                {
+                    unableToDetermineSize = true;
+                }
             }
         }
 
-        if (!ErrorReporter.Errors.Any())
+        if (!unableToDetermineSize)
         {
-            if (union.QueuedForSizeResolve)
+            if (union.QueuedForSizeResolve && !ErrorReporter.Errors.Any())
             {
                 _sizeResolveQueue.Enqueue(union);
                 return;
             }
 
             DetermineUnionSize(union);
+        }
+
+        if (!ErrorReporter.Errors.Any())
+        {
+            SubmitUnion(union);
         }
         union.Verified = true;
     }
@@ -1216,7 +1241,10 @@ public static class TypeChecker
                 union.Size += union.Alignment - alignmentOffset;
             }
         }
+    }
 
+    private static void SubmitUnion(UnionAst union)
+    {
         TypeTable.CreateTypeInfo(union);
         Messages.Submit(MessageType.TypeCheckSuccessful, union);
     }
