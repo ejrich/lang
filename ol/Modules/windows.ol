@@ -36,6 +36,7 @@ bool WriteFile(Handle* hFile, void* lpBuffer, int nNumberOfBytesToWrite, int* nN
 bool GetFileTime(Handle* hFile, FILETIME* lpCreationTime,  FILETIME* lpLastAccessTime,  FILETIME* lpLastWriteTime) #extern "kernel32"
 
 bool CreatePipe(Handle** hReadPipe, Handle** hWritePipe, SECURITY_ATTRIBUTES* lpPipeAttributes, int nSize) #extern "kernel32"
+bool PeekNamedPipe(Handle* hNamedPipe, void* lpBuffer, int nBufferSize, int* lpBytesRead, int* lpTotalBytesAvail, int* lpBytesLeftThisMessage) #extern "kernel32"
 bool SetHandleInformation(Handle* hObject, HandleFlags dwMask, HandleFlags dwFlags) #extern "kernel32"
 bool CreateProcessA(string lpApplicationName, string lpCommandLine, SECURITY_ATTRIBUTES* lpProcessAttributes, SECURITY_ATTRIBUTES* lpThreadAttributes, bool bInheritHandles, ProcessCreationFlags dwCreationFlags, void* lpEnvironment, string lpCurrentDirectory, STARTUPINFOA* lpStartupInfo, PROCESS_INFORMATION* lpProcessInformation) #extern "kernel32"
 bool TerminateProcess(Handle* hProcess, int dwExitCode) #extern "kernel32"
