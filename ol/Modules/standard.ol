@@ -1284,6 +1284,7 @@ bool, string read_file(string file_path, Allocate allocator = default_allocator)
     success, file := open_file(file_path);
     if success {
         #if os == OS.Linux {
+            // TODO Handle large files
             size := lseek(file.handle, 0, Whence.SEEK_END);
             if size < 0 {
                 success = false;
@@ -1297,17 +1298,22 @@ bool, string read_file(string file_path, Allocate allocator = default_allocator)
             }
         }
         #if os == OS.Windows {
-            size := SetFilePointer(file.handle, 0, null, MoveMethod.FILE_END);
-            if size < 0 {
-                success = false;
-            }
-            else {
+            size: u64;
+            success = GetFileSizeEx(file.handle, &size);
+            if success {
                 SetFilePointer(file.handle, 0, null, MoveMethod.FILE_BEGIN);
 
                 file_contents = { length = size; data = allocator(size); }
 
                 read: int;
-                ReadFile(file.handle, file_contents.data, size, &read, null);
+                cursor: u64;
+                while size > 0 {
+                    read_size: int = 0x7FFFFFFF & size;
+                    ReadFile(file.handle, file_contents.data + cursor, read_size, &read, null);
+
+                    size -= read;
+                    cursor += read;
+                }
             }
         }
 
