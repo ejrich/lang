@@ -1096,7 +1096,11 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
             return false, file;
         }
         else if flags & FileFlags.Append {
-            lseek(file.handle, 0, Whence.SEEK_END);
+            result := lseek(file.handle, 0, Whence.SEEK_END);
+            if result < 0 {
+                close(file.handle);
+                return false, file;
+            }
         }
     }
     #if os == OS.Windows {
@@ -1142,7 +1146,11 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
             return false, file;
         }
         else if flags & FileFlags.Append {
-            SetFilePointer(file.handle, 0, null, MoveMethod.FILE_END);
+            result := SetFilePointer(file.handle, 0, null, MoveMethod.FILE_END);
+            if result < 0 {
+                CloseHandle(file.handle);
+                return false, file;
+            }
         }
     }
 
@@ -1277,20 +1285,30 @@ bool, string read_file(string file_path, Allocate allocator = default_allocator)
     if success {
         #if os == OS.Linux {
             size := lseek(file.handle, 0, Whence.SEEK_END);
-            lseek(file.handle, 0, Whence.SEEK_SET);
+            if size < 0 {
+                success = false;
+            }
+            else {
+                lseek(file.handle, 0, Whence.SEEK_SET);
 
-            file_contents = { length = size; data = allocator(size); }
+                file_contents = { length = size; data = allocator(size); }
 
-            read(file.handle, file_contents.data, size);
+                read(file.handle, file_contents.data, size);
+            }
         }
         #if os == OS.Windows {
             size := SetFilePointer(file.handle, 0, null, MoveMethod.FILE_END);
-            SetFilePointer(file.handle, 0, null, MoveMethod.FILE_BEGIN);
+            if size < 0 {
+                success = false;
+            }
+            else {
+                SetFilePointer(file.handle, 0, null, MoveMethod.FILE_BEGIN);
 
-            file_contents = { length = size; data = allocator(size); }
+                file_contents = { length = size; data = allocator(size); }
 
-            read: int;
-            ReadFile(file.handle, file_contents.data, size, &read, null);
+                read: int;
+                ReadFile(file.handle, file_contents.data, size, &read, null);
+            }
         }
 
         close_file(file);
