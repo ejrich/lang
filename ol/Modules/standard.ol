@@ -1301,8 +1301,6 @@ bool, string read_file(string file_path, Allocate allocator = default_allocator)
             size: u64;
             success = GetFileSizeEx(file.handle, &size);
             if success {
-                SetFilePointer(file.handle, 0, null, MoveMethod.FILE_BEGIN);
-
                 file_contents = { length = size; data = allocator(size); }
 
                 read: int;
@@ -1313,7 +1311,12 @@ bool, string read_file(string file_path, Allocate allocator = default_allocator)
 
                     size -= read;
                     cursor += read;
+                    if size > 0 {
+                        SetFilePointer(file.handle, read, null, MoveMethod.FILE_CURRENT);
+                    }
                 }
+
+                SetFilePointer(file.handle, 0, null, MoveMethod.FILE_BEGIN);
             }
         }
 
