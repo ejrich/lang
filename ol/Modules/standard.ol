@@ -1336,13 +1336,28 @@ bool, int read_file_into_buffer(File file, u8* buffer, int length) {
 
     #if os == OS.Linux {
         read = read(file.handle, buffer, length);
-        success = size < 0;
+        success = size >= 0;
     }
     #if os == OS.Windows {
         success = ReadFile(file.handle, buffer, length, &read, null);
     }
 
     return success, read;
+}
+
+bool move_to_start_of_file(File file) {
+    success: bool;
+
+    #if os == OS.Linux {
+        result := lseek(file.handle, 0, Whence.SEEK_SET);
+        success = result >= 0;
+    }
+    #if os == OS.Windows {
+        result := SetFilePointer(file.handle, 0, null, MoveMethod.FILE_BEGIN);
+        success = result >= 0;
+    }
+
+    return success;
 }
 
 write_to_file(File file, string format, Params args) {
