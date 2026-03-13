@@ -791,9 +791,9 @@ add_chars_to_string_buffer(StringBuffer* buffer, u8* chars, s64 length) {
 
         if length > max_copy_length {
             memory_copy(buffer.buffer.data + buffer.length, chars + char_index, max_copy_length);
-            buffer.length += max_copy_length;
 
             if buffer.flush != null {
+                buffer.length += max_copy_length;
                 buffer.flush(buffer.flush_data, buffer.buffer.data, buffer.length);
                 buffer.length = 0;
 
@@ -801,6 +801,7 @@ add_chars_to_string_buffer(StringBuffer* buffer, u8* chars, s64 length) {
                 length -= max_copy_length;
             }
             else {
+                buffer.length += length;
                 length = 0;
             }
         }

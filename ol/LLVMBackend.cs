@@ -1440,26 +1440,26 @@ public static unsafe class LLVMBackend
                         {
                             constraint = arguments.Length switch
                             {
-                                1 => "{di}",
-                                2 => "{di},{si}",
-                                3 => "{di},{si},{dx}",
-                                4 => "{di},{si},{dx},{r10}",
-                                5 => "{di},{si},{dx},{r10},{r8}",
-                                6 => "{di},{si},{dx},{r10},{r8},{r9}",
-                                _ => string.Empty
+                                1 => "{di},~{rcx},~{r11}",
+                                2 => "{di},{si},~{rcx},~{r11}",
+                                3 => "{di},{si},{dx},~{rcx},~{r11}",
+                                4 => "{di},{si},{dx},{r10},~{rcx},~{r11}",
+                                5 => "{di},{si},{dx},{r10},{r8},~{rcx},~{r11}",
+                                6 => "{di},{si},{dx},{r10},{r8},{r9},~{rcx},~{r11}",
+                                _ => "~{rcx},~{r11}"
                             };
                         }
                         else
                         {
                             constraint = arguments.Length switch
                             {
-                                1 => "=A,{di}",
-                                2 => "=A,{di},{si}",
-                                3 => "=A,{di},{si},{dx}",
-                                4 => "=A,{di},{si},{dx},{r10}",
-                                5 => "=A,{di},{si},{dx},{r10},{r8}",
-                                6 => "=A,{di},{si},{dx},{r10},{r8},{r9}",
-                                _ => "=A"
+                                1 => "=A,{di},~{rcx},~{r11}",
+                                2 => "=A,{di},{si},~{rcx},~{r11}",
+                                3 => "=A,{di},{si},{dx},~{rcx},~{r11}",
+                                4 => "=A,{di},{si},{dx},{r10},~{rcx},~{r11}",
+                                5 => "=A,{di},{si},{dx},{r10},{r8},~{rcx},~{r11}",
+                                6 => "=A,{di},{si},{dx},{r10},{r8},{r9},~{rcx},~{r11}",
+                                _ => "=A,~{rcx},~{r11}"
                             };
                         }
 
