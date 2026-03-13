@@ -1292,7 +1292,6 @@ bool, string read_file(File file, Allocate allocator = default_allocator) {
     success := true;
 
     #if os == OS.Linux {
-        // TODO Handle large files
         lseek(file.handle, 0, Whence.SEEK_SET);
         size := lseek(file.handle, 0, Whence.SEEK_END);
         if size < 0 {
