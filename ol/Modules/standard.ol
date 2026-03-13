@@ -1321,9 +1321,6 @@ bool, string read_file(File file, Allocate allocator = default_allocator) {
 
                 size -= read;
                 cursor += read;
-                if size > 0 {
-                    SetFilePointer(file.handle, read, null, MoveMethod.FILE_CURRENT);
-                }
             }
         }
     }
