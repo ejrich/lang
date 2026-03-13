@@ -1331,12 +1331,12 @@ bool, string read_file(File file, Allocate allocator = default_allocator) {
 }
 
 bool, int read_file_into_buffer(File file, u8* buffer, int length) {
-    success := true;
+    success: bool;
     read: int;
 
     #if os == OS.Linux {
         read = read(file.handle, buffer, length);
-        success = size >= 0;
+        success = read >= 0;
     }
     #if os == OS.Windows {
         success = ReadFile(file.handle, buffer, length, &read, null);
