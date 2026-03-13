@@ -1279,51 +1279,74 @@ bool close_file(File file) {
 }
 
 bool, string read_file(string file_path, Allocate allocator = default_allocator) {
-    file_contents: string;
-
     success, file := open_file(file_path);
     if success {
-        #if os == OS.Linux {
-            // TODO Handle large files
-            size := lseek(file.handle, 0, Whence.SEEK_END);
-            if size < 0 {
-                success = false;
-            }
-            else {
-                lseek(file.handle, 0, Whence.SEEK_SET);
-
-                file_contents = { length = size; data = allocator(size); }
-
-                read(file.handle, file_contents.data, size);
-            }
-        }
-        #if os == OS.Windows {
-            size: u64;
-            success = GetFileSizeEx(file.handle, &size);
-            if success {
-                file_contents = { length = size; data = allocator(size); }
-
-                read: int;
-                cursor: u64;
-                while size > 0 {
-                    read_size: int = 0x7FFFFFFF & size;
-                    ReadFile(file.handle, file_contents.data + cursor, read_size, &read, null);
-
-                    size -= read;
-                    cursor += read;
-                    if size > 0 {
-                        SetFilePointer(file.handle, read, null, MoveMethod.FILE_CURRENT);
-                    }
-                }
-
-                SetFilePointer(file.handle, 0, null, MoveMethod.FILE_BEGIN);
-            }
-        }
-
-        close_file(file);
+        return read_file(file, allocator);
     }
 
+    return success, empty_string;
+}
+
+bool, string read_file(File file, Allocate allocator = default_allocator) {
+    file_contents: string;
+    success := true;
+
+    #if os == OS.Linux {
+        // TODO Handle large files
+        lseek(file.handle, 0, Whence.SEEK_SET);
+        size := lseek(file.handle, 0, Whence.SEEK_END);
+        if size < 0 {
+            success = false;
+        }
+        else {
+            lseek(file.handle, 0, Whence.SEEK_SET);
+
+            file_contents = { length = size; data = allocator(size); }
+
+            read(file.handle, file_contents.data, size);
+        }
+    }
+    #if os == OS.Windows {
+        SetFilePointer(file.handle, 0, null, MoveMethod.FILE_BEGIN);
+
+        size: u64;
+        success = GetFileSizeEx(file.handle, &size);
+        if success {
+            file_contents = { length = size; data = allocator(size); }
+
+            read: int;
+            cursor: u64;
+            while size > 0 {
+                read_size: int = 0x7FFFFFFF & size;
+                ReadFile(file.handle, file_contents.data + cursor, read_size, &read, null);
+
+                size -= read;
+                cursor += read;
+                if size > 0 {
+                    SetFilePointer(file.handle, read, null, MoveMethod.FILE_CURRENT);
+                }
+            }
+        }
+    }
+
+    close_file(file);
+
     return success, file_contents;
+}
+
+bool, int read_file_into_buffer(File file, u8* buffer, int length) {
+    success := true;
+    read: int;
+
+    #if os == OS.Linux {
+        read = read(file.handle, buffer, length);
+        success = size < 0;
+    }
+    #if os == OS.Windows {
+        success = ReadFile(file.handle, buffer, length, &read, null);
+    }
+
+    return success, read;
 }
 
 write_to_file(File file, string format, Params args) {
