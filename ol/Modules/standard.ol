@@ -1361,6 +1361,43 @@ bool move_to_start_of_file(File file) {
     return success;
 }
 
+bool copy_file(string source, string target) {
+    success: bool;
+
+    #if os == OS.Linux {
+        source_opened, source_file := open_file(source);
+        if !source_opened {
+            success = false;
+        }
+        else {
+            defer close_file(source_file);
+
+            target_opened, target_file := open_file(target, FileFlags.Create);
+            if !target_opened {
+                success = false;
+            }
+            else {
+                defer close_file(target_file);
+
+                size := lseek(source_file.handle, 0, Whence.SEEK_END);
+                if size < 0 {
+                    success = false;
+                }
+                else {
+                    lseek(source_file.handle, 0, Whence.SEEK_SET);
+                    result := sendfile(source_file.handle, target_file.handle, null, size);
+                    success = result >= 0;
+                }
+            }
+        }
+    }
+    #if os == OS.Windows {
+        success = CopyFileA(source, target, false);
+    }
+
+    return success;
+}
+
 write_to_file(File file, string format, Params args) {
     if args.length == 0 {
         write_buffer_to_file(file, format.data, format.length);

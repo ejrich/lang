@@ -35,6 +35,7 @@ int dup2(int oldfd, int newfd) #syscall 33
 int pause() #syscall 34
 int nanosleep(Timespec* req, Timespec* rem) #syscall 35
 int getpid() #syscall 39
+s64 sendfile(int out_fd, int in_fd, s64* offset, s64 count) #syscall 40
 int clone(CloneFlags clone_flags, void* newsp, int* parent_tidptr, int* child_tidptr, u64 tls) #syscall 56
 int fork() #syscall 57
 int vfork() #syscall 58

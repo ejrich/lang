@@ -29,6 +29,7 @@ Handle* CreateFileA(string lpFileName, int dwDesiredAccess, int dwShareMode, SEC
 bool DeleteFileA(string lpFileName) #extern "kernel32"
 bool CloseHandle(Handle* hObject) #extern "kernel32"
 bool CreateDirectoryA(string lpPathName, SECURITY_ATTRIBUTES* lpSecurityAttributes) #extern "kernel32"
+bool CopyFileA(string lpExistingFileName, string lpNewFileName, bool bFailIfExists) #extern "kernel32"
 
 int SetFilePointer(Handle* hFile, u32 lDistanceToMove, u32* lpDistanceToMoveHigh, MoveMethod dwMoveMethod) #extern "kernel32"
 bool GetFileSizeEx(Handle* hFile, u64* lpFileSize) #extern "kernel32"

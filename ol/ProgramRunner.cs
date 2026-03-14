@@ -36,7 +36,7 @@ public static unsafe class ProgramRunner
     private static readonly Dictionary<string, Dictionary<string, IntPtr>> LibraryFunctionPointers = new();
     private static readonly List<IntPtr> Globals = new();
     #if _LINUX
-    private static readonly byte*[] EnvironmentVariablePointers;
+    private static readonly IntPtr EnvironmentVariablesPointer;
     #endif
 
     private static int _typeCount;
@@ -55,14 +55,22 @@ public static unsafe class ProgramRunner
 
         #if _LINUX
         var environmentVariables = Environment.GetEnvironmentVariables();
-        EnvironmentVariablePointers = new byte*[environmentVariables.Count + 1];
+        var environmentVariablePointers = new IntPtr[environmentVariables.Count + 1];
         var i = 0;
         foreach (DictionaryEntry variable in environmentVariables)
         {
             var value = $"{variable.Key}={variable.Value}";
-            EnvironmentVariablePointers[i++] = (byte*)Allocator.AllocateString(value).ToPointer();
+            environmentVariablePointers[i++] = Allocator.AllocateString(value);
         }
-        EnvironmentVariablePointers[^1] = null;
+        environmentVariablePointers[^1] = IntPtr.Zero;
+
+        var environmentVariablesArraySize = environmentVariablePointers.Length * sizeof(IntPtr);
+        EnvironmentVariablesPointer = Allocator.Allocate(environmentVariablesArraySize);
+
+        fixed (IntPtr* pointer = &environmentVariablePointers[0])
+        {
+            Buffer.MemoryCopy(pointer, EnvironmentVariablesPointer.ToPointer(), environmentVariablesArraySize, environmentVariablesArraySize);
+        }
         #endif
     }
 
@@ -103,9 +111,9 @@ public static unsafe class ProgramRunner
         #if _LINUX
         else if (variable.Name == "__environment_variables_pointer")
         {
-            fixed (byte** p = EnvironmentVariablePointers)
+            fixed (IntPtr* p = &EnvironmentVariablesPointer)
             {
-                Buffer.MemoryCopy(&p, pointer.ToPointer(), 8, 8);
+                Buffer.MemoryCopy(p, pointer.ToPointer(), 8, 8);
             }
         }
         #endif
