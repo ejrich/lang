@@ -85,31 +85,34 @@ public static class Allocator
 
     private static (IntPtr, int, MemoryBlock) FindMemoryBlock(int size, List<MemoryBlock> blocks)
     {
-        // Search for a memory block with open space
-        for (var i = 0; i < blocks.Count; i++)
+        lock (blocks)
         {
-            var block = blocks[i];
-            while (true)
+            // Search for a memory block with open space
+            for (var i = 0; i < blocks.Count; i++)
             {
-                var cursor = block.Cursor;
-                if (size > block.Size - cursor) break;
-
-                if (Interlocked.CompareExchange(ref block.Cursor, cursor + size, cursor) == cursor)
+                var block = blocks[i];
+                while (true)
                 {
-                    var pointer = block.Pointer + cursor;
-                    return (pointer, cursor, block);
+                    var cursor = block.Cursor;
+                    if (size > block.Size - cursor) break;
+
+                    if (Interlocked.CompareExchange(ref block.Cursor, cursor + size, cursor) == cursor)
+                    {
+                        var pointer = block.Pointer + cursor;
+                        return (pointer, cursor, block);
+                    }
                 }
             }
+
+            // Allocate a new block if necessary
+            var blockPointer = Marshal.AllocHGlobal(BlockSize);
+            _openPointers.Add(blockPointer);
+
+            var memoryBlock = new MemoryBlock {Pointer = blockPointer, Cursor = size, Size = BlockSize};
+            blocks.Add(memoryBlock);
+
+            return (blockPointer, 0, memoryBlock);
         }
-
-        // Allocate a new block if necessary
-        var blockPointer = Marshal.AllocHGlobal(BlockSize);
-        _openPointers.Add(blockPointer);
-
-        var memoryBlock = new MemoryBlock {Pointer = blockPointer, Cursor = size, Size = BlockSize};
-        blocks.Add(memoryBlock);
-
-        return (blockPointer, 0, memoryBlock);
     }
 
     public static void Free()

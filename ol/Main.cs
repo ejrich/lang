@@ -37,11 +37,14 @@ public static class BuildSettings
 
     public static int AddFile(string file)
     {
-        var fileIndex = Files.Count;
-        Files.Add(file);
-        FileNames.Add(Allocator.MakeString(GetFileName(file), false));
-        TypeChecker.PrivateScopes.Add(null);
-        return fileIndex;
+        lock (Files)
+        {
+            var fileIndex = Files.Count;
+            Files.Add(file);
+            FileNames.Add(Allocator.MakeString(GetFileName(file), false));
+            TypeChecker.PrivateScopes.Add(null);
+            return fileIndex;
+        }
     }
 
     private static string GetFileName(string name) => name.Replace(BuildSettings.Path, string.Empty);
