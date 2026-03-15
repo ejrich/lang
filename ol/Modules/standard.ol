@@ -1051,11 +1051,12 @@ else {
 }
 
 enum FileFlags {
-    None   = 0;
-    Read   = 1;
-    Write  = 2;
-    Create = 4;
-    Append = 8;
+    None     = 0;
+    Read     = 1;
+    Write    = 2;
+    Create   = 4;
+    Truncate = 8;
+    Append   = 16;
 }
 
 bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
@@ -1083,6 +1084,9 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
                 open_flags |= OpenFlags.O_WRONLY;
             }
             open_flags |= OpenFlags.O_CREAT;
+        }
+        if flags & FileFlags.Truncate {
+            open_flags |= OpenFlags.O_TRUNC;
         }
         if flags & FileFlags.Append {
             if (flags & FileFlags.Write) == FileFlags.None {
@@ -1126,6 +1130,9 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
             if (flags & FileFlags.Write) == FileFlags.None {
                 open_type |= OpenFileType.OF_WRITE;
             }
+            open_type |= OpenFileType.OF_CREATE;
+        }
+        if flags & FileFlags.Truncate {
             open_type |= OpenFileType.OF_CREATE;
         }
         if flags & FileFlags.Append {
@@ -1382,8 +1389,7 @@ bool copy_file(string source, string target) {
             else {
                 defer close(target_fd);
 
-                result := sendfile(source_fd, target_fd, null, stat.st_size);
-                print("% % % %\n", source, target, stat.st_size, result);
+                result := sendfile(target_fd, source_fd, null, stat.st_size);
                 success = result >= 0;
             }
         }
