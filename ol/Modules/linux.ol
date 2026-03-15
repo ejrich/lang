@@ -6,11 +6,11 @@
 
 s64 read(int fd, u8* buf, u64 count) #syscall 0
 s64 write(int fd, u8* buf, u64 count) #syscall 1
-int open(u8* pathname, OpenFlags flags, OpenMode mode) #syscall 2
+int open(u8* pathname, OpenFlags flags, FileMode mode) #syscall 2
 int close(int fd) #syscall 3
 int stat(u8* path, Stat* buf) #syscall 4
 int fstat(int fd, Stat* buf) #syscall 5
-int lstat(int fd, Stat* buf) #syscall 6
+int lstat(u8* path, Stat* buf) #syscall 6
 int poll(PollFd* ufds, u32 nfds, int timeout) #syscall 7
 s64 lseek(int fd, u64 offset, Whence whence) #syscall 8
 void* mmap(void* addr, u64 length, Prot prot, MmapFlags flags, int fd, u64 offset) #syscall 9
@@ -49,6 +49,7 @@ int fchdir(int fd) #syscall 81
 int rename(u8* oldname, u8* newname) #syscall 82
 int mkdir(u8* pathname, int mode) #syscall 83
 int unlink(u8* path) #syscall 87
+int symlink(u8* old, u8* new) #syscall 88
 int readlink(u8* path, u8* buf, int bufsize) #syscall 89
 int setpgid(int pid, int pgid) #syscall 109
 int futex(u32* uaddr, FutexOperation op, u32 val, Timespec* timeout, u32* uaddr2, u32 val3) #syscall 202
@@ -91,7 +92,8 @@ enum OpenFlags {
     O_TMPFILE   = 0x410000;
 }
 
-enum OpenMode {
+enum FileMode : u32 {
+    S_NONE  = 0x0;
     S_IXOTH = 0x1;
     S_IWOTH = 0x2;
     S_IROTH = 0x4;
@@ -105,27 +107,6 @@ enum OpenMode {
     S_IRUSR = 0x100;
     S_IRWXU = 0x1C0;
     S_RWALL = 0x1B6;
-}
-
-struct Stat {
-    st_dev: u64;
-    st_ino: u64;
-    st_nlink: u64;
-    st_mode: StatMode;
-    st_uid: int;
-    st_gid: int;
-    __pad0: int;
-    st_rdev: u64;
-    st_size: u64;
-    st_blksize: u64;
-    st_blocks: u64;
-    st_atim: Timespec;
-    st_mtim: Timespec;
-    st_ctim: Timespec;
-    __reserved: CArray<u64>[3];
-}
-
-enum StatMode : u32 {
     S_ISVTX  = 0x200;
     S_ISGID  = 0x400;
     S_ISUID  = 0x800;
@@ -137,6 +118,24 @@ enum StatMode : u32 {
     S_IFLNK	 = 0xA000;
     S_IFSOCK = 0xC000;
     S_IFMT   = 0xF000;
+}
+
+struct Stat {
+    st_dev: u64;
+    st_ino: u64;
+    st_nlink: u64;
+    st_mode: FileMode;
+    st_uid: int;
+    st_gid: int;
+    __pad0: int;
+    st_rdev: u64;
+    st_size: u64;
+    st_blksize: u64;
+    st_blocks: u64;
+    st_atim: Timespec;
+    st_mtim: Timespec;
+    st_ctim: Timespec;
+    __reserved: CArray<u64>[3];
 }
 
 struct PollFd {

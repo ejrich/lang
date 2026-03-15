@@ -1011,7 +1011,7 @@ bool is_directory(string path) {
         stat_buf: Stat;
         exists := stat(null_terminated_path.data, &stat_buf) == 0;
         if exists {
-            result = (stat_buf.st_mode & StatMode.S_IFMT) == StatMode.S_IFDIR;
+            result = (stat_buf.st_mode & FileMode.S_IFMT) == FileMode.S_IFDIR;
         }
     }
     #if os == OS.Windows {
@@ -1082,7 +1082,7 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
             if (flags & FileFlags.Write) == FileFlags.None {
                 open_flags |= OpenFlags.O_WRONLY;
             }
-            open_flags |= OpenFlags.O_CREAT | OpenFlags.O_TRUNC;
+            open_flags |= OpenFlags.O_CREAT;
         }
         if flags & FileFlags.Append {
             if (flags & FileFlags.Write) == FileFlags.None {
@@ -1091,7 +1091,7 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
             open_flags |= OpenFlags.O_CREAT | OpenFlags.O_APPEND;
         }
 
-        file.handle = open(null_terminated_path.data, open_flags, OpenMode.S_RWALL);
+        file.handle = open(null_terminated_path.data, open_flags, FileMode.S_RWALL);
 
         if file.handle < 0 {
             return false, file;
@@ -1196,7 +1196,7 @@ bool, Array<FileEntry> get_files_in_directory(string path, Allocate allocator = 
         null_terminated_path[path.length] = 0;
 
         open_flags := OpenFlags.O_RDONLY | OpenFlags.O_NONBLOCK | OpenFlags.O_DIRECTORY | OpenFlags.O_LARGEFILE | OpenFlags.O_CLOEXEC;
-        directory := open(null_terminated_path.data, open_flags, OpenMode.S_RWALL);
+        directory := open(null_terminated_path.data, open_flags, FileMode.S_RWALL);
 
         if directory < 0 {
             return false, files;
@@ -1293,17 +1293,17 @@ bool, string read_file(File file, Allocate allocator = default_allocator) {
     success := true;
 
     #if os == OS.Linux {
-        lseek(file.handle, 0, Whence.SEEK_SET);
-        size := lseek(file.handle, 0, Whence.SEEK_END);
-        if size < 0 {
+        stat: Stat;
+        result := fstat(file.handle, &stat);
+        if result < 0 {
             success = false;
         }
         else {
             lseek(file.handle, 0, Whence.SEEK_SET);
 
-            file_contents = { length = size; data = allocator(size); }
+            file_contents = { length = stat.st_size; data = allocator(stat.st_size); }
 
-            read(file.handle, file_contents.data, size);
+            read(file.handle, file_contents.data, stat.st_size);
         }
     }
     #if os == OS.Windows {
@@ -1365,29 +1365,26 @@ bool copy_file(string source, string target) {
     success: bool;
 
     #if os == OS.Linux {
-        source_opened, source_file := open_file(source);
-        if !source_opened {
+        source_fd := open(source.data, OpenFlags.O_RDONLY, FileMode.S_NONE);
+        if source_fd < 0 {
             success = false;
         }
         else {
-            defer close_file(source_file);
+            defer close(source_fd);
 
-            target_opened, target_file := open_file(target, FileFlags.Create);
-            if !target_opened {
+            stat: Stat;
+            fstat(source_fd, &stat);
+
+            target_fd := open(target.data, OpenFlags.O_WRONLY | OpenFlags.O_CREAT, stat.st_mode);
+            if target_fd < 0 {
                 success = false;
             }
             else {
-                defer close_file(target_file);
+                defer close(target_fd);
 
-                size := lseek(source_file.handle, 0, Whence.SEEK_END);
-                if size < 0 {
-                    success = false;
-                }
-                else {
-                    lseek(source_file.handle, 0, Whence.SEEK_SET);
-                    result := sendfile(source_file.handle, target_file.handle, null, size);
-                    success = result >= 0;
-                }
+                result := sendfile(source_fd, target_fd, null, stat.st_size);
+                print("% % % %\n", source, target, stat.st_size, result);
+                success = result >= 0;
             }
         }
     }
