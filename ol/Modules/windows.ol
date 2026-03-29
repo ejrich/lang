@@ -49,6 +49,7 @@ bool TerminateJobObject(Handle* hJob, u32 uExitCode) #extern "kernel32"
 bool AssignProcessToJobObject(Handle* hJob, Handle* hProcess) #extern "kernel32"
 
 Handle* FindFirstFileA(string lpFileName, WIN32_FIND_DATAA* lpFindFileData) #extern "kernel32"
+Handle* FindFirstFileExA(string lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAA* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, void* lpSearchFilter, int dwAdditionalFlags) #extern "kernel32"
 bool FindNextFileA(Handle* hFindHandle, WIN32_FIND_DATAA* lpFindFileData) #extern "kernel32"
 bool FindClose(Handle* hFindFile) #extern "kernel32"
 
@@ -267,6 +268,19 @@ enum ProcessCreationFlags {
     CREATE_PRESERVE_CODE_AUTHZ_LEVEL = 0x02000000;
     CREATE_DEFAULT_ERROR_MODE        = 0x04000000;
     CREATE_NO_WINDOW                 = 0x08000000;
+}
+
+enum FINDEX_INFO_LEVELS {
+    FindExInfoStandard;
+    FindExInfoBasic;
+    FindExInfoMaxInfoLevel;
+}
+
+enum FINDEX_SEARCH_OPS {
+    FindExSearchNameMatch;
+    FindExSearchLimitToDirectories;
+    FindExSearchLimitToDevices;
+    FindExSearchMaxSearchOp;
 }
 
 struct WIN32_FIND_DATAA {

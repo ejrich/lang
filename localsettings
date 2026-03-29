@@ -1,0 +1,6 @@
+- Settings
+source_control=Perforce
+perforce_client_suffix=-lang
+
+- Commands
+F8=dotnet build --no-restore
