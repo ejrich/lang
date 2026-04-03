@@ -18,7 +18,7 @@ int mprotect(void* addr, u64 length, Prot prot) #syscall 10
 int munmap(void* addr, u64 length) #syscall 11
 int brk(void* addr) #syscall 12
 int rt_sigaction(int sig, Sigaction* act, Sigaction* oact, u64 sigsetsize) #syscall 13
-int rt_sigprocmask(Sighow how, Sigset_T* set, Sigset_T* oset, u64 sigsetsize) #syscall 14
+int rt_sigprocmask(Sighow how, Sigset* set, Sigset* oset, u64 sigsetsize) #syscall 14
 int rt_sigreturn() #syscall 15
 int ioctl(int fd, u32 cmd, u64 arg) #syscall 16
 int pread64(int fd, u8* buf, u64 count, u64 pos) #syscall 17
@@ -115,7 +115,7 @@ enum FileMode : u32 {
     S_IFDIR  = 0x4000;
     S_IFBLK  = 0x6000;
     S_IFREG  = 0x8000;
-    S_IFLNK	 = 0xA000;
+    S_IFLNK  = 0xA000;
     S_IFSOCK = 0xC000;
     S_IFMT   = 0xF000;
 }
@@ -175,12 +175,22 @@ enum MmapFlags {
     MAP_FIXED_NOREPLACE = 0x100000;
 }
 
+interface SigHandler(int signal)
+interface SigRestorer()
+
 struct Sigaction {
+    sa_handler: SigHandler;
+    sa_flags: u64;
+    sa_restorer: SigRestorer;
+    sa_mask: Sigset;
+}
+
+struct SigInfo {
     // @Incomplete Add fields before using
 }
 
-struct Sigset_T {
-    // @Incomplete Add fields before using
+struct Sigset {
+    data: CArray<u64>[16];
 }
 
 enum Sighow {
