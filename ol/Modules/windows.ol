@@ -123,6 +123,9 @@ Handle* GlobalAlloc(u32 uFlags, u32 dwBytes) #extern "kernel32"
 void* GlobalLock(Handle* hMem) #extern "kernel32"
 bool GlobalUnlock(Handle* hMem) #extern "kernel32"
 
+EXCEPTION_HANDLER SetUnhandledExceptionFilter(EXCEPTION_HANDLER lpTopLevelExceptionFilter) #extern "kernel32"
+void* AddVectoredExceptionHandler(u64 First, EXCEPTION_HANDLER Handler) #extern "kernel32"
+
 STD_INPUT_HANDLE  := -10; #const
 STD_OUTPUT_HANDLE := -11; #const
 STD_ERROR_HANDLE  := -12; #const
@@ -1610,6 +1613,134 @@ enum ClipboardFormat : u32 {
     CF_WAVE         = 12;
     CF_UNICODETEXT  = 13;
     CF_ENHMETAFILE  = 14;
+}
+
+interface int EXCEPTION_HANDLER(EXCEPTION_POINTERS* ExceptionInfo)
+
+struct EXCEPTION_POINTERS {
+    ExceptionRecord: EXCEPTION_RECORD*;
+    ContextRecord: CONTEXT*;
+}
+
+EXCEPTION_MAXIMUM_PARAMETERS := 15; #const
+
+struct EXCEPTION_RECORD {
+    ExceptionCode: int;
+    ExceptionFlags: int;
+    ExceptionRecord: EXCEPTION_RECORD*;
+    ExceptionAddress: void*;
+    NumberParameters: int;
+    ExceptionInformation: CArray<u64*>[EXCEPTION_MAXIMUM_PARAMETERS];
+}
+
+struct CONTEXT {
+    // Register parameter home addresses
+    P1Home: s64;
+    P2Home: s64;
+    P3Home: s64;
+    P4Home: s64;
+    P5Home: s64;
+    P6Home: s64;
+    // Control flags
+    ContextFlags: int;
+    MxCsr: int;
+    // Segment Registers and processor flags
+    SegCs: s16;
+    SegDs: s16;
+    SegEs: s16;
+    SegFs: s16;
+    SegGs: s16;
+    SegSs: s16;
+    EFlags: int;
+    // Debug registers
+    Dr0: s64;
+    Dr1: s64;
+    Dr2: s64;
+    Dr3: s64;
+    Dr6: s64;
+    Dr7: s64;
+    // Integer registers
+    Rax: s64;
+    Rcx: s64;
+    Rdx: s64;
+    Rbx: s64;
+    Rsp: s64;
+    Rbp: s64;
+    Rsi: s64;
+    Rdi: s64;
+    R8: s64;
+    R9: s64;
+    R10: s64;
+    R11: s64;
+    R12: s64;
+    R13: s64;
+    R14: s64;
+    R15: s64;
+    // Program counter
+    Rip: s64;
+    // Floating point state
+    FltState: CONTEXT_FLOATING_POINT_STATE;
+    // Vector registers
+    VectorRegister: CArray<M128A>[26];
+    VectorControl: s64;
+    // Special debug control registers
+    DebugControl: s64;
+    LastBranchToRip: s64;
+    LastBranchFromRip: s64;
+    LastExceptionToRip: s64;
+    LastExceptionFromRip: s64;
+}
+
+union CONTEXT_FLOATING_POINT_STATE {
+    FltSave: XMM_SAVE_AREA32;
+    FltRegisters: CONTEXT_FLOATING_POINT_STATE_REGISTERS;
+}
+
+struct XMM_SAVE_AREA32 {
+    ControlWord: s16;
+    StatusWord: s16;
+    TagWord: s8;
+    Reserved1: s8;
+    ErrorOpcode: s16;
+    ErrorOffset: s32;
+    ErrorSelector: s16;
+    Reserved2: s16;
+    DataOffset: s32;
+    DataSelector: s16;
+    Reserved3: s16;
+    MxCsr: s32;
+    MxCsr_Mask: s32;
+    FloatRegisters: CArray<M128A>[8];
+    XmmRegisters: CArray<M128A>[16];
+    Reserved4: CArray<s8>[96];
+}
+
+struct CONTEXT_FLOATING_POINT_STATE_REGISTERS {
+    Header: CArray<M128A>[2];
+    Legacy: CArray<M128A>[8];
+    Xmm0: M128A;
+    Xmm1: M128A;
+    Xmm2: M128A;
+    Xmm3: M128A;
+    Xmm4: M128A;
+    Xmm5: M128A;
+    Xmm6: M128A;
+    Xmm7: M128A;
+    Xmm8: M128A;
+    Xmm9: M128A;
+    Xmm10: M128A;
+    Xmm11: M128A;
+    Xmm12: M128A;
+    Xmm13: M128A;
+    Xmm14: M128A;
+    Xmm15: M128A;
+}
+
+struct M128A {
+    a: float;
+    b: float;
+    c: float;
+    d: float;
 }
 
 
