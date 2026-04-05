@@ -29,6 +29,8 @@ Handle* OpenFile(string lpFileName, OFSTRUCT* lpReOpenBuff, OpenFileType uStyle)
 Handle* CreateFileA(string lpFileName, int dwDesiredAccess, int dwShareMode, SECURITY_ATTRIBUTES* lpSecurityAttributes, int dwCreationDisposition, int dwFlagsAndAttributes, Handle* hTemplateFile) #extern "kernel32"
 bool DeleteFileA(string lpFileName) #extern "kernel32"
 bool CloseHandle(Handle* hObject) #extern "kernel32"
+bool SetFileInformationByHandle(Handle* hFile, FILE_INFO_BY_HANDLE_CLASS FileInformationClass, void* lpFileInformation,
+int dwBufferSize) #extern "kernel32"
 bool CreateDirectoryA(string lpPathName, SECURITY_ATTRIBUTES* lpSecurityAttributes) #extern "kernel32"
 bool CopyFileA(string lpExistingFileName, string lpNewFileName, bool bFailIfExists) #extern "kernel32"
 
@@ -205,6 +207,35 @@ enum OpenFileType {
     OF_PROMPT           = 0x2000;
     OF_EXIST            = 0x4000;
     OF_REOPEN           = 0x8000;
+}
+
+enum FILE_INFO_BY_HANDLE_CLASS {
+    FileBasicInfo;
+    FileStandardInfo;
+    FileNameInfo;
+    FileRenameInfo;
+    FileDispositionInfo;
+    FileAllocationInfo;
+    FileEndOfFileInfo;
+    FileStreamInfo;
+    FileCompressionInfo;
+    FileAttributeTagInfo;
+    FileIdBothDirectoryInfo;
+    FileIdBothDirectoryRestartInfo;
+    FileIoPriorityHintInfo;
+    FileRemoteProtocolInfo;
+    FileFullDirectoryInfo;
+    FileFullDirectoryRestartInfo;
+    FileStorageInfo;
+    FileAlignmentInfo;
+    FileIdInfo;
+    FileIdExtdDirectoryInfo;
+    FileIdExtdDirectoryRestartInfo;
+    FileDispositionInfoEx;
+    FileRenameInfoEx;
+    FileCaseSensitiveInfo;
+    FileNormalizedNameInfo;
+    MaximumFileInfoByHandleClass;
 }
 
 enum MoveMethod {
