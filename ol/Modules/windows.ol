@@ -8,6 +8,7 @@ int GetLastError() #extern "kernel32"
 void* VirtualAlloc(void* lpAddress, u64 dwSize, AllocationType flAllocationType, ProtectionType flProtect) #extern "kernel32"
 bool VirtualFree(void* lpAddress, u64 dwSize, FreeType dwFreeType) #extern "kernel32"
 s64 VirtualQuery(void* lpAddress, MEMORY_BASIC_INFORMATION* lpBuffer, int dwLength) #extern "kernel32"
+Handle* GetCurrentProcess() #extern "kernel32"
 ExitProcess(int uExitCode) #extern "kernel32"
 
 Sleep(int dwMilliseconds) #extern "kernel32"
@@ -123,6 +124,11 @@ Handle* GlobalAlloc(u32 uFlags, u32 dwBytes) #extern "kernel32"
 void* GlobalLock(Handle* hMem) #extern "kernel32"
 bool GlobalUnlock(Handle* hMem) #extern "kernel32"
 
+bool SymInitialize(Handle* hProcess, string UserSearchPath, bool fInvadeProcess) #extern "Dbghelp"
+int SymSetOptions(int SymOptions) #extern "Dbghelp"
+bool SymFromAddr(Handle* hProcess, s64 Address, s64* Displacement, SYMBOL_INFO* Symbol) #extern "Dbghelp"
+bool SymGetLineFromAddr64(Handle* hProcess, s64 Address, int* Displacement, IMAGEHLP_LINE* Line64) #extern "Dbghelp"
+s16 RtlCaptureStackBackTrace(int FramesToSkip, int FramesToCapture, void** BackTrace, s32* BackTraceHash) #extern "OneCoreUAP"
 EXCEPTION_HANDLER SetUnhandledExceptionFilter(EXCEPTION_HANDLER lpTopLevelExceptionFilter) #extern "kernel32"
 void* AddVectoredExceptionHandler(u64 First, EXCEPTION_HANDLER Handler) #extern "kernel32"
 
@@ -1613,6 +1619,32 @@ enum ClipboardFormat : u32 {
     CF_WAVE         = 12;
     CF_UNICODETEXT  = 13;
     CF_ENHMETAFILE  = 14;
+}
+
+struct SYMBOL_INFO {
+    SizeOfStruct: u32;
+    TypeIndex: u32;
+    Reserved: CArray<u64>[2];
+    Index: u32;
+    Size: u32;
+    ModBase: u64;
+    Flags: u32;
+    Value: u64;
+    Address: u64;
+    Register: u32;
+    Scope: u32;
+    Tag: u32;
+    NameLen: u32;
+    MaxNameLen: u32;
+    Name: CArray<u8>[1];
+}
+
+struct IMAGEHLP_LINE {
+  SizeOfStruct: u32;
+  Key: void*;
+  LineNumber: u32;
+  FileName: u8*;
+  Address: u64;
 }
 
 interface int EXCEPTION_HANDLER(EXCEPTION_POINTERS* ExceptionInfo)
