@@ -1080,16 +1080,28 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
             }
         }
         if flags & FileFlags.Create {
-            if (flags & FileFlags.Write) == FileFlags.None {
+            if flags & FileFlags.Read {
+                open_flags |= OpenFlags.O_RDWR;
+            }
+            else if (flags & FileFlags.Write) == FileFlags.None {
                 open_flags |= OpenFlags.O_WRONLY;
             }
             open_flags |= OpenFlags.O_CREAT;
         }
         if flags & FileFlags.Truncate {
+            if flags & FileFlags.Read {
+                open_flags |= OpenFlags.O_RDWR;
+            }
+            else if (flags & FileFlags.Write) == FileFlags.None {
+                open_flags |= OpenFlags.O_WRONLY;
+            }
             open_flags |= OpenFlags.O_TRUNC;
         }
         if flags & FileFlags.Append {
-            if (flags & FileFlags.Write) == FileFlags.None {
+            if flags & FileFlags.Read {
+                open_flags |= OpenFlags.O_RDWR;
+            }
+            else if (flags & FileFlags.Write) == FileFlags.None {
                 open_flags |= OpenFlags.O_WRONLY;
             }
             open_flags |= OpenFlags.O_CREAT | OpenFlags.O_APPEND;
@@ -1099,13 +1111,6 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
 
         if file.handle < 0 {
             return false, file;
-        }
-        else if flags & FileFlags.Append {
-            result := lseek(file.handle, 0, Whence.SEEK_END);
-            if result < 0 {
-                close(file.handle);
-                return false, file;
-            }
         }
     }
     #if os == OS.Windows {
