@@ -1112,53 +1112,39 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
         file_exists := PathFileExistsA(null_terminated_path.data);
         if !file_exists && flags == FileFlags.Read return false, file;
 
-        open_type: OpenFileType;
-        file_info: OFSTRUCT;
+        access: DesiredAccess;
+        share_mode: ShareMode;
+        disposition: CreationDisposition;
 
         if flags & FileFlags.Read {
-            open_type |= OpenFileType.OF_READ;
+            access |= DesiredAccess.FILE_READ_DATA;
+            disposition = CreationDisposition.OPEN_EXISTING;
         }
         if flags & FileFlags.Write {
-            if flags & FileFlags.Read {
-                open_type = OpenFileType.OF_READWRITE;
-            }
-            else {
-                open_type |= OpenFileType.OF_WRITE;
-            }
+            access |= DesiredAccess.FILE_WRITE_DATA;
+            share_mode = ShareMode.FILE_SHARE_READ | ShareMode.FILE_SHARE_WRITE;
+            disposition = CreationDisposition.OPEN_EXISTING;
         }
         if flags & FileFlags.Create {
-            if (flags & FileFlags.Write) == FileFlags.None {
-                open_type |= OpenFileType.OF_WRITE;
-            }
-            open_type |= OpenFileType.OF_CREATE;
+            access |= DesiredAccess.FILE_WRITE_DATA;
+            share_mode = ShareMode.FILE_SHARE_READ | ShareMode.FILE_SHARE_WRITE;
+            disposition = CreationDisposition.OPEN_ALWAYS;
         }
         if flags & FileFlags.Truncate {
-            open_type |= OpenFileType.OF_CREATE;
+            access |= DesiredAccess.FILE_WRITE_DATA;
+            share_mode = ShareMode.FILE_SHARE_READ | ShareMode.FILE_SHARE_WRITE;
+            disposition = CreationDisposition.CREATE_ALWAYS;
         }
         if flags & FileFlags.Append {
-            if (flags & FileFlags.Write) == FileFlags.None {
-                open_type |= OpenFileType.OF_WRITE;
-            }
-
-            if PathFileExistsA(null_terminated_path.data) {
-                open_type |= OpenFileType.OF_WRITE;
-            }
-            else {
-                open_type |= OpenFileType.OF_CREATE;
-            }
+            access |= DesiredAccess.FILE_APPEND_DATA | DesiredAccess.FILE_READ_DATA;
+            share_mode = ShareMode.FILE_SHARE_READ | ShareMode.FILE_SHARE_WRITE;
+            disposition = CreationDisposition.OPEN_ALWAYS;
         }
 
-        file.handle = OpenFile(null_terminated_path.data, &file_info, open_type);
+        file.handle = CreateFileA(null_terminated_path.data, access, share_mode, null, disposition, FileAttribute.FILE_ATTRIBUTE_NORMAL, null);
 
         if file.handle == null {
             return false, file;
-        }
-        else if flags & FileFlags.Append {
-            result := SetFilePointer(file.handle, 0, null, MoveMethod.FILE_END);
-            if result < 0 {
-                CloseHandle(file.handle);
-                return false, file;
-            }
         }
     }
 

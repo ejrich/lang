@@ -26,7 +26,7 @@ bool PathFileExistsA(string pszPath) #extern "shlwapi"
 FileAttribute PathIsDirectoryA(string pszPath) #extern "shlwapi"
 int GetFullPathNameA(string lpFileName, int nBufferLength, u8* lpBuffer, u8** lpFilePart) #extern "kernel32"
 Handle* OpenFile(string lpFileName, OFSTRUCT* lpReOpenBuff, OpenFileType uStyle) #extern "kernel32"
-Handle* CreateFileA(string lpFileName, int dwDesiredAccess, int dwShareMode, SECURITY_ATTRIBUTES* lpSecurityAttributes, int dwCreationDisposition, int dwFlagsAndAttributes, Handle* hTemplateFile) #extern "kernel32"
+Handle* CreateFileA(string lpFileName, DesiredAccess dwDesiredAccess, ShareMode dwShareMode, SECURITY_ATTRIBUTES* lpSecurityAttributes, CreationDisposition dwCreationDisposition, FileAttribute dwFlagsAndAttributes, Handle* hTemplateFile) #extern "kernel32"
 bool DeleteFileA(string lpFileName) #extern "kernel32"
 bool CloseHandle(Handle* hObject) #extern "kernel32"
 bool SetFileInformationByHandle(Handle* hFile, FILE_INFO_BY_HANDLE_CLASS FileInformationClass, void* lpFileInformation,
@@ -207,6 +207,39 @@ enum OpenFileType {
     OF_PROMPT           = 0x2000;
     OF_EXIST            = 0x4000;
     OF_REOPEN           = 0x8000;
+}
+
+enum DesiredAccess {
+    FILE_READ_DATA            = 0x0001; // file & pipe
+    FILE_LIST_DIRECTORY       = 0x0001; // directory
+    FILE_WRITE_DATA           = 0x0002; // file & pipe
+    FILE_ADD_FILE             = 0x0002; // directory
+    FILE_APPEND_DATA          = 0x0004; // file
+    FILE_ADD_SUBDIRECTORY     = 0x0004; // directory
+    FILE_CREATE_PIPE_INSTANCE = 0x0004; // named pipe
+    FILE_READ_EA              = 0x0008; // file & directory
+    FILE_WRITE_EA             = 0x0010; // file & directory
+    FILE_EXECUTE              = 0x0020; // file
+    FILE_TRAVERSE             = 0x0020; // directory
+    FILE_DELETE_CHILD         = 0x0040; // directory
+    FILE_READ_ATTRIBUTES      = 0x0080; // all
+    FILE_WRITE_ATTRIBUTES     = 0x0100; // all
+}
+
+enum ShareMode {
+    FILE_SHARE_NONE   = 0x0;
+    FILE_SHARE_READ   = 0x1;
+    FILE_SHARE_WRITE  = 0x2;
+    FILE_SHARE_DELETE = 0x4;
+}
+
+enum CreationDisposition {
+    None;
+    CREATE_NEW;
+    CREATE_ALWAYS;
+    OPEN_EXISTING;
+    OPEN_ALWAYS;
+    TRUNCATE_EXISTING;
 }
 
 enum FILE_INFO_BY_HANDLE_CLASS {
