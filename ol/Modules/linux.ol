@@ -42,7 +42,7 @@ int vfork() #syscall 58
 int execve(u8* pathname, u8** argv, u8** envp) #syscall 59
 exit(int status) #syscall 60
 int wait4(int pid, int* status, int options, void* rusage) #syscall 61
-int kill(int pid, KillSignal sig) #syscall 62
+int kill(int pid, LinuxSignal sig) #syscall 62
 u8* getcwd(u8* buf, u64 size) #syscall 79
 int chdir(u8* path) #syscall 80
 int fchdir(int fd) #syscall 81
@@ -212,7 +212,7 @@ enum LinuxSignal {
     SIGUNUSED = 31;
 }
 
-interface SigHandler(int signal)
+interface SigHandler(LinuxSignal signal)
 interface SigRestorer()
 
 struct Sigaction {
@@ -273,40 +273,6 @@ enum MremapFlags {
     MREMAP_MAYMOVE   = 1;
     MREMAP_FIXED     = 2;
     MREMAP_DONTUNMAP = 4;
-}
-
-enum KillSignal {
-    SIGHUP    = 1;
-    SIGINT    = 2;
-    SIGQUIT   = 3;
-    SIGILL    = 4;
-    SIGTRAP   = 5;
-    SIGABRT   = 6;
-    SIGBUS    = 7;
-    SIGFPE    = 8;
-    SIGKILL   = 9;
-    SIGUSR1   = 10;
-    SIGSEGV   = 11;
-    SIGUSR2   = 12;
-    SIGPIPE   = 13;
-    SIGALRM   = 14;
-    SIGTERM   = 15;
-    SIGSTKFLT = 16;
-    SIGCHLD   = 17;
-    SIGCONT   = 18;
-    SIGSTOP   = 19;
-    SIGTSTP   = 20;
-    SIGTTIN   = 21;
-    SIGTTOU   = 22;
-    SIGURG    = 23;
-    SIGXCPU   = 24;
-    SIGXFSZ   = 25;
-    SIGVTALRM = 26;
-    SIGPROF   = 27;
-    SIGWINCH  = 28;
-    SIGIO     = 29;
-    SIGPWR    = 30;
-    SIGSYS    = 31;
 }
 
 enum FutexOperation {
