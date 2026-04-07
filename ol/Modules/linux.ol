@@ -17,7 +17,7 @@ void* mmap(void* addr, u64 length, Prot prot, MmapFlags flags, int fd, u64 offse
 int mprotect(void* addr, u64 length, Prot prot) #syscall 10
 int munmap(void* addr, u64 length) #syscall 11
 int brk(void* addr) #syscall 12
-int rt_sigaction(int sig, Sigaction* act, Sigaction* oact, u64 sigsetsize) #syscall 13
+int rt_sigaction(LinuxSignal sig, Sigaction* act, Sigaction* oact, u64 sigsetsize) #syscall 13
 int rt_sigprocmask(Sighow how, Sigset* set, Sigset* oset, u64 sigsetsize) #syscall 14
 int rt_sigreturn() #syscall 15
 int ioctl(int fd, u32 cmd, u64 arg) #syscall 16
@@ -173,6 +173,43 @@ enum MmapFlags {
     MAP_HUGETLB         = 0x40000;
     MAP_SYNC            = 0x80000;
     MAP_FIXED_NOREPLACE = 0x100000;
+}
+
+enum LinuxSignal {
+    SIGHUP    = 1;
+    SIGINT    = 2;
+    SIGQUIT   = 3;
+    SIGILL    = 4;
+    SIGTRAP   = 5;
+    SIGABRT   = 6;
+    SIGIOT    = 6;
+    SIGBUS    = 7;
+    SIGFPE    = 8;
+    SIGKILL   = 9;
+    SIGUSR1   = 10;
+    SIGSEGV   = 11;
+    SIGUSR2   = 12;
+    SIGPIPE   = 13;
+    SIGALRM   = 14;
+    SIGTERM   = 15;
+    SIGSTKFLT = 16;
+    SIGCHLD   = 17;
+    SIGCONT   = 18;
+    SIGSTOP   = 19;
+    SIGTSTP   = 20;
+    SIGTTIN   = 21;
+    SIGTTOU   = 22;
+    SIGURG    = 23;
+    SIGXCPU   = 24;
+    SIGXFSZ   = 25;
+    SIGVTALRM = 26;
+    SIGPROF   = 27;
+    SIGWINCH  = 28;
+    SIGIO     = 29;
+    SIGPOLL   = 29;
+    SIGPWR    = 30;
+    SIGSYS    = 31;
+    SIGUNUSED = 31;
 }
 
 interface SigHandler(int signal)
