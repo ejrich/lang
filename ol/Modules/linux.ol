@@ -219,7 +219,7 @@ struct Sigaction {
     sa_handler: SigHandler;
     sa_flags: u64;
     sa_restorer: SigRestorer;
-    sa_mask: Sigset;
+    sa_mask: u64;
 }
 
 struct SigInfo {
