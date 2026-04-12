@@ -213,7 +213,7 @@ enum LinuxSignal {
 }
 
 interface SigHandler(LinuxSignal signal)
-interface SigHandlerWithInfo(LinuxSignal signal, SigInfo* info, void* ucontext)
+interface SigHandlerWithInfo(LinuxSignal signal, SigInfo* info, UContext* ucontext)
 
 union SigHandler_T {
     sa_handler: SigHandler;
@@ -303,6 +303,42 @@ struct SigsysSigInfo {
     _call_addr: void*;
     _syscall: int;
     _arch: u32;
+}
+
+struct UContext {
+    uc_link: UContext*;
+    uc_flags: u32;
+    uc_sigmask: Sigset;
+    uc_mcontext: MContext;
+}
+
+struct MContext {
+    mc_gregs: CArray<u64>[19];
+    mc_fp: u64;
+    mc_i7: u64;
+    mc_fpregs: MContextFpu;
+}
+
+struct MContextFpu {
+    mcfpu_fregs: FpuFregs;
+    mcfpu_fsr: u64;
+    mcfpu_fprs: u64;
+    mcfpu_gsr: u64;
+    mcfpu_fq: FpuFq*;
+    mcfpu_qcnt: u8;
+    mcfpu_qentsz: u8;
+    mcfpu_enab: u8;
+}
+
+union FpuFregs {
+    sregs: CArray<u32>[32];
+    dregs: CArray<float>[32];
+    qregs: CArray<float64>[16];
+}
+
+struct FpuFq {
+    mcfq_addr: u64*;
+    mcfq_insn: u32;
 }
 
 struct Sigset {
