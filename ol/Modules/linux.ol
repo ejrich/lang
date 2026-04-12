@@ -213,17 +213,96 @@ enum LinuxSignal {
 }
 
 interface SigHandler(LinuxSignal signal)
+interface SigHandlerWithInfo(LinuxSignal signal, SigInfo* info, void* ucontext)
+
+union SigHandler_T {
+    sa_handler: SigHandler;
+    sigaction_handler: SigHandlerWithInfo;
+}
+
 interface SigRestorer()
 
 struct Sigaction {
-    sa_handler: SigHandler;
-    sa_flags: u64;
+    sa_handler: SigHandler_T;
+    sa_flags: int;
     sa_restorer: SigRestorer;
     sa_mask: u64;
 }
 
 struct SigInfo {
-    // @Incomplete Add fields before using
+   si_signo: int;
+   si_errno: int;
+   si_code: int;
+   si_trapno: int;
+   si_fields: SigInfoFields;
+}
+
+union SigInfoFields {
+    _pad: CArray<u8>[112];
+    _kill: KillSigInfo;
+    _timer: TimerSigInfo;
+    _rt: RtSigInfo;
+    _sigchld: SigchldSigInfo;
+    _sigfault: SigfaultSigInfo;
+    _sigpoll: SigpollSigInfo;
+    _sigsys: SigsysSigInfo;
+}
+
+struct KillSigInfo {
+    si_pid: int;
+    si_uid: int;
+}
+
+struct TimerSigInfo {
+    si_tid: int;
+    si_overrun: int;
+    si_sigval: Sigval;
+}
+
+struct RtSigInfo {
+    si_pid: int;
+    si_uid: int;
+    si_sigval: Sigval;
+}
+
+union Sigval {
+    sival_int: int;
+    sival_ptr: void*;
+}
+
+struct SigchldSigInfo {
+    si_pid: int;
+    si_uid: int;
+    si_status: int;
+    si_utime: u64;
+    si_stime: u64;
+}
+
+struct SigfaultSigInfo {
+    si_addr: void*;
+    si_addr_lsb: s16;
+    _bounds: SigfaultSigInfoBounds;
+}
+
+union SigfaultSigInfoBounds {
+    _addr_bnd: SigfaultSigInfoAddressBounds;
+    _pkey: u32;
+}
+
+struct SigfaultSigInfoAddressBounds {
+    _lower: void*;
+    _upper: void*;
+}
+
+struct SigpollSigInfo {
+    si_band: s64;
+    si_fd: int;
+}
+
+struct SigsysSigInfo {
+    _call_addr: void*;
+    _syscall: int;
+    _arch: u32;
 }
 
 struct Sigset {
