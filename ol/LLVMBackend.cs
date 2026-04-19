@@ -15,6 +15,7 @@ public static unsafe class LLVMBackend
     private static LLVMContextRef _context;
     private static LLVMBuilderRef _builder;
     private static uint _elementTypeAttributeKind;
+    private static LLVMAttributeRef _framePointerAttribute;
 
     private static LLVMTypeRef[] _types;
     private static LLVMTypeRef[] _interfaceTypes;
@@ -167,8 +168,13 @@ public static unsafe class LLVMBackend
         _module = LLVMModuleRef.CreateWithName(BuildSettings.Name);
         _context = _module.Context;
         _builder = LLVMBuilderRef.Create(_context);
+
         using var elementType = new MarshaledString("elementtype");
         _elementTypeAttributeKind = LLVM.GetEnumAttributeKindForName(elementType.Value, (UIntPtr)elementType.Length);
+
+        using var framePointer = new MarshaledString("frame-pointer");
+        using var allValue = new MarshaledString("all");
+        _framePointerAttribute = LLVM.CreateStringAttribute(_context, framePointer.Value, (uint)framePointer.Length, allValue.Value, (uint)allValue.Length);
 
         if (BuildSettings.EmitDebug)
         {
@@ -1166,6 +1172,8 @@ public static unsafe class LLVMBackend
             var functionType = GetFunctionType(function.Source);
             functionPointer = _module.AddFunction(name, functionType);
         }
+
+        LLVM.AddAttributeAtIndex(functionPointer, LLVMAttributeIndex.LLVMAttributeFunctionIndex, _framePointerAttribute);
 
         if (function.Instructions == null)
         {
