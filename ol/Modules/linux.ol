@@ -306,39 +306,63 @@ struct SigsysSigInfo {
 }
 
 struct UContext {
+    uc_flags: u64;
     uc_link: UContext*;
-    uc_flags: u32;
-    uc_sigmask: Sigset;
+    uc_stack: Stack_T;
     uc_mcontext: MContext;
+    uc_sigmask: Sigset;
+}
+
+struct Stack_T {
+    ss_sp: void*;
+    ss_flags: int;
+    ss_size: u64;
 }
 
 struct MContext {
-    mc_gregs: CArray<u64>[19];
-    mc_fp: u64;
-    mc_i7: u64;
-    mc_fpregs: MContextFpu;
+    mc_gregs: CArray<u64>[23];
+    mc_fp: FpState*;
+    reserved1: CArray<u64>[8];
 }
 
-struct MContextFpu {
-    mcfpu_fregs: FpuFregs;
-    mcfpu_fsr: u64;
-    mcfpu_fprs: u64;
-    mcfpu_gsr: u64;
-    mcfpu_fq: FpuFq*;
-    mcfpu_qcnt: u8;
-    mcfpu_qentsz: u8;
-    mcfpu_enab: u8;
+enum MContextRegister : u8 {
+    REG_R8 = 0;
+    REG_R9;
+    REG_R10;
+    REG_R11;
+    REG_R12;
+    REG_R13;
+    REG_R14;
+    REG_R15;
+    REG_RDI;
+    REG_RSI;
+    REG_RBP;
+    REG_RBX;
+    REG_RDX;
+    REG_RAX;
+    REG_RCX;
+    REG_RSP;
+    REG_RIP;
+    REG_EFL;
+    REG_CSGSFS;
+    REG_ERR;
+    REG_TRAPNO;
+    REG_OLDMASK;
+    REG_CR2;
 }
 
-union FpuFregs {
-    sregs: CArray<u32>[32];
-    dregs: CArray<float>[32];
-    qregs: CArray<float64>[16];
-}
-
-struct FpuFq {
-    mcfq_addr: u64*;
-    mcfq_insn: u32;
+struct FpState {
+    	cwd: u16;
+    	swd: u16;
+    	twd: u16;
+    	fop: u16;
+    	rip: u64;
+    	rdp: u64;
+    	mxcsr: u32;
+    	mxcsr_mask: u32;
+    	st_space: CArray<u32>[32];	// 8x FP registers, 16 bytes each
+    	xmm_space: CArray<u32>[64];	// 16x XMM registers, 16 bytes each
+    	reserved: CArray<u32>[24];
 }
 
 struct Sigset {
