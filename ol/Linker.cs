@@ -98,7 +98,8 @@ public static class Linker
             {
                 FileName = LinkerName,
                 Arguments = linkerArguments,
-                WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory
+                WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory,
+                CreateNoWindow = true
             }
         };
 
