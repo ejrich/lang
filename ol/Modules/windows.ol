@@ -29,8 +29,7 @@ Handle* OpenFile(string lpFileName, OFSTRUCT* lpReOpenBuff, OpenFileType uStyle)
 Handle* CreateFileA(string lpFileName, DesiredAccess dwDesiredAccess, ShareMode dwShareMode, SECURITY_ATTRIBUTES* lpSecurityAttributes, CreationDisposition dwCreationDisposition, FileAttribute dwFlagsAndAttributes, Handle* hTemplateFile) #extern "kernel32"
 bool DeleteFileA(string lpFileName) #extern "kernel32"
 bool CloseHandle(Handle* hObject) #extern "kernel32"
-bool SetFileInformationByHandle(Handle* hFile, FILE_INFO_BY_HANDLE_CLASS FileInformationClass, void* lpFileInformation,
-int dwBufferSize) #extern "kernel32"
+bool SetFileInformationByHandle(Handle* hFile, FILE_INFO_BY_HANDLE_CLASS FileInformationClass, void* lpFileInformation, int dwBufferSize) #extern "kernel32"
 bool CreateDirectoryA(string lpPathName, SECURITY_ATTRIBUTES* lpSecurityAttributes) #extern "kernel32"
 bool CopyFileA(string lpExistingFileName, string lpNewFileName, bool bFailIfExists) #extern "kernel32"
 
@@ -209,6 +208,7 @@ enum OpenFileType {
     OF_REOPEN           = 0x8000;
 }
 
+[flags]
 enum DesiredAccess {
     FILE_READ_DATA            = 0x0001; // file & pipe
     FILE_LIST_DIRECTORY       = 0x0001; // directory
@@ -226,6 +226,7 @@ enum DesiredAccess {
     FILE_WRITE_ATTRIBUTES     = 0x0100; // all
 }
 
+[flags]
 enum ShareMode {
     FILE_SHARE_NONE   = 0x0;
     FILE_SHARE_READ   = 0x1;

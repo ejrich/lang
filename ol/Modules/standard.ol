@@ -1118,7 +1118,7 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
         if !file_exists && flags == FileFlags.Read return false, file;
 
         access: DesiredAccess;
-        share_mode: ShareMode;
+        share_mode: ShareMode = ShareMode.FILE_SHARE_READ | ShareMode.FILE_SHARE_WRITE | ShareMode.FILE_SHARE_DELETE;
         disposition: CreationDisposition;
 
         if flags & FileFlags.Read {
@@ -1127,28 +1127,24 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
         }
         if flags & FileFlags.Write {
             access |= DesiredAccess.FILE_WRITE_DATA;
-            share_mode = ShareMode.FILE_SHARE_READ | ShareMode.FILE_SHARE_WRITE;
             disposition = CreationDisposition.OPEN_EXISTING;
         }
         if flags & FileFlags.Create {
             access |= DesiredAccess.FILE_WRITE_DATA;
-            share_mode = ShareMode.FILE_SHARE_READ | ShareMode.FILE_SHARE_WRITE;
             disposition = CreationDisposition.OPEN_ALWAYS;
         }
         if flags & FileFlags.Truncate {
             access |= DesiredAccess.FILE_WRITE_DATA;
-            share_mode = ShareMode.FILE_SHARE_READ | ShareMode.FILE_SHARE_WRITE;
             disposition = CreationDisposition.CREATE_ALWAYS;
         }
         if flags & FileFlags.Append {
             access |= DesiredAccess.FILE_APPEND_DATA | DesiredAccess.FILE_READ_DATA;
-            share_mode = ShareMode.FILE_SHARE_READ | ShareMode.FILE_SHARE_WRITE;
             disposition = CreationDisposition.OPEN_ALWAYS;
         }
 
         file.handle = CreateFileA(null_terminated_path.data, access, share_mode, null, disposition, FileAttribute.FILE_ATTRIBUTE_NORMAL, null);
 
-        if file.handle == null {
+        if file.handle == null || cast(s64, file.handle) == -1 {
             return false, file;
         }
     }
