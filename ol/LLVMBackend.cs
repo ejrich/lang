@@ -2413,7 +2413,7 @@ public static unsafe class LLVMBackend
             if (BuildSettings.Optimizations.GlobalValueNumbering == 1)
                 passArray.Add("gvn");
 
-            if (BuildSettings.Optimizations.CombineRedudantInstruction == 1)
+            if (BuildSettings.Optimizations.CombineRedundantInstruction == 1)
                 passArray.Add("instcombine");
 
             if (BuildSettings.Optimizations.PromoteMemoryToRegister == 1)

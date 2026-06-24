@@ -84,7 +84,7 @@ public struct ReleaseOptimizations
         MergeFunctions = 1;
         InlineThreshold = InlineThreshold.Default;
         GlobalValueNumbering = 1;
-        CombineRedudantInstruction = 1;
+        CombineRedundantInstruction = 1;
         PromoteMemoryToRegister = 1;
         SimplifyControlFlow = 1;
     }
@@ -98,7 +98,7 @@ public struct ReleaseOptimizations
     [FieldOffset(6)] public byte MergeFunctions;
     [FieldOffset(7)] public InlineThreshold InlineThreshold;
     [FieldOffset(8)] public byte GlobalValueNumbering;
-    [FieldOffset(9)] public byte CombineRedudantInstruction;
+    [FieldOffset(9)] public byte CombineRedundantInstruction;
     [FieldOffset(10)] public byte PromoteMemoryToRegister;
     [FieldOffset(11)] public byte SimplifyControlFlow;
 }
