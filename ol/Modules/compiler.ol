@@ -63,7 +63,7 @@ struct ReleaseOptimizations {
     merge_functions: bool;
     inline_threshold: InlineThreshold;
     global_value_numbering: bool;
-    combine_redudant_instruction: bool;
+    combine_redundant_instruction: bool;
     promote_memory_to_register: bool;
     simplify_control_flow: bool;
 }
