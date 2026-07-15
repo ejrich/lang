@@ -86,3 +86,81 @@ T atomic_increment<T>(T* pointer) {
 
     return *pointer;
 }
+
+T atomic_decrement<T>(T* pointer) {
+    #assert type_of(T).type == TypeKind.Integer;
+
+    #if size_of(T) == 1 {
+        asm {
+            in rax, pointer;
+            in cl, -1;
+            lock;
+            xadd [rax], cl;
+        }
+    }
+    else #if size_of(T) == 2 {
+        asm {
+            in rax, pointer;
+            in cx, -1;
+            lock;
+            xadd [rax], cx;
+        }
+    }
+    else #if size_of(T) == 4 {
+        asm {
+            in rax, pointer;
+            in ecx, -1;
+            lock;
+            xadd [rax], ecx;
+        }
+    }
+    else {
+        asm {
+            in rax, pointer;
+            in rcx, -1;
+            lock;
+            xadd [rax], rcx;
+        }
+    }
+
+    return *pointer;
+}
+
+T atomic_add<T>(T* pointer, T value) {
+    #assert type_of(T).type == TypeKind.Integer;
+
+    #if size_of(T) == 1 {
+        asm {
+            in rax, pointer;
+            in cl, value;
+            lock;
+            xadd [rax], cl;
+        }
+    }
+    else #if size_of(T) == 2 {
+        asm {
+            in rax, pointer;
+            in cx, value;
+            lock;
+            xadd [rax], cx;
+        }
+    }
+    else #if size_of(T) == 4 {
+        asm {
+            in rax, pointer;
+            in ecx, value;
+            lock;
+            xadd [rax], ecx;
+        }
+    }
+    else {
+        asm {
+            in rax, pointer;
+            in rcx, value;
+            lock;
+            xadd [rax], rcx;
+        }
+    }
+
+    return *pointer;
+}
