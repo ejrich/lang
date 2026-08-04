@@ -2,151 +2,19 @@
 
 #assert os == OS.Windows;
 
+struct Handle {}
+home_environment_variable := "UserProfile"; #const
+
 // Windows kernel functions
 
+
+// Error handling, memory, and process
 int GetLastError() #extern "kernel32"
 void* VirtualAlloc(void* lpAddress, u64 dwSize, AllocationType flAllocationType, ProtectionType flProtect) #extern "kernel32"
 bool VirtualFree(void* lpAddress, u64 dwSize, FreeType dwFreeType) #extern "kernel32"
 s64 VirtualQuery(void* lpAddress, MEMORY_BASIC_INFORMATION* lpBuffer, int dwLength) #extern "kernel32"
 Handle* GetCurrentProcess() #extern "kernel32"
 ExitProcess(int uExitCode) #extern "kernel32"
-
-Sleep(int dwMilliseconds) #extern "kernel32"
-YieldProcessor() #extern "kernel32"
-bool QueryPerformanceCounter(u64* lpPerformanceCount) #extern "kernel32"
-bool QueryPerformanceFrequency(u64* lpFrequency) #extern "kernel32"
-
-u8* GetCommandLineA() #extern "kernel32"
-Handle* GetStdHandle(int nStdHandle) #extern "kernel32"
-bool WriteConsoleA(Handle* hConsoleOutput, void* lpBuffer, int nNumberOfCharsToWrite, int* lpNumberOfCharsWritten, void* lpReserved) #extern "kernel32"
-OutputDebugStringA(string lpOutputString) #extern "kernel32"
-bool AttachConsole(int dwProcessId) #extern "kernel32"
-
-bool PathFileExistsA(string pszPath) #extern "shlwapi"
-FileAttribute PathIsDirectoryA(string pszPath) #extern "shlwapi"
-int GetFullPathNameA(string lpFileName, int nBufferLength, u8* lpBuffer, u8** lpFilePart) #extern "kernel32"
-Handle* OpenFile(string lpFileName, OFSTRUCT* lpReOpenBuff, OpenFileType uStyle) #extern "kernel32"
-Handle* CreateFileA(string lpFileName, DesiredAccess dwDesiredAccess, ShareMode dwShareMode, SECURITY_ATTRIBUTES* lpSecurityAttributes, CreationDisposition dwCreationDisposition, FileAttribute dwFlagsAndAttributes, Handle* hTemplateFile) #extern "kernel32"
-bool DeleteFileA(string lpFileName) #extern "kernel32"
-bool CloseHandle(Handle* hObject) #extern "kernel32"
-bool SetFileInformationByHandle(Handle* hFile, FILE_INFO_BY_HANDLE_CLASS FileInformationClass, void* lpFileInformation, int dwBufferSize) #extern "kernel32"
-bool CreateDirectoryA(string lpPathName, SECURITY_ATTRIBUTES* lpSecurityAttributes) #extern "kernel32"
-bool CopyFileA(string lpExistingFileName, string lpNewFileName, bool bFailIfExists) #extern "kernel32"
-
-int SetFilePointer(Handle* hFile, u32 lDistanceToMove, u32* lpDistanceToMoveHigh, MoveMethod dwMoveMethod) #extern "kernel32"
-bool GetFileSizeEx(Handle* hFile, u64* lpFileSize) #extern "kernel32"
-bool ReadFile(Handle* hFile, void* lpBuffer, int nNumberOfBytesToRead, int* nNumberOfBytesRead, void* lpOverlapped) #extern "kernel32"
-bool WriteFile(Handle* hFile, void* lpBuffer, int nNumberOfBytesToWrite, int* nNumberOfBytesWritten, void* lpOverlapped) #extern "kernel32"
-bool GetFileTime(Handle* hFile, FILETIME* lpCreationTime,  FILETIME* lpLastAccessTime,  FILETIME* lpLastWriteTime) #extern "kernel32"
-
-bool CreatePipe(Handle** hReadPipe, Handle** hWritePipe, SECURITY_ATTRIBUTES* lpPipeAttributes, int nSize) #extern "kernel32"
-bool PeekNamedPipe(Handle* hNamedPipe, void* lpBuffer, int nBufferSize, int* lpBytesRead, int* lpTotalBytesAvail, int* lpBytesLeftThisMessage) #extern "kernel32"
-bool SetHandleInformation(Handle* hObject, HandleFlags dwMask, HandleFlags dwFlags) #extern "kernel32"
-bool CreateProcessA(string lpApplicationName, string lpCommandLine, SECURITY_ATTRIBUTES* lpProcessAttributes, SECURITY_ATTRIBUTES* lpThreadAttributes, bool bInheritHandles, ProcessCreationFlags dwCreationFlags, void* lpEnvironment, string lpCurrentDirectory, STARTUPINFOA* lpStartupInfo, PROCESS_INFORMATION* lpProcessInformation) #extern "kernel32"
-bool TerminateProcess(Handle* hProcess, int dwExitCode) #extern "kernel32"
-bool GetExitCodeProcess(Handle* hProcess, int* lpExitCode) #extern "kernel32"
-
-Handle* CreateJobObjectA(SECURITY_ATTRIBUTES* lpSecurityAttributes, string lpName) #extern "kernel32"
-bool TerminateJobObject(Handle* hJob, u32 uExitCode) #extern "kernel32"
-bool AssignProcessToJobObject(Handle* hJob, Handle* hProcess) #extern "kernel32"
-
-Handle* FindFirstFileA(string lpFileName, WIN32_FIND_DATAA* lpFindFileData) #extern "kernel32"
-Handle* FindFirstFileExA(string lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAA* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, void* lpSearchFilter, int dwAdditionalFlags) #extern "kernel32"
-bool FindNextFileA(Handle* hFindHandle, WIN32_FIND_DATAA* lpFindFileData) #extern "kernel32"
-bool FindClose(Handle* hFindFile) #extern "kernel32"
-
-int GetModuleFileNameA(Handle* hModule, u8* lpFileName, int nSize) #extern "kernel32"
-int GetCurrentDirectoryA(int nBufferLength, u8* lpBuffer) #extern "kernel32"
-bool SetCurrentDirectoryA(string lpPathName) #extern "kernel32"
-
-Handle* GetModuleHandleA(string lpModuleName) #extern "kernel32"
-bool RegisterClassExA(WNDCLASSEXA* wndClass) #extern "user32"
-Handle* LoadCursorA(Handle* hInstance, u64 lpCursorName) #extern "user32"
-Handle* LoadIconA(Handle* hInstance, string lpIconName) #extern "user32"
-Handle* CreateSolidBrush(u32 color) #extern "Gdi32"
-int GetSystemMetrics(int nIndex) #extern "user32"
-s64 DefWindowProcA(Handle* hWnd, MessageType uMsg, u64 wParam, s64 lParam) #extern "user32"
-Handle* CreateWindowExA(ExtendedWindowStyle dwExStyle, string lpClassName, string lpWindowName, WindowStyle dwStyle, u32 x, u32 y, u32 nWidth, u32 nWeight, Handle* hWndParent, Handle* hMenu, Handle* hInstance, void* lpParam) #extern "user32"
-s32 SetWindowLongA(Handle* hWnd, s32 nIndex, s64 dwNewLong) #extern "user32"
-bool SetLayeredWindowAttributes(Handle* hWnd, u32 crKey, u8 bAlpha, u32 dwFlags) #extern "user32"
-bool ShowWindow(Handle* hWnd, WindowShow nCmdShow) #extern "user32"
-bool UpdateWindow(Handle* hWnd) #extern "user32"
-bool CloseWindow(Handle* hWnd) #extern "user32"
-bool GetWindowRect(Handle* hWnd, RECT* lpRect) #extern "user32"
-bool SetWindowPos(Handle* hWnd, Handle* hWndInsertAfter, int X, int Y, int cx, int cy, SWPFlags uFlags) #extern "user32"
-bool SetProcessDPIAware() #extern "user32"
-s32 DwmExtendFrameIntoClientArea(Handle* hWnd, MARGINS* pMarInset) #extern "dwmapi"
-
-bool WaitMessage() #extern "user32"
-s64 SendMessage(Handle* hWnd, MessageType Msg, u64 wParam, s64 lParam) #extern "user32"
-bool SendNotifyMessageA(Handle* hWnd, MessageType Msg, u64 wParam, s64 lParam) #extern "user32"
-bool GetMessage(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax) #extern "user32"
-bool PeekMessageA(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax, RemoveMsg wRemoveMsg) #extern "user32"
-bool TranslateMessage(MSG* lpMsg) #extern "user32"
-s64 DispatchMessageA(MSG* lpMsg) #extern "user32"
-s16 GetKeyState(int nVirtKey) #extern "user32"
-bool GetKeyboardState(u8* lpKeyState) #extern "user32"
-int ToAscii(u32 uVirtKey, u32 uScanCode, u8* lpKeyState, u8* lpChar, u32 uFlags) #extern "user32"
-bool GetCursorPos(POINT* lpPoint) #extern "user32"
-
-Handle* BeginPaint(Handle* hWnd, PAINTSTRUCT* lpPaint) #extern "user32"
-bool EndPaint(Handle* hWnd, PAINTSTRUCT* lpPaint) #extern "user32"
-bool InvalidateRect(Handle* hWnd, RECT* lpRect, bool bErase) #extern "user32"
-
-NtStatus BCryptOpenAlgorithmProvider(Handle** phAlgorithm, u16* pszAlgId, u16* pszImplementation, u64 dwFlags) #extern "bcrypt"
-NtStatus BCryptCloseAlgorithmProvider(Handle* phAlgorithm, u64 dwFlags) #extern "bcrypt"
-NtStatus BCryptGenRandom(Handle* hProv, void* pbBuffer, u64 cbBuffer, u64 dwFlags) #extern "bcrypt"
-
-GetSystemInfo(SYSTEM_INFO* lpSystemInfo) #extern "kernel32"
-Handle* CreateThread(SECURITY_ATTRIBUTES* lpThreadAttributes, u64 dwStackSize, ThreadProcedure lpStartAddress, void* lpParameter, int dwCreationFlags, int* lpThreadId) #extern "kernel32"
-int ResumeThread(Handle* hThread) #extern "kernel32"
-bool TerminateThread(Handle* hThread, int dwExitCode) #extern "kernel32"
-Handle* CreateSemaphoreA(SECURITY_ATTRIBUTES* lpSemaphoreAttributes, u64 lInitialCount, u64 lMaximumCount, string lpName) #extern "kernel32"
-bool ReleaseSemaphore(Handle* hSemaphore, u64 lReleaseCount, u64* lpPreviousCount) #extern "kernel32"
-int WaitForSingleObject(Handle* hHandle, int dwMilliseconds) #extern "kernel32"
-int GetEnvironmentVariableA(string lpName, u8* lpBuffer, int nSize) #extern "kernel32"
-
-GetSystemTime(SYSTEMTIME* lpSystemTime) #extern "kernel32"
-GetLocalTime(SYSTEMTIME* lpSystemTime) #extern "kernel32"
-
-s32 CoInitializeEx(void* pvReserved, u32 dwCoInit) #extern "ole32"
-s32 CoCreateInstance(GUID* rclsid, void** pUnkOuter, u32 dwClsContext, void* riid, void** ppv) #extern "ole32"
-CoTaskMemFree(void* pv) #extern "ole32"
-Handle* CreateEventA(SECURITY_ATTRIBUTES* lpSecurityAttributes, bool bManualReset, bool bInitialState, string lpName) #extern "kernel32"
-
-bool AddClipboardFormatListener(Handle* hwnd) #extern "user32"
-bool OpenClipboard(Handle* hWndNewOwner) #extern "user32"
-bool CloseClipboard() #extern "user32"
-Handle* GetClipboardData(ClipboardFormat uFormat) #extern "user32"
-Handle* SetClipboardData(ClipboardFormat uFormat, Handle* hMem) #extern "user32"
-bool EmptyClipboard() #extern "user32"
-
-Handle* GlobalAlloc(u32 uFlags, u32 dwBytes) #extern "kernel32"
-void* GlobalLock(Handle* hMem) #extern "kernel32"
-bool GlobalUnlock(Handle* hMem) #extern "kernel32"
-
-bool SymInitialize(Handle* hProcess, string UserSearchPath, bool fInvadeProcess) #extern "Dbghelp"
-int SymSetOptions(int SymOptions) #extern "Dbghelp"
-bool SymFromAddr(Handle* hProcess, s64 Address, s64* Displacement, SYMBOL_INFO* Symbol) #extern "Dbghelp"
-bool SymGetLineFromAddr64(Handle* hProcess, s64 Address, int* Displacement, IMAGEHLP_LINE* Line64) #extern "Dbghelp"
-s16 RtlCaptureStackBackTrace(int FramesToSkip, int FramesToCapture, void** BackTrace, s32* BackTraceHash) #extern "OneCoreUAP"
-EXCEPTION_HANDLER SetUnhandledExceptionFilter(EXCEPTION_HANDLER lpTopLevelExceptionFilter) #extern "kernel32"
-void* AddVectoredExceptionHandler(u64 First, EXCEPTION_HANDLER Handler) #extern "kernel32"
-
-STD_INPUT_HANDLE  := -10; #const
-STD_OUTPUT_HANDLE := -11; #const
-STD_ERROR_HANDLE  := -12; #const
-
-struct GUID {
-    data1: u32;
-    data2: u16;
-    data3: u16;
-    data4: CArray<u8>[8];
-}
-
-home_environment_variable := "UserProfile"; #const
-
-struct Handle {}
 
 enum AllocationType {
     MEM_COMMIT     = 0x1000;
@@ -181,6 +49,40 @@ struct MEMORY_BASIC_INFORMATION {
     Protect: ProtectionType;
     Type: int;
 }
+
+// Timing
+Sleep(int dwMilliseconds) #extern "kernel32"
+YieldProcessor() #extern "kernel32"
+bool QueryPerformanceCounter(u64* lpPerformanceCount) #extern "kernel32"
+bool QueryPerformanceFrequency(u64* lpFrequency) #extern "kernel32"
+
+// Console
+u8* GetCommandLineA() #extern "kernel32"
+Handle* GetStdHandle(int nStdHandle) #extern "kernel32"
+bool WriteConsoleA(Handle* hConsoleOutput, void* lpBuffer, int nNumberOfCharsToWrite, int* lpNumberOfCharsWritten, void* lpReserved) #extern "kernel32"
+OutputDebugStringA(string lpOutputString) #extern "kernel32"
+bool AttachConsole(int dwProcessId) #extern "kernel32"
+
+STD_INPUT_HANDLE  := -10; #const
+STD_OUTPUT_HANDLE := -11; #const
+STD_ERROR_HANDLE  := -12; #const
+
+// Path and files
+bool PathFileExistsA(string pszPath) #extern "shlwapi"
+FileAttribute PathIsDirectoryA(string pszPath) #extern "shlwapi"
+int GetFullPathNameA(string lpFileName, int nBufferLength, u8* lpBuffer, u8** lpFilePart) #extern "kernel32"
+Handle* OpenFile(string lpFileName, OFSTRUCT* lpReOpenBuff, OpenFileType uStyle) #extern "kernel32"
+Handle* CreateFileA(string lpFileName, DesiredAccess dwDesiredAccess, ShareMode dwShareMode, SECURITY_ATTRIBUTES* lpSecurityAttributes, CreationDisposition dwCreationDisposition, FileAttribute dwFlagsAndAttributes, Handle* hTemplateFile) #extern "kernel32"
+bool DeleteFileA(string lpFileName) #extern "kernel32"
+bool CloseHandle(Handle* hObject) #extern "kernel32"
+bool SetFileInformationByHandle(Handle* hFile, FILE_INFO_BY_HANDLE_CLASS FileInformationClass, void* lpFileInformation, int dwBufferSize) #extern "kernel32"
+bool CreateDirectoryA(string lpPathName, SECURITY_ATTRIBUTES* lpSecurityAttributes) #extern "kernel32"
+bool CopyFileA(string lpExistingFileName, string lpNewFileName, bool bFailIfExists) #extern "kernel32"
+int SetFilePointer(Handle* hFile, u32 lDistanceToMove, u32* lpDistanceToMoveHigh, MoveMethod dwMoveMethod) #extern "kernel32"
+bool GetFileSizeEx(Handle* hFile, u64* lpFileSize) #extern "kernel32"
+bool ReadFile(Handle* hFile, void* lpBuffer, int nNumberOfBytesToRead, int* nNumberOfBytesRead, void* lpOverlapped) #extern "kernel32"
+bool WriteFile(Handle* hFile, void* lpBuffer, int nNumberOfBytesToWrite, int* nNumberOfBytesWritten, void* lpOverlapped) #extern "kernel32"
+bool GetFileTime(Handle* hFile, FILETIME* lpCreationTime,  FILETIME* lpLastAccessTime,  FILETIME* lpLastWriteTime) #extern "kernel32"
 
 struct OFSTRUCT {
     cBytes: u8;
@@ -289,6 +191,14 @@ struct SECURITY_ATTRIBUTES {
     bInheritHandle: bool;
 }
 
+// Pipes and processes
+bool CreatePipe(Handle** hReadPipe, Handle** hWritePipe, SECURITY_ATTRIBUTES* lpPipeAttributes, int nSize) #extern "kernel32"
+bool PeekNamedPipe(Handle* hNamedPipe, void* lpBuffer, int nBufferSize, int* lpBytesRead, int* lpTotalBytesAvail, int* lpBytesLeftThisMessage) #extern "kernel32"
+bool SetHandleInformation(Handle* hObject, HandleFlags dwMask, HandleFlags dwFlags) #extern "kernel32"
+bool CreateProcessA(string lpApplicationName, string lpCommandLine, SECURITY_ATTRIBUTES* lpProcessAttributes, SECURITY_ATTRIBUTES* lpThreadAttributes, bool bInheritHandles, ProcessCreationFlags dwCreationFlags, void* lpEnvironment, string lpCurrentDirectory, STARTUPINFOA* lpStartupInfo, PROCESS_INFORMATION* lpProcessInformation) #extern "kernel32"
+bool TerminateProcess(Handle* hProcess, int dwExitCode) #extern "kernel32"
+bool GetExitCodeProcess(Handle* hProcess, int* lpExitCode) #extern "kernel32"
+
 enum HandleFlags {
     None;
     HANDLE_FLAG_INHERIT;
@@ -344,6 +254,17 @@ enum ProcessCreationFlags {
     CREATE_NO_WINDOW                 = 0x08000000;
 }
 
+// Jobs
+Handle* CreateJobObjectA(SECURITY_ATTRIBUTES* lpSecurityAttributes, string lpName) #extern "kernel32"
+bool TerminateJobObject(Handle* hJob, u32 uExitCode) #extern "kernel32"
+bool AssignProcessToJobObject(Handle* hJob, Handle* hProcess) #extern "kernel32"
+
+// File finder
+Handle* FindFirstFileA(string lpFileName, WIN32_FIND_DATAA* lpFindFileData) #extern "kernel32"
+Handle* FindFirstFileExA(string lpFileName, FINDEX_INFO_LEVELS fInfoLevelId, WIN32_FIND_DATAA* lpFindFileData, FINDEX_SEARCH_OPS fSearchOp, void* lpSearchFilter, int dwAdditionalFlags) #extern "kernel32"
+bool FindNextFileA(Handle* hFindHandle, WIN32_FIND_DATAA* lpFindFileData) #extern "kernel32"
+bool FindClose(Handle* hFindFile) #extern "kernel32"
+
 enum FINDEX_INFO_LEVELS {
     FindExInfoStandard;
     FindExInfoBasic;
@@ -396,6 +317,30 @@ enum FileAttribute {
     FILE_ATTRIBUTE_RECALL_ON_OPEN        = 0x40000;
     FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS = 0x400000;
 }
+
+// Working directory
+int GetModuleFileNameA(Handle* hModule, u8* lpFileName, int nSize) #extern "kernel32"
+int GetCurrentDirectoryA(int nBufferLength, u8* lpBuffer) #extern "kernel32"
+bool SetCurrentDirectoryA(string lpPathName) #extern "kernel32"
+
+// Windows
+Handle* GetModuleHandleA(string lpModuleName) #extern "kernel32"
+bool RegisterClassExA(WNDCLASSEXA* wndClass) #extern "user32"
+Handle* LoadCursorA(Handle* hInstance, u64 lpCursorName) #extern "user32"
+Handle* LoadIconA(Handle* hInstance, string lpIconName) #extern "user32"
+Handle* CreateSolidBrush(u32 color) #extern "Gdi32"
+int GetSystemMetrics(int nIndex) #extern "user32"
+s64 DefWindowProcA(Handle* hWnd, MessageType uMsg, u64 wParam, s64 lParam) #extern "user32"
+Handle* CreateWindowExA(ExtendedWindowStyle dwExStyle, string lpClassName, string lpWindowName, WindowStyle dwStyle, u32 x, u32 y, u32 nWidth, u32 nWeight, Handle* hWndParent, Handle* hMenu, Handle* hInstance, void* lpParam) #extern "user32"
+s32 SetWindowLongA(Handle* hWnd, s32 nIndex, s64 dwNewLong) #extern "user32"
+bool SetLayeredWindowAttributes(Handle* hWnd, u32 crKey, u8 bAlpha, u32 dwFlags) #extern "user32"
+bool ShowWindow(Handle* hWnd, WindowShow nCmdShow) #extern "user32"
+bool UpdateWindow(Handle* hWnd) #extern "user32"
+bool CloseWindow(Handle* hWnd) #extern "user32"
+bool GetWindowRect(Handle* hWnd, RECT* lpRect) #extern "user32"
+bool SetWindowPos(Handle* hWnd, Handle* hWndInsertAfter, int X, int Y, int cx, int cy, SWPFlags uFlags) #extern "user32"
+bool SetProcessDPIAware() #extern "user32"
+s32 DwmExtendFrameIntoClientArea(Handle* hWnd, MARGINS* pMarInset) #extern "dwmapi"
 
 interface s64 WNDPROC(Handle* hWnd, MessageType uMsg, u64 wParam, s64 lParam)
 
@@ -506,6 +451,44 @@ enum WindowShow {
     SW_FORCEMINIMIZE;
 }
 
+enum SWPFlags {
+    SWP_NOSIZE         = 0x1;
+    SWP_NOMOVE         = 0x2;
+    SWP_NOZORDER       = 0x4;
+    SWP_NOREDRAW       = 0x8;
+    SWP_NOACTIVATE     = 0x10;
+    SWP_DRAWFRAME      = 0x20;
+    SWP_FRAMECHANGED   = 0x20;
+    SWP_SHOWWINDOW     = 0x40;
+    SWP_HIDEWINDOW     = 0x80;
+    SWP_NOCOPYBITS     = 0x100;
+    SWP_NOOWNERZORDER  = 0x200;
+    SWP_NOREPOSITION   = 0x200;
+    SWP_NOSENDCHANGING = 0x400;
+    SWP_DEFERASE       = 0x2000;
+    SWP_ASYNCWINDOWPOS = 0x4000;
+}
+
+struct MARGINS {
+    cxLeftWidth: s32;
+    cxRightWidth: s32;
+    cyTopHeight: s32;
+    cyBottomHeight: s32;
+}
+
+// Window messages
+bool WaitMessage() #extern "user32"
+s64 SendMessage(Handle* hWnd, MessageType Msg, u64 wParam, s64 lParam) #extern "user32"
+bool SendNotifyMessageA(Handle* hWnd, MessageType Msg, u64 wParam, s64 lParam) #extern "user32"
+bool GetMessage(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax) #extern "user32"
+bool PeekMessageA(MSG* lpMsg, Handle* hWnd, u32 wMsgFilterMin, u32 wMsgFilterMax, RemoveMsg wRemoveMsg) #extern "user32"
+bool TranslateMessage(MSG* lpMsg) #extern "user32"
+s64 DispatchMessageA(MSG* lpMsg) #extern "user32"
+s16 GetKeyState(int nVirtKey) #extern "user32"
+bool GetKeyboardState(u8* lpKeyState) #extern "user32"
+int ToAscii(u32 uVirtKey, u32 uScanCode, u8* lpKeyState, u8* lpChar, u32 uFlags) #extern "user32"
+bool GetCursorPos(POINT* lpPoint) #extern "user32"
+
 struct MSG {
     hwnd: Handle*;
     message: MessageType;
@@ -514,20 +497,6 @@ struct MSG {
     time: int;
     pt: POINT;
     lPrivate: int;
-}
-
-struct POINT {
-    x: s32;
-    y: s32;
-}
-
-struct PAINTSTRUCT {
-    hdc: Handle*;
-    fErase: s32;
-    rcPaint: RECT;
-    fRestore: s32;
-    fIncUpdate: s32;
-    rgbReserved: CArray<u8>[32];
 }
 
 enum MessageType {
@@ -1577,38 +1546,6 @@ enum RemoveMsg {
     PM_NOYIELD;
 }
 
-struct RECT {
-    left: s32;
-    top: s32;
-    right: s32;
-    bottom: s32;
-}
-
-enum SWPFlags {
-    SWP_NOSIZE         = 0x1;
-    SWP_NOMOVE         = 0x2;
-    SWP_NOZORDER       = 0x4;
-    SWP_NOREDRAW       = 0x8;
-    SWP_NOACTIVATE     = 0x10;
-    SWP_DRAWFRAME      = 0x20;
-    SWP_FRAMECHANGED   = 0x20;
-    SWP_SHOWWINDOW     = 0x40;
-    SWP_HIDEWINDOW     = 0x80;
-    SWP_NOCOPYBITS     = 0x100;
-    SWP_NOOWNERZORDER  = 0x200;
-    SWP_NOREPOSITION   = 0x200;
-    SWP_NOSENDCHANGING = 0x400;
-    SWP_DEFERASE       = 0x2000;
-    SWP_ASYNCWINDOWPOS = 0x4000;
-}
-
-struct MARGINS {
-    cxLeftWidth: s32;
-    cxRightWidth: s32;
-    cyTopHeight: s32;
-    cyBottomHeight: s32;
-}
-
 struct NCCALCSIZE_PARAMS {
     rgrc: CArray<RECT>[3];
     lppos: WINDOWPOS;
@@ -1624,14 +1561,6 @@ struct WINDOWPOS {
     flags: SWPFlags;
 }
 
-enum NtStatus : u32 {
-    STATUS_SUCCESS           = 0x0;
-    STATUS_INVALID_HANDLE    = 0xC0000008;
-    STATUS_INVALID_PARAMETER = 0xC000000D;
-    STATUS_NO_MEMORY         = 0xC0000017;
-    STATUS_NOT_FOUND         = 0xC0000225;
-}
-
 [flags]
 enum MouseButtonMod {
     MK_LBUTTON  = 0x1;
@@ -1642,6 +1571,59 @@ enum MouseButtonMod {
     MK_XBUTTON1 = 0x20;
     MK_XBUTTON2 = 0x40;
 }
+
+struct POINT {
+    x: s32;
+    y: s32;
+}
+
+// Window paint
+Handle* BeginPaint(Handle* hWnd, PAINTSTRUCT* lpPaint) #extern "user32"
+bool EndPaint(Handle* hWnd, PAINTSTRUCT* lpPaint) #extern "user32"
+bool InvalidateRect(Handle* hWnd, RECT* lpRect, bool bErase) #extern "user32"
+
+struct PAINTSTRUCT {
+    hdc: Handle*;
+    fErase: s32;
+    rcPaint: RECT;
+    fRestore: s32;
+    fIncUpdate: s32;
+    rgbReserved: CArray<u8>[32];
+}
+
+struct RECT {
+    left: s32;
+    top: s32;
+    right: s32;
+    bottom: s32;
+}
+
+// Random
+NtStatus BCryptOpenAlgorithmProvider(Handle** phAlgorithm, u16* pszAlgId, u16* pszImplementation, u64 dwFlags) #extern "bcrypt"
+NtStatus BCryptCloseAlgorithmProvider(Handle* phAlgorithm, u64 dwFlags) #extern "bcrypt"
+NtStatus BCryptGenRandom(Handle* hProv, void* pbBuffer, u64 cbBuffer, u64 dwFlags) #extern "bcrypt"
+
+enum NtStatus : u32 {
+    STATUS_SUCCESS           = 0x0;
+    STATUS_INVALID_HANDLE    = 0xC0000008;
+    STATUS_INVALID_PARAMETER = 0xC000000D;
+    STATUS_NO_MEMORY         = 0xC0000017;
+    STATUS_NOT_FOUND         = 0xC0000225;
+}
+
+// Thread and synchronization
+Handle* CreateThread(SECURITY_ATTRIBUTES* lpThreadAttributes, u64 dwStackSize, ThreadProcedure lpStartAddress, void* lpParameter, int dwCreationFlags, int* lpThreadId) #extern "kernel32"
+int ResumeThread(Handle* hThread) #extern "kernel32"
+bool TerminateThread(Handle* hThread, int dwExitCode) #extern "kernel32"
+Handle* CreateSemaphoreA(SECURITY_ATTRIBUTES* lpSemaphoreAttributes, u64 lInitialCount, u64 lMaximumCount, string lpName) #extern "kernel32"
+bool ReleaseSemaphore(Handle* hSemaphore, u64 lReleaseCount, u64* lpPreviousCount) #extern "kernel32"
+int WaitForSingleObject(Handle* hHandle, int dwMilliseconds) #extern "kernel32"
+
+// System
+GetSystemInfo(SYSTEM_INFO* lpSystemInfo) #extern "kernel32"
+int GetEnvironmentVariableA(string lpName, u8* lpBuffer, int nSize) #extern "kernel32"
+GetSystemTime(SYSTEMTIME* lpSystemTime) #extern "kernel32"
+GetLocalTime(SYSTEMTIME* lpSystemTime) #extern "kernel32"
 
 struct SYSTEM_INFO {
     DUMMYUNIONNAME: int;
@@ -1669,6 +1651,27 @@ struct SYSTEMTIME {
 
 INFINITE := -1; #const
 
+// COM Interfaces
+s32 CoInitializeEx(void* pvReserved, u32 dwCoInit) #extern "ole32"
+s32 CoCreateInstance(GUID* rclsid, void** pUnkOuter, u32 dwClsContext, void* riid, void** ppv) #extern "ole32"
+CoTaskMemFree(void* pv) #extern "ole32"
+Handle* CreateEventA(SECURITY_ATTRIBUTES* lpSecurityAttributes, bool bManualReset, bool bInitialState, string lpName) #extern "kernel32"
+
+struct GUID {
+    data1: u32;
+    data2: u16;
+    data3: u16;
+    data4: CArray<u8>[8];
+}
+
+// Clipboard
+bool AddClipboardFormatListener(Handle* hwnd) #extern "user32"
+bool OpenClipboard(Handle* hWndNewOwner) #extern "user32"
+bool CloseClipboard() #extern "user32"
+Handle* GetClipboardData(ClipboardFormat uFormat) #extern "user32"
+Handle* SetClipboardData(ClipboardFormat uFormat, Handle* hMem) #extern "user32"
+bool EmptyClipboard() #extern "user32"
+
 enum ClipboardFormat : u32 {
     CF_TEXT         = 1;
     CF_BITMAP       = 2;
@@ -1685,6 +1688,20 @@ enum ClipboardFormat : u32 {
     CF_UNICODETEXT  = 13;
     CF_ENHMETAFILE  = 14;
 }
+
+// Global allocation
+Handle* GlobalAlloc(u32 uFlags, u32 dwBytes) #extern "kernel32"
+void* GlobalLock(Handle* hMem) #extern "kernel32"
+bool GlobalUnlock(Handle* hMem) #extern "kernel32"
+
+// Debugging
+bool SymInitialize(Handle* hProcess, string UserSearchPath, bool fInvadeProcess) #extern "Dbghelp"
+int SymSetOptions(int SymOptions) #extern "Dbghelp"
+bool SymFromAddr(Handle* hProcess, s64 Address, s64* Displacement, SYMBOL_INFO* Symbol) #extern "Dbghelp"
+bool SymGetLineFromAddr64(Handle* hProcess, s64 Address, int* Displacement, IMAGEHLP_LINE* Line64) #extern "Dbghelp"
+s16 RtlCaptureStackBackTrace(int FramesToSkip, int FramesToCapture, void** BackTrace, s32* BackTraceHash) #extern "OneCoreUAP"
+EXCEPTION_HANDLER SetUnhandledExceptionFilter(EXCEPTION_HANDLER lpTopLevelExceptionFilter) #extern "kernel32"
+void* AddVectoredExceptionHandler(u64 First, EXCEPTION_HANDLER Handler) #extern "kernel32"
 
 struct SYMBOL_INFO {
     SizeOfStruct: u32;
@@ -1840,6 +1857,114 @@ struct M128A {
     d: float;
 }
 
+// Sockets
+int WSAStartup(u16 wVersionRequired, WSAData* lpWSAData) #extern "Ws2_32"
+int WSACleanup() #extern "Ws2_32"
+int getaddrinfo(string pNodeName, string pServiceName, ADDRINFOA* pHints, ADDRINFOA** ppResult) #extern "Ws2_32"
+SOCKET* socket(AddressFamily af, SocketType type, SocketProtocol protocol) #extern "Ws2_32"
+int connect(SOCKET* s, sockaddr* name, int namelen) #extern "Ws2_32"
+int send(SOCKET* s, void* buf, int len, int flags) #extern "Ws2_32"
+int recv(SOCKET* s, void* buf, int len, int flags) #extern "Ws2_32"
+int shutdown(SOCKET* s, SocketShutdownHow how) #extern "Ws2_32"
+int closesocket(SOCKET* s) #extern "Ws2_32"
+
+struct WSAData {
+    wVersion: u16;
+    wHighVersion: u16;
+    iMaxSockets: u16;
+    iMaxUdpDg: u16;
+    lpVendorInfo: u8*;
+    szDescription: CArray<u8>[257];
+    szSystemStatus: CArray<u8>[129];
+}
+
+struct ADDRINFOA {
+    ai_flags: int;
+    ai_family: int;
+    ai_socktype: int;
+    ai_protocol: int;
+    ai_addrlen: u64;
+    ai_canonname: u8*;
+    ai_addr: sockaddr*;
+    ai_next: ADDRINFOA*;
+}
+
+struct SOCKET {
+    handle: u32;
+}
+
+enum AddressFamily {
+    AF_UNSPEC    = 0;
+    AF_INET      = 2;
+    AF_IPEX      = 6;
+    AF_APPLETALK = 16;
+    AF_NETBIOS   = 17;
+    AF_NET6      = 23;
+    AF_IRDA      = 26;
+    AF_BTH       = 32;
+}
+
+enum SocketType {
+    SOCK_STREAM    = 1;
+    SOCK_DGRAM     = 2;
+    SOCK_RAW       = 3;
+    SOCK_RDM       = 4;
+    SOCK_SEQPACKET = 5;
+}
+
+enum SocketProtocol {
+    IPPROTO_ICMP    = 1;
+    IPPROTO_IGMP    = 2;
+    BTHPROTO_RFCOMM = 3;
+    IPPROTO_TCP     = 6;
+    IPPROTO_UDP     = 17;
+    IPPROTO_ICMPV6  = 58;
+    IPPROTO_RM      = 113;
+}
+
+struct sockaddr {
+    sa_family: u16;
+    sa_data: CArray<u8>[14];
+}
+
+struct sockaddr_in {
+    sin_family: u16;
+    sin_port: u16;
+    sin_addr: in_addr;
+    sin_zero: CArray<u8>[8];
+}
+
+struct in_addr {
+    a: u8;
+    b: u8;
+    c: u8;
+    d: u8;
+}
+
+struct sockaddr_in6 {
+    sin6_family: u16;
+    sin6_port: u16;
+    sin6_flowinfo: u32;
+    sin6_addr: in6_addr;
+    sin6_scope_id: u32;
+}
+
+struct in6_addr {
+    a: u16;
+    b: u16;
+    c: u16;
+    d: u16;
+    e: u16;
+    f: u16;
+    g: u16;
+    h: u16;
+}
+
+enum SocketShutdownHow {
+    SD_RECEIVE = 0;
+    SD_SEND    = 1;
+    SD_BOTH    = 2;
+}
 
 // Virtual key codes
 VK_LBUTTON: u8 = 0x01; #const
