@@ -36,6 +36,16 @@ int pause() #syscall 34
 int nanosleep(Timespec* req, Timespec* rem) #syscall 35
 int getpid() #syscall 39
 s64 sendfile(int out_fd, int in_fd, s64* offset, s64 count) #syscall 40
+int socket(SocketDomain domain, SocketType type, SocketProtocol protocol) #syscall 41
+int connect(int socket, sockaddr* addr, u64 addrlen) #syscall 42
+int accept(int socket, sockaddr* addr, u64* addrlen) #syscall 43
+int sendto(int socket, void* buf, u64 len, SocketMessageFlags flags, sockaddr* dest_addr, u64 addrlen) #syscall 44
+int recvfrom(int socket, void* buf, u64 len, SocketMessageFlags flags, sockaddr* dest_addr, u64* addrlen) #syscall 45
+int sendmsg(int socket, msghdr* msg, SocketMessageFlags flags) #syscall 46
+int recvmsg(int socket, msghdr* msg, SocketMessageFlags flags) #syscall 47
+int shutdown(int socket, SocketShutdownHow how) #syscall 48
+int bind(int socket, sockaddr* dest_addr, u64 addrlen) #syscall 49
+int listen(int socket, int backlog) #syscall 50
 int clone(CloneFlags clone_flags, void* newsp, int* parent_tidptr, int* child_tidptr, u64 tls) #syscall 56
 int fork() #syscall 57
 int vfork() #syscall 58
@@ -352,17 +362,17 @@ enum MContextRegister : u8 {
 }
 
 struct FpState {
-    	cwd: u16;
-    	swd: u16;
-    	twd: u16;
-    	fop: u16;
-    	rip: u64;
-    	rdp: u64;
-    	mxcsr: u32;
-    	mxcsr_mask: u32;
-    	st_space: CArray<u32>[32];	// 8x FP registers, 16 bytes each
-    	xmm_space: CArray<u32>[64];	// 16x XMM registers, 16 bytes each
-    	reserved: CArray<u32>[24];
+        cwd: u16;
+        swd: u16;
+        twd: u16;
+        fop: u16;
+        rip: u64;
+        rdp: u64;
+        mxcsr: u32;
+        mxcsr_mask: u32;
+        st_space: CArray<u32>[32];    // 8x FP registers, 16 bytes each
+        xmm_space: CArray<u32>[64];    // 16x XMM registers, 16 bytes each
+        reserved: CArray<u32>[24];
 }
 
 struct Sigset {
@@ -474,6 +484,223 @@ enum RandomFlags {
     GRND_NONBLOCK = 1;
     GRND_RANDOM   = 2;
     GRND_INSECURE = 4;
+}
+
+enum SocketDomain {
+    AF_UNSPEC     = 0;
+    AF_LOCAL      = 1;
+    AF_UNIX       = 1;
+    AF_FILE       = 1;
+    AF_INET       = 2;
+    AF_AX25       = 3;
+    AF_IPX        = 4;
+    AF_APPLETALK  = 5;
+    AF_NETROM     = 6;
+    AF_BRIDGE     = 7;
+    AF_ATMPVC     = 8;
+    AF_X25        = 9;
+    AF_INET6      = 10;
+    AF_ROSE       = 11;
+    AF_DECnet     = 12;
+    AF_NETBEUI    = 13;
+    AF_SECURITY   = 14;
+    AF_KEY        = 15;
+    AF_NETLINK    = 16;
+    AF_ROUTE      = 16;
+    AF_PACKET     = 17;
+    AF_ASH        = 18;
+    AF_ECONET     = 19;
+    AF_ATMSVC     = 20;
+    AF_RDS        = 21;
+    AF_SNA        = 22;
+    AF_IRDA       = 23;
+    AF_PPPOX      = 24;
+    AF_WANPIPE    = 25;
+    AF_LLC        = 26;
+    AF_IB         = 27;
+    AF_MPLS       = 28;
+    AF_CAN        = 29;
+    AF_TIPC       = 30;
+    AF_BLUETOOTH  = 31;
+    AF_IUCV       = 32;
+    AF_RXRPC      = 33;
+    AF_ISDN       = 34;
+    AF_PHONET     = 35;
+    AF_IEEE802154 = 36;
+    AF_CAIF       = 37;
+    AF_ALG        = 38;
+    AF_NFC        = 39;
+    AF_VSOCK      = 40;
+    AF_KCM        = 41;
+    AF_QIPCRTR    = 42;
+    AF_SMC        = 43;
+    AF_XDP        = 44;
+    AF_MCTP       = 45;
+    AF_MAX        = 46;
+}
+
+enum SocketType {
+    SOCK_STREAM    = 1;
+    SOCK_DGRAM     = 2;
+    SOCK_RAW       = 3;
+    SOCK_RDM       = 4;
+    SOCK_SEQPACKET = 5;
+    SOCK_DCCP      = 6;
+    SOCK_PACKET    = 10;
+    SOCK_CLOEXEC   = 02000000;
+    SOCK_NONBLOCK  = 00004000;
+}
+
+enum SocketProtocol {
+    PF_UNSPEC        = 0;
+    PF_LOCAL         = 1;
+    PF_UNIX          = 1;
+    PF_FILE          = 1;
+    PF_INET          = 2;
+    PF_AX25          = 3;
+    PF_IPX           = 4;
+    PF_APPLETALK     = 5;
+    PF_NETROM        = 6;
+    PF_BRIDGE        = 7;
+    PF_ATMPVC        = 8;
+    PF_X25           = 9;
+    PF_INET6         = 10;
+    PF_ROSE          = 11;
+    PF_DECnet        = 12;
+    PF_NETBEUI       = 13;
+    PF_SECURITY      = 14;
+    PF_KEY           = 15;
+    PF_NETLINK       = 16;
+    PF_ROUTE         = 16;
+    PF_PACKET        = 17;
+    PF_ASH           = 18;
+    PF_ECONET        = 19;
+    PF_ATMSVC        = 20;
+    PF_RDS           = 21;
+    PF_SNA           = 22;
+    PF_IRDA          = 23;
+    PF_PPPOX         = 24;
+    PF_WANPIPE       = 25;
+    PF_LLC           = 26;
+    PF_IB            = 27;
+    PF_MPLS          = 28;
+    PF_CAN           = 29;
+    PF_TIPC          = 30;
+    PF_BLUETOOTH     = 31;
+    PF_IUCV          = 32;
+    PF_RXRPC         = 33;
+    PF_ISDN          = 34;
+    PF_PHONET        = 35;
+    PF_IEEE802154    = 36;
+    PF_CAIF          = 37;
+    PF_ALG           = 38;
+    PF_NFC           = 39;
+    PF_VSOCK         = 40;
+    PF_KCM           = 41;
+    PF_QIPCRTR       = 42;
+    PF_SMC           = 43;
+    PF_XDP           = 44;
+    PF_MCTP          = 45;
+    PF_MAX           = 46;
+}
+
+struct sockaddr {
+    sa_family: u16;
+    sa_data: CArray<u8>[14];
+}
+
+struct sockaddr_in {
+    sin_family: u16;
+    sin_port: u16;
+    sin_addr: in_addr;
+    sin_zero: CArray<u8>[8];
+}
+
+struct in_addr {
+    a: u8;
+    b: u8;
+    c: u8;
+    d: u8;
+}
+
+struct sockaddr_in6 {
+    sin6_family: u16;
+    sin6_port: u16;
+    sin6_flowinfo: u32;
+    sin6_addr: in6_addr;
+    sin6_scope_id: u32;
+}
+
+struct in6_addr {
+    a: u16;
+    b: u16;
+    c: u16;
+    d: u16;
+    e: u16;
+    f: u16;
+    g: u16;
+    h: u16;
+}
+
+struct addrinfo {
+    ai_flags: int;
+    ai_family: SocketDomain;
+    ai_socktype: SocketType;
+    ai_protocol: SocketProtocol;
+    ai_addrlen: u32;
+    ai_canonname: u8*;
+    ai_addr: sockaddr*;
+    ai_next: ADDRINFOA*;
+}
+
+int getaddrinfo(string node, string service, addrinfo* hints, addrinfo** res) #extern "c"
+freeaddrinfo(addrinfo* res) #extern "c"
+
+[flags]
+enum SocketMessageFlags {
+    MSG_OOB                = 0x01;
+    MSG_PEEK               = 0x02;
+    MSG_DONTROUTE       = 0x04;
+    MSG_CTRUNC             = 0x08;
+    MSG_PROXY              = 0x10;
+    MSG_TRUNC              = 0x20;
+    MSG_DONTWAIT        = 0x40;
+    MSG_EOR                = 0x80;
+    MSG_WAITALL            = 0x100;
+    MSG_FIN                = 0x200;
+    MSG_SYN                = 0x400;
+    MSG_CONFIRM            = 0x800;
+    MSG_RST                = 0x1000;
+    MSG_ERRQUEUE        = 0x2000;
+    MSG_NOSIGNAL        = 0x4000;
+    MSG_MORE               = 0x8000;
+    MSG_WAITFORONE      = 0x10000;
+    MSG_BATCH              = 0x40000;
+    MSG_SOCK_DEVMEM     = 0x2000000;
+    MSG_ZEROCOPY        = 0x4000000;
+    MSG_FASTOPEN        = 0x20000000;
+    MSG_CMSG_CLOEXEC    = 0x40000000;
+}
+
+struct msghdr {
+    msg_name: void*;
+    msg_namelen: u32;
+    msg_iov: iovec*;
+    msg_iovlen: u64;
+    msg_control: void*;
+    msg_controllen: u64;
+    msg_flags: int;
+}
+
+struct iovec {
+    iov_base: void*;
+    iov_len: u64;
+}
+
+enum SocketShutdownHow {
+    SHUT_RD   = 0;
+    SHUT_WR   = 1;
+    SHUT_RDWR = 2;
 }
 
 [flags]

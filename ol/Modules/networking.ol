@@ -138,3 +138,5 @@ enum TLSContentType : u8 {
     Application      = 0x17;
     HeartBeat        = 0x18;
 }
+
+// Socket functions

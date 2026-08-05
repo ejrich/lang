@@ -1861,6 +1861,7 @@ struct M128A {
 int WSAStartup(u16 wVersionRequired, WSAData* lpWSAData) #extern "Ws2_32"
 int WSACleanup() #extern "Ws2_32"
 int getaddrinfo(string pNodeName, string pServiceName, ADDRINFOA* pHints, ADDRINFOA** ppResult) #extern "Ws2_32"
+freeaddrinfo(ADDRINFOA* pHints) #extern "Ws2_32"
 SOCKET* socket(AddressFamily af, SocketType type, SocketProtocol protocol) #extern "Ws2_32"
 int connect(SOCKET* s, sockaddr* name, int namelen) #extern "Ws2_32"
 int send(SOCKET* s, void* buf, int len, int flags) #extern "Ws2_32"
@@ -1880,10 +1881,10 @@ struct WSAData {
 
 struct ADDRINFOA {
     ai_flags: int;
-    ai_family: int;
-    ai_socktype: int;
-    ai_protocol: int;
-    ai_addrlen: u64;
+    ai_family: AddressFamily;
+    ai_socktype: SocketType;
+    ai_protocol: SocketProtocol;
+    ai_addrlen: int;
     ai_canonname: u8*;
     ai_addr: sockaddr*;
     ai_next: ADDRINFOA*;
