@@ -78,7 +78,7 @@ u8 get_traffic_class(IPv6Header* header) {
 
 u32 get_flow_control(IPv6Header* header) {
     assert(header != null);
-    return (header.version_class_and_flow & 0x000FFFFF;
+    return header.version_class_and_flow & 0x000FFFFF;
 }
 
 // TCP structs and helper functions
@@ -140,3 +140,166 @@ enum TLSContentType : u8 {
 }
 
 // Socket functions
+
+#if os == OS.Windows {
+    struct AddressInfo {
+        addr_info: ADDRINFOA*;
+    }
+
+    struct Socket {
+        socket: SOCKET*;
+    }
+}
+#if os == OS.Linux {
+    struct AddressInfo {
+        addr_info: addrinfo*;
+    }
+
+    struct Socket {
+        socket: s32;
+    }
+}
+
+bool, AddressInfo lookup_ip_address_tcp(string domain, string port) {
+    success: bool;
+    address_info: AddressInfo;
+
+    #if os == OS.Windows {
+        __init_wsa();
+        hints: ADDRINFOA = {
+            ai_family = AddressFamily.AF_UNSPEC;
+            ai_socktype = SocketType.SOCK_STREAM;
+            ai_protocol = SocketProtocol.IPPROTO_TCP;
+        }
+
+        success = getaddrinfo(domain, port, &hints, &address_info.addr_info) == 0;
+    }
+    #if os == OS.Linux {
+        hints: addrinfo = {
+            ai_family = AddressDomain.AF_UNSPEC;
+            ai_socktype = SocketType.SOCK_STREAM;
+            ai_protocol = SocketProtocol.IPPROTO_TCP;
+        }
+
+        success = getaddrinfo(domain, port, &hints, &address_info.addr_info) == 0;
+    }
+
+    return success, address_info;
+}
+
+close_ip_address(AddressInfo address_info) {
+    #if os == OS.Windows {
+        __init_wsa();
+        freeaddrinfo(address_info.addr_info);
+    }
+    #if os == OS.Linux {
+        freeaddrinfo(address_info.addr_info);
+    }
+}
+
+bool, Socket connect_socket(AddressInfo address_info) {
+    connected := false;
+    socket: Socket;
+
+    #if os == OS.Windows {
+        __init_wsa();
+
+        addr_info := address_info.addr_info;
+        while (addr_info) {
+            handle := socket(addr_info.ai_family, addr_info.ai_socktype, addr_info.ai_protocol);
+            if cast(u64, handle) < 0xFFFFFFFFFFFFFFFF {
+                connected = connect(handle, addr_info.ai_addr, addr_info.ai_addrlen) == 0;
+
+                if connected {
+                    socket.socket = handle;
+                    break;
+                }
+
+                closesocket(handle);
+            }
+        }
+    }
+    #if os == OS.Linux {
+        addr_info := address_info.addr_info;
+        while (addr_info) {
+            fd := socket(addr_info.ai_family, addr_info.ai_socktype, addr_info.ai_protocol);
+            if fd > 0 {
+                connected = connect(fd, addr_info.ai_addr, addr_info.ai_addrlen) == 0;
+
+                if connected {
+                    socket.socket = fd;
+                    break;
+                }
+
+                close(fd);
+            }
+        }
+    }
+
+    return connected, socket;
+}
+
+s32 socket_send(Socket socket, void* buffer, s32 length) {
+    assert(length >= 0);
+
+    result: s32;
+    #if os == OS.Windows {
+        __init_wsa();
+        result = send(socket.socket, buffer, length, 0);
+    }
+    #if os == OS.Linux {
+        result = sendto(socket.socket, buffer, length, SocketMessageFlags.None, null, 0);
+    }
+
+    return result;
+}
+
+int socket_receive(Socket socket, void* buffer, u64 length) {
+    assert(length >= 0);
+
+    result: s32;
+    #if os == OS.Windows {
+        __init_wsa();
+        result = recv(socket.socket, buffer, length, 0);
+    }
+    #if os == OS.Linux {
+        result = recvfrom(socket.socket, buffer, length, SocketMessageFlags.None, null, 0);
+    }
+
+    return result;
+}
+
+close_socket(Socket socket) {
+    #if os == OS.Windows {
+        __init_wsa();
+        closesocket(socket.socket);
+    }
+    #if os == OS.Linux {
+        close(socket.socket);
+    }
+}
+
+#private
+
+#if os == OS.Windows {
+    #import atomic
+    #import standard
+
+    __init_wsa() {
+        if !__wsa_startup_completed {
+            if !__wsa_startup_initialized && compare_exchange(&__wsa_startup_initialized, true, false) == false {
+                data: WSAData;
+                WSAStartup(0x0202, &data);
+                __wsa_startup_completed = true;
+            }
+            else {
+                while !__wsa_startup_completed {
+                    sleep(1);
+                }
+            }
+        }
+    }
+
+    __wsa_startup_initialized := false;
+    __wsa_startup_completed := false;
+}

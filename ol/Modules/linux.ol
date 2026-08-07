@@ -552,56 +552,36 @@ enum SocketType {
 }
 
 enum SocketProtocol {
-    PF_UNSPEC        = 0;
-    PF_LOCAL         = 1;
-    PF_UNIX          = 1;
-    PF_FILE          = 1;
-    PF_INET          = 2;
-    PF_AX25          = 3;
-    PF_IPX           = 4;
-    PF_APPLETALK     = 5;
-    PF_NETROM        = 6;
-    PF_BRIDGE        = 7;
-    PF_ATMPVC        = 8;
-    PF_X25           = 9;
-    PF_INET6         = 10;
-    PF_ROSE          = 11;
-    PF_DECnet        = 12;
-    PF_NETBEUI       = 13;
-    PF_SECURITY      = 14;
-    PF_KEY           = 15;
-    PF_NETLINK       = 16;
-    PF_ROUTE         = 16;
-    PF_PACKET        = 17;
-    PF_ASH           = 18;
-    PF_ECONET        = 19;
-    PF_ATMSVC        = 20;
-    PF_RDS           = 21;
-    PF_SNA           = 22;
-    PF_IRDA          = 23;
-    PF_PPPOX         = 24;
-    PF_WANPIPE       = 25;
-    PF_LLC           = 26;
-    PF_IB            = 27;
-    PF_MPLS          = 28;
-    PF_CAN           = 29;
-    PF_TIPC          = 30;
-    PF_BLUETOOTH     = 31;
-    PF_IUCV          = 32;
-    PF_RXRPC         = 33;
-    PF_ISDN          = 34;
-    PF_PHONET        = 35;
-    PF_IEEE802154    = 36;
-    PF_CAIF          = 37;
-    PF_ALG           = 38;
-    PF_NFC           = 39;
-    PF_VSOCK         = 40;
-    PF_KCM           = 41;
-    PF_QIPCRTR       = 42;
-    PF_SMC           = 43;
-    PF_XDP           = 44;
-    PF_MCTP          = 45;
-    PF_MAX           = 46;
+    IPPROTO_IP       = 0;
+    IPPROTO_ICMP     = 1;
+    IPPROTO_IGMP     = 2;
+    IPPROTO_IPIP     = 4;
+    IPPROTO_TCP      = 6;
+    IPPROTO_EGP      = 8;
+    IPPROTO_PUP      = 12;
+    IPPROTO_UDP      = 17;
+    IPPROTO_IDP      = 22;
+    IPPROTO_TP       = 29;
+    IPPROTO_DCCP     = 33;
+    IPPROTO_IPV6     = 41;
+    IPPROTO_RSVP     = 46;
+    IPPROTO_GRE      = 47;
+    IPPROTO_ESP      = 50;
+    IPPROTO_AH       = 51;
+    IPPROTO_MTP      = 92;
+    IPPROTO_BEETPH   = 94;
+    IPPROTO_ENCAP    = 98;
+    IPPROTO_PIM      = 103;
+    IPPROTO_COMP     = 108;
+    IPPROTO_L2TP     = 115;
+    IPPROTO_SCTP     = 132;
+    IPPROTO_UDPLITE  = 136;
+    IPPROTO_MPLS     = 137;
+    IPPROTO_ETHERNET = 143;
+    IPPROTO_RAW      = 255;
+    IPPROTO_SMC      = 256;
+    IPPROTO_MPTCP    = 262;
+    IPPROTO_MAX;
 }
 
 struct sockaddr {
@@ -650,7 +630,7 @@ struct addrinfo {
     ai_addrlen: u32;
     ai_canonname: u8*;
     ai_addr: sockaddr*;
-    ai_next: ADDRINFOA*;
+    ai_next: addrinfo*;
 }
 
 int getaddrinfo(string node, string service, addrinfo* hints, addrinfo** res) #extern "c"
@@ -658,28 +638,29 @@ freeaddrinfo(addrinfo* res) #extern "c"
 
 [flags]
 enum SocketMessageFlags {
-    MSG_OOB                = 0x01;
-    MSG_PEEK               = 0x02;
-    MSG_DONTROUTE       = 0x04;
-    MSG_CTRUNC             = 0x08;
-    MSG_PROXY              = 0x10;
-    MSG_TRUNC              = 0x20;
-    MSG_DONTWAIT        = 0x40;
-    MSG_EOR                = 0x80;
-    MSG_WAITALL            = 0x100;
-    MSG_FIN                = 0x200;
-    MSG_SYN                = 0x400;
-    MSG_CONFIRM            = 0x800;
-    MSG_RST                = 0x1000;
-    MSG_ERRQUEUE        = 0x2000;
-    MSG_NOSIGNAL        = 0x4000;
-    MSG_MORE               = 0x8000;
-    MSG_WAITFORONE      = 0x10000;
-    MSG_BATCH              = 0x40000;
-    MSG_SOCK_DEVMEM     = 0x2000000;
-    MSG_ZEROCOPY        = 0x4000000;
-    MSG_FASTOPEN        = 0x20000000;
-    MSG_CMSG_CLOEXEC    = 0x40000000;
+    None             = 0x00;
+    MSG_OOB          = 0x01;
+    MSG_PEEK         = 0x02;
+    MSG_DONTROUTE    = 0x04;
+    MSG_CTRUNC       = 0x08;
+    MSG_PROXY        = 0x10;
+    MSG_TRUNC        = 0x20;
+    MSG_DONTWAIT     = 0x40;
+    MSG_EOR          = 0x80;
+    MSG_WAITALL      = 0x100;
+    MSG_FIN          = 0x200;
+    MSG_SYN          = 0x400;
+    MSG_CONFIRM      = 0x800;
+    MSG_RST          = 0x1000;
+    MSG_ERRQUEUE     = 0x2000;
+    MSG_NOSIGNAL     = 0x4000;
+    MSG_MORE         = 0x8000;
+    MSG_WAITFORONE   = 0x10000;
+    MSG_BATCH        = 0x40000;
+    MSG_SOCK_DEVMEM  = 0x2000000;
+    MSG_ZEROCOPY     = 0x4000000;
+    MSG_FASTOPEN     = 0x20000000;
+    MSG_CMSG_CLOEXEC = 0x40000000;
 }
 
 struct msghdr {
