@@ -41,7 +41,7 @@ int SSL_write(SSL* ssl, void* buf, int num) #extern ssl
 // Crypto
 interface void* CRYPTO_malloc_fn(u64 num, u8* file, int line)
 interface void* CRYPTO_realloc_fn(void* addr, u64 num, u8* file, int line)
-interface void* CRYPTO_free_fn(void* addr, u8* file, int line)
+interface CRYPTO_free_fn(void* addr, u8* file, int line)
 
 int CRYPTO_set_mem_functions(CRYPTO_malloc_fn malloc_fn, CRYPTO_realloc_fn realloc_fn, CRYPTO_free_fn free_fn) #extern crypto
 
