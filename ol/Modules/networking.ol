@@ -354,7 +354,7 @@ close_socket(Socket socket) {
 
     __init_wsa() {
         if !__wsa_startup_completed {
-            if !__wsa_startup_initialized && compare_exchange(&__wsa_startup_initialized, true, false) == false {
+            if !__wsa_startup_initializing && compare_exchange(&__wsa_startup_initializing, true, false) == false {
                 data: WSAData;
                 WSAStartup(0x0202, &data);
                 __wsa_startup_completed = true;
@@ -367,6 +367,6 @@ close_socket(Socket socket) {
         }
     }
 
-    __wsa_startup_initialized := false;
+    __wsa_startup_initializing := false;
     __wsa_startup_completed := false;
 }
