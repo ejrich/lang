@@ -80,7 +80,7 @@ operator < (string a, string b) {
 
 string convert_c_string(u8* string_pointer) {
     length := 0;
-    while string_pointer[length] length++;
+    while string_pointer != null && string_pointer[length] > 0 length++;
     str: string = { length = length; data = string_pointer; }
     return str;
 }

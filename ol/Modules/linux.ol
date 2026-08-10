@@ -627,7 +627,7 @@ struct addrinfo {
     ai_family: SocketDomain;
     ai_socktype: SocketType;
     ai_protocol: SocketProtocol;
-    ai_addrlen: u32;
+    ai_addrlen: u64;
     ai_canonname: u8*;
     ai_addr: sockaddr*;
     ai_next: addrinfo*;

@@ -23,19 +23,41 @@ struct SSL_CTX {}
 SSL_CTX* SSL_CTX_new(SSL_METHOD* meth) #extern ssl
 SSL_CTX_free(SSL_CTX* ctx) #extern ssl
 
+int SSL_CTX_load_verify_file(SSL_CTX* ctx, string CAfile) #extern ssl
+int SSL_CTX_load_verify_dir(SSL_CTX* ctx, string CApath) #extern ssl
+int SSL_CTX_load_verify_store(SSL_CTX* ctx, string CAstore) #extern ssl
+int SSL_CTX_load_verify_locations(SSL_CTX* ctx, string CAfile, string CApath) #extern ssl
+
+SSL_CTX_set_verify(SSL_CTX* ctx, int mode, void* callback) #extern ssl
+
 struct SSL {}
 
 SSL* SSL_new(SSL_CTX* ctx) #extern ssl
 SSL_free(SSL* ssl) #extern ssl
 
+u64 SSL_ctrl(SSL*ssl, int cmd, u64 larg, void *parg) #extern ssl
+
 int SSL_set_fd(SSL* ssl, int fd) #extern ssl
+
+int SSL_get_error(SSL* ssl, int ret) #extern ssl
+int ERR_print_errors_cb(ERR_print_errors_cb_fn cb, void* u) #extern ssl
+
+interface int ERR_print_errors_cb_fn(u8* str, u64 len, void* u)
 
 int SSL_accept(SSL* ssl) #extern ssl
 int SSL_stateless(SSL* ssl) #extern ssl
 int SSL_connect(SSL* ssl) #extern ssl
-int SSL_peek(SSL* ssl, void *buf, int num) #extern ssl
+
 int SSL_read(SSL* ssl, void* buf, int num) #extern ssl
+int SSL_read_ex(SSL* ssl, void* buf, u64 num, u64* bytesread) #extern ssl
+
+int SSL_peek(SSL* ssl, void *buf, int num) #extern ssl
+int SSL_peek_ex(SSL* ssl, void *buf, u64 num, u64* bytesread) #extern ssl
+
 int SSL_write(SSL* ssl, void* buf, int num) #extern ssl
+int SSL_write_ex(SSL* ssl, void* buf, u64 num, u64* written) #extern ssl
+
+int SSL_shutdown(SSL* s) #extern ssl
 
 
 // Crypto
@@ -67,7 +89,7 @@ SSL_CTX* initialize_openssl(OpenSSLMethod method) {
     return SSL_CTX_new(ssl_method);
 }
 
-bool, SSL* connect_socket_openssl(Socket socket, SSL_CTX* context) {
+bool, SSL* connect_socket_openssl(Socket socket, string hostname, SSL_CTX* context) {
     success: bool;
     ssl := SSL_new(context);
     if ssl {
@@ -81,7 +103,10 @@ bool, SSL* connect_socket_openssl(Socket socket, SSL_CTX* context) {
         }
 
         if fd_set == 1 {
-            if SSL_connect(ssl) > 0 {
+            SSL_ctrl(ssl, /* SSL_CTRL_SET_TLSEXT_HOSTNAME */ 55, /* TLSEXT_NAMETYPE_host_name */ 0, hostname.data);
+
+            result := SSL_connect(ssl);
+            if result > 0 {
                 success = true;
             }
             else {

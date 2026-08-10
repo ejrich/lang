@@ -1884,8 +1884,7 @@ struct ADDRINFOA {
     ai_family: AddressFamily;
     ai_socktype: SocketType;
     ai_protocol: SocketProtocol;
-    ai_addrlen: u32;
-    __unused: u32;
+    ai_addrlen: u64;
     ai_canonname: u8*;
     ai_addr: sockaddr*;
     ai_next: ADDRINFOA*;
