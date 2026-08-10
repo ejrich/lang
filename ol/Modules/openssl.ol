@@ -75,7 +75,7 @@ enum OpenSSLMethod {
     Server;
 }
 
-SSL_CTX* initialize_openssl(OpenSSLMethod method) {
+SSL_CTX* initialize_openssl(OpenSSLMethod method, string cacert = empty_string) {
     ssl_method: SSL_METHOD*;
     switch method {
         case OpenSSLMethod.Client;
@@ -86,7 +86,15 @@ SSL_CTX* initialize_openssl(OpenSSLMethod method) {
             ssl_method = TLS_method();
     }
 
-    return SSL_CTX_new(ssl_method);
+    context := SSL_CTX_new(ssl_method);
+
+    if !string_is_empty(cacert) {
+        SSL_CTX_load_verify_file(context, cacert);
+    }
+
+    SSL_CTX_set_verify(context, 1, null);
+
+    return context;
 }
 
 bool, SSL* connect_socket_openssl(Socket socket, string hostname, SSL_CTX* context) {
