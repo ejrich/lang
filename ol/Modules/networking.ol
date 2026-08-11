@@ -206,6 +206,115 @@ enum HTTPStatusCode : u16 {
     NetworkAuthenticationRequired = 511;
 }
 
+enum HTTPVersion : u8 {
+    HTTP1_0;
+    HTTP1_1;
+    HTTP2;
+    HTTP3;
+}
+
+enum HTTPMethod : u8 {
+    GET;
+    HEAD;
+    POST;
+    PUT;
+    DELETE;
+    CONNECT;
+    OPTIONS;
+    TRACE;
+    PATCH;
+}
+
+enum HTTPConnection : u8 {
+    Close;
+    KeepAlive;
+}
+
+struct HTTPRequest {
+    version: HTTPVersion;
+    method: HTTPMethod;
+    connection: HTTPConnection;
+    headers: Array<string>;
+    resource: string;
+    host: string;
+    accept: string;
+    authorization: string;
+    content_type: string;
+    content_length: u64;
+    body: string;
+}
+
+struct HTTPResponse {
+    version: HTTPVersion;
+    connection: HTTPConnection;
+    status_code: HTTPStatusCode;
+    headers: Array<string>;
+    date: string;
+    content_type: string;
+    content_length: u64;
+    body: string;
+}
+
+bool, u64, HTTPResponse parse_http_response(string text) {
+    response: HTTPResponse;
+
+    // Parse version
+    i, value := http_parse_next_value(text, 0);
+    if i >= text.length return false, 0, response;
+    response.version = http_parse_version(value);
+
+    // Parse status code
+    i, value = http_parse_next_value(text, i + 1);
+    if i >= text.length return false, 0, response;
+    response.status_code = http_parse_status_code(value);
+
+    i = http_clear_to_new_line(text, i);
+    if i >= text.length return false, 0, response;
+
+    // Parse headers
+    header_found: bool;
+    name: string;
+    while true {
+        header_found, i, name, value = http_parse_header_line(text, i);
+        if !header_found break;
+
+        if i >= text.length return false, 0, response;
+
+        if name == "Connection" {
+            if value == "close" {
+                response.connection = HTTPConnection.Close;
+            }
+            else if value == "keep-alive" {
+                response.connection = HTTPConnection.KeepAlive;
+            }
+        }
+        else if name == "Date" {
+            response.date = value;
+        }
+        else if name == "Content-Type" {
+            response.content_type = value;
+        }
+        else if name == "Content-Length" {
+            each j in value.length {
+                response.content_length *= 10;
+                response.content_length += value[j] - '0';
+            }
+        }
+        else {
+            // TODO Add others to headers array
+        }
+    }
+
+    // Add the body
+    if response.content_length > 0 {
+        if i + response.content_length > text.length return false, 0, response;
+        response.body = { length = response.content_length; data = text.data + i; }
+        i += response.content_length;
+    }
+
+    return true, i, response;
+}
+
 // Socket functions
 
 #if os == OS.Windows {
@@ -369,4 +478,65 @@ close_socket(Socket socket) {
 
     __wsa_startup_initializing := false;
     __wsa_startup_completed := false;
+}
+
+// HTTP Helper functions
+u64, string http_parse_next_value(string text, u64 start) {
+    i := start + 1;
+    while i < text.length && text[i] != ' ' {
+        i++;
+    }
+
+    value: string = { length = i - start; data = text.data + start; }
+    return i, value;
+}
+
+u64 http_clear_to_new_line(string text, u64 i) {
+    while i < text.length {
+        if (text[i] == '\n' && i > 0 && text[i - 1] == '\r') {
+            i++;
+            break;
+        }
+
+        i++;
+    }
+
+    return i;
+}
+
+bool, u64, string, string http_parse_header_line(string text, u64 start) {
+    // Handle the end of header \r\n
+    if text[start] == '\r' && (start < text.length - 1) && text[start + 1] == '\n' {
+        return false, start + 2, empty_string, empty_string;
+    }
+
+    i := start + 1;
+    while i < text.length && text[i] != ':' {
+        i++;
+    }
+
+    name: string = { length = i - start; data = text.data + start; }
+
+    start = i + 2;
+    i = http_clear_to_new_line(text, start);
+    value: string = { length = i - 2 - start; data = text.data + start; }
+
+    return true, i, name, value;
+}
+
+HTTPVersion http_parse_version(string name) {
+    if name == "HTTP/1.1" return HTTPVersion.HTTP1_1;
+    if name == "HTTP/2"   return HTTPVersion.HTTP2;
+    if name == "HTTP/3"   return HTTPVersion.HTTP3;
+    return HTTPVersion.HTTP1_0;
+}
+
+HTTPStatusCode http_parse_status_code(string code) {
+    number: u16;
+    each i in code.length {
+        number *= 10;
+        number += code[i] - '0';
+    }
+
+    return cast(HTTPStatusCode, number);
 }

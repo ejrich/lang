@@ -48,6 +48,9 @@ int SSL_accept(SSL* ssl) #extern ssl
 int SSL_stateless(SSL* ssl) #extern ssl
 int SSL_connect(SSL* ssl) #extern ssl
 
+int SSL_pending(SSL* ssl) #extern ssl
+int SSL_has_pending(SSL* ssl) #extern ssl
+
 int SSL_read(SSL* ssl, void* buf, int num) #extern ssl
 int SSL_read_ex(SSL* ssl, void* buf, u64 num, u64* bytesread) #extern ssl
 
