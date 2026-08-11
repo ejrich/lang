@@ -1,3 +1,5 @@
+#import standard
+
 // Module for working with network interfaces
 
 // IP structs and helper functions
@@ -226,29 +228,168 @@ enum HTTPMethod : u8 {
 }
 
 enum HTTPConnection : u8 {
+    None;
     Close;
     KeepAlive;
+}
+
+struct HTTPHeader {
+    name: string;
+    value: string;
 }
 
 struct HTTPRequest {
     version: HTTPVersion;
     method: HTTPMethod;
     connection: HTTPConnection;
-    headers: Array<string>;
+    headers: Array<HTTPHeader>;
     resource: string;
     host: string;
     accept: string;
     authorization: string;
     content_type: string;
-    content_length: u64;
     body: string;
 }
+
+string serialize_http_request(HTTPRequest request, Allocate allocator= default_allocator) {
+    // Determine the buffer size before allocating
+    length: u64;
+    method := get_enum_name(request.method);
+    length += method.length + 1;
+
+    length += request.resource.length + 1;
+
+    version := http_get_version_string(request.version);
+    length += version.length + 2;
+
+    each header in request.headers {
+        length += header.name.length + header.value.length + 4;
+    }
+
+    connection_header := "Connection"; #const
+    switch request.connection {
+        case HTTPConnection.Close;     length += connection_header.length + 9;
+        case HTTPConnection.KeepAlive; length += connection_header.length + 14;
+    }
+
+    host_header := "Host"; #const
+    if !string_is_empty(request.host) {
+        length += host_header.length + request.host.length + 4;
+    }
+
+    accept_header := "Accept"; #const
+    if !string_is_empty(request.accept) {
+        length += accept_header.length + request.accept.length + 4;
+    }
+
+    authorization_header := "Authorization"; #const
+    if !string_is_empty(request.authorization) {
+        length += authorization_header.length + request.authorization.length + 4;
+    }
+
+    content_type_header := "Content-Type"; #const
+    if !string_is_empty(request.content_type) {
+        length += content_type_header.length + request.content_type.length + 4;
+    }
+
+    content_length_header := "Content-Length"; #const
+    content_length_factor: u64 = 1;
+    if !string_is_empty(request.body) {
+        content_length := request.body.length;
+        digits := 0;
+        while content_length {
+            digits++;
+            content_length /= 10;
+
+            if content_length
+                content_length_factor *= 10;
+        }
+
+        length += content_length_header.length + digits + 4;
+        length += request.body.length;
+    }
+
+    length += 2;
+
+    result: string = { length = length; data = allocator(length); }
+
+    // Serialize the request into the result buffer
+    memory_copy(result.data, method.data, method.length);
+    i: u64 = method.length;
+    result[i++] = ' ';
+
+    memory_copy(result.data + i, request.resource.data, request.resource.length);
+    i += request.resource.length;
+    result[i++] = ' ';
+
+    memory_copy(result.data + i, version.data, version.length);
+    i += version.length;
+    result[i++] = '\r';
+    result[i++] = '\n';
+
+    each header in request.headers {
+        i = http_add_header(result, i, header.name, header.value);
+    }
+
+    switch request.connection {
+        case HTTPConnection.Close;
+            i = http_add_header(result, i, connection_header, "close");
+        case HTTPConnection.KeepAlive;
+            i = http_add_header(result, i, connection_header, "keep-alive");
+    }
+
+    if !string_is_empty(request.host) {
+        i = http_add_header(result, i, host_header, request.host);
+    }
+
+    if !string_is_empty(request.accept) {
+        i = http_add_header(result, i, accept_header, request.accept);
+    }
+
+    if !string_is_empty(request.authorization) {
+        i = http_add_header(result, i, authorization_header, request.authorization);
+    }
+
+    if !string_is_empty(request.content_type) {
+        i = http_add_header(result, i, content_type_header, request.content_type);
+    }
+
+    if !string_is_empty(request.body) {
+        memory_copy(result.data + i, content_length_header.data, content_length_header.length);
+        i += content_length_header.length;
+        result[i++] = ':';
+        result[i++] = ' ';
+
+        content_length := request.body.length;
+        while content_length_factor {
+            digit := content_length / content_length_factor;
+            result[i++] = digit + '0';
+
+            content_length -= digit * content_length_factor;
+            content_length_factor /= 10;
+        }
+
+        result[i++] = '\r';
+        result[i++] = '\n';
+    }
+
+    result[i++] = '\r';
+    result[i++] = '\n';
+
+    if !string_is_empty(request.body) {
+        memory_copy(result.data + i, request.body.data, request.body.length);
+        i += request.body.length;
+    }
+
+    return result;
+}
+
 
 struct HTTPResponse {
     version: HTTPVersion;
     connection: HTTPConnection;
     status_code: HTTPStatusCode;
-    headers: Array<string>;
+    headers: Array<HTTPHeader>;
     date: string;
     content_type: string;
     content_length: u64;
@@ -459,7 +600,6 @@ close_socket(Socket socket) {
 
 #if os == OS.Windows {
     #import atomic
-    #import standard
 
     __init_wsa() {
         if !__wsa_startup_completed {
@@ -524,11 +664,25 @@ bool, u64, string, string http_parse_header_line(string text, u64 start) {
     return true, i, name, value;
 }
 
+__http_1_0 := "HTTP/1.0"; #const
+__http_1_1 := "HTTP/1.1"; #const
+__http_2   := "HTTP/2"; #const
+__http_3   := "HTTP/3"; #const
+
 HTTPVersion http_parse_version(string name) {
-    if name == "HTTP/1.1" return HTTPVersion.HTTP1_1;
-    if name == "HTTP/2"   return HTTPVersion.HTTP2;
-    if name == "HTTP/3"   return HTTPVersion.HTTP3;
+    if name == __http_1_1 return HTTPVersion.HTTP1_1;
+    if name == __http_2   return HTTPVersion.HTTP2;
+    if name == __http_3   return HTTPVersion.HTTP3;
     return HTTPVersion.HTTP1_0;
+}
+
+string http_get_version_string(HTTPVersion version) {
+    switch version {
+        case HTTPVersion.HTTP1_1; return __http_1_1;
+        case HTTPVersion.HTTP2;   return __http_2;
+        case HTTPVersion.HTTP3;   return __http_3;
+    }
+    return __http_1_0;
 }
 
 HTTPStatusCode http_parse_status_code(string code) {
@@ -539,4 +693,18 @@ HTTPStatusCode http_parse_status_code(string code) {
     }
 
     return cast(HTTPStatusCode, number);
+}
+
+u64 http_add_header(string result, u64 i, string name, string value) {
+    memory_copy(result.data + i, name.data, name.length);
+    i += name.length;
+    result[i++] = ':';
+    result[i++] = ' ';
+
+    memory_copy(result.data + i, value.data, value.length);
+    i += value.length;
+    result[i++] = '\r';
+    result[i++] = '\n';
+
+    return i;
 }
