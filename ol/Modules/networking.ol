@@ -266,33 +266,27 @@ string serialize_http_request(HTTPRequest request, Allocate allocator= default_a
         length += header.name.length + header.value.length + 4;
     }
 
-    connection_header := "Connection"; #const
     switch request.connection {
-        case HTTPConnection.Close;     length += connection_header.length + 9;
-        case HTTPConnection.KeepAlive; length += connection_header.length + 14;
+        case HTTPConnection.Close;     length += connection_header.length + connection_close_header_value.length + 4;
+        case HTTPConnection.KeepAlive; length += connection_header.length + connection_keep_alive_header_value.length + 4;
     }
 
-    host_header := "Host"; #const
     if !string_is_empty(request.host) {
         length += host_header.length + request.host.length + 4;
     }
 
-    accept_header := "Accept"; #const
     if !string_is_empty(request.accept) {
         length += accept_header.length + request.accept.length + 4;
     }
 
-    authorization_header := "Authorization"; #const
     if !string_is_empty(request.authorization) {
         length += authorization_header.length + request.authorization.length + 4;
     }
 
-    content_type_header := "Content-Type"; #const
     if !string_is_empty(request.content_type) {
         length += content_type_header.length + request.content_type.length + 4;
     }
 
-    content_length_header := "Content-Length"; #const
     content_length_factor: u64 = 1;
     if !string_is_empty(request.body) {
         content_length := request.body.length;
@@ -384,13 +378,13 @@ string serialize_http_request(HTTPRequest request, Allocate allocator= default_a
     return result;
 }
 
-
 struct HTTPResponse {
     version: HTTPVersion;
     connection: HTTPConnection;
     status_code: HTTPStatusCode;
     headers: Array<HTTPHeader>;
     date: string;
+    transfer_encoding: string;
     content_type: string;
     content_length: u64;
     body: string;
@@ -421,21 +415,24 @@ bool, u64, HTTPResponse parse_http_response(string text) {
 
         if i >= text.length return false, 0, response;
 
-        if name == "Connection" {
-            if value == "close" {
+        if name == connection_header {
+            if value == connection_close_header_value {
                 response.connection = HTTPConnection.Close;
             }
-            else if value == "keep-alive" {
+            else if value == connection_keep_alive_header_value {
                 response.connection = HTTPConnection.KeepAlive;
             }
         }
-        else if name == "Date" {
+        else if name == date_header {
             response.date = value;
         }
-        else if name == "Content-Type" {
+        else if name == transfer_encoding_header {
+            response.transfer_encoding = value;
+        }
+        else if name == content_type_header {
             response.content_type = value;
         }
-        else if name == "Content-Length" {
+        else if name == content_length_header {
             each j in value.length {
                 response.content_length *= 10;
                 response.content_length += value[j] - '0';
@@ -522,7 +519,7 @@ bool, Socket connect_socket(AddressInfo address_info) {
         __init_wsa();
 
         addr_info := address_info.addr_info;
-        while (addr_info) {
+        while addr_info {
             handle := socket(addr_info.ai_family, addr_info.ai_socktype, addr_info.ai_protocol);
             if cast(u64, handle) < 0xFFFFFFFFFFFFFFFF {
                 connected = connect(handle, addr_info.ai_addr, addr_info.ai_addrlen) == 0;
@@ -534,11 +531,13 @@ bool, Socket connect_socket(AddressInfo address_info) {
 
                 closesocket(handle);
             }
+
+            addr_info = addr_info.ai_next;
         }
     }
     #if os == OS.Linux {
         addr_info := address_info.addr_info;
-        while (addr_info) {
+        while addr_info {
             fd := socket(addr_info.ai_family, addr_info.ai_socktype, addr_info.ai_protocol);
             if fd > 0 {
                 connected = connect(fd, addr_info.ai_addr, addr_info.ai_addrlen) == 0;
@@ -550,6 +549,8 @@ bool, Socket connect_socket(AddressInfo address_info) {
 
                 close(fd);
             }
+
+            addr_info = addr_info.ai_next;
         }
     }
 
@@ -586,6 +587,19 @@ int socket_receive(Socket socket, void* buffer, u64 length) {
     return result;
 }
 
+bool socket_shutdown(Socket socket) {
+    result: s32;
+    #if os == OS.Windows {
+        __init_wsa();
+        result = shutdown(socket.socket, SocketShutdownHow.SD_SEND);
+    }
+    #if os == OS.Linux {
+        result = shutdown(socket.socket, SocketShutdownHow.SHUT_WR);
+    }
+
+    return result == 0;
+}
+
 close_socket(Socket socket) {
     #if os == OS.Windows {
         __init_wsa();
@@ -620,7 +634,18 @@ close_socket(Socket socket) {
     __wsa_startup_completed := false;
 }
 
-// HTTP Helper functions
+// HTTP Helpers
+connection_header := "Connection"; #const
+connection_close_header_value := "close"; #const
+connection_keep_alive_header_value := "keep-alive"; #const
+host_header := "Host"; #const
+accept_header := "Accept"; #const
+date_header := "Date"; #const
+authorization_header := "Authorization"; #const
+transfer_encoding_header := "Transfer-Encoding"; #const
+content_type_header := "Content-Type"; #const
+content_length_header := "Content-Length"; #const
+
 u64, string http_parse_next_value(string text, u64 start) {
     i := start + 1;
     while i < text.length && text[i] != ' ' {
