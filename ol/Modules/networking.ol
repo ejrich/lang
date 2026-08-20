@@ -251,7 +251,7 @@ struct HTTPRequest {
     body: string;
 }
 
-string serialize_http_request(HTTPRequest request, Allocate allocator= default_allocator) {
+string serialize_http_request(HTTPRequest request, Allocate allocator = default_allocator) {
     // Determine the buffer size before allocating
     length: u64;
     method := get_enum_name(request.method);

@@ -925,8 +925,18 @@ public static class ProgramIRBuilder
         EmitStore(function, lengthPointer, lengthValue, scope);
 
         var dataPointerType = arrayStruct.Fields[1].Type;
-        var arrayData = AddArrayAllocation(function, dataPointerType, elementType, length);
-        var arrayDataPointer = EmitInstruction(InstructionType.PointerCast, function, dataPointerType, scope, arrayData, new InstructionValue {ValueType = InstructionValueType.Type, Type = dataPointerType});
+        InstructionValue arrayData;
+        InstructionValue arrayDataPointer;
+        if (length > 0)
+        {
+            arrayData = AddArrayAllocation(function, dataPointerType, elementType, length);
+            arrayDataPointer = EmitInstruction(InstructionType.PointerCast, function, dataPointerType, scope, arrayData, new InstructionValue {ValueType = InstructionValueType.Type, Type = dataPointerType});
+        }
+        else
+        {
+            arrayData = arrayDataPointer = new InstructionValue {ValueType = InstructionValueType.Null, Type = dataPointerType };
+        }
+
         var dataPointer = EmitGetStructPointer(function, arrayPointer, scope, arrayStruct, 1);
         EmitStore(function, dataPointer, arrayDataPointer, scope);
 
@@ -1194,7 +1204,7 @@ public static class ProgramIRBuilder
         {
             InstructionValue arrayPointer;
             var elementType = arrayStruct.GenericTypes[0];
-            if (initializing && arrayValues.Any())
+            if (initializing)
             {
                 arrayPointer = InitializeConstArray(function, pointer, arrayStruct, (uint)arrayValues.Count, elementType, scope);
             }
