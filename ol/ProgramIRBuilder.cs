@@ -1241,11 +1241,15 @@ public static class ProgramIRBuilder
             for (var i = 0; i < structDef.Fields.Count; i++)
             {
                 var field = structDef.Fields[i];
+                var fieldPointer = EmitGetStructPointer(function, pointer, scope, structDef, i, field);
+
                 if (values.Assignments.TryGetValue(field.Name, out var assignmentValue))
                 {
-                    var fieldPointer = EmitGetStructPointer(function, pointer, scope, structDef, i, field);
-
                     EmitAssignments(function, assignmentValue, scope, fieldPointer, field.Type, initializing);
+                }
+                else
+                {
+                    InitializeField(function, field, fieldPointer, scope);
                 }
             }
         }
