@@ -557,7 +557,7 @@ bool, Socket connect_socket(AddressInfo address_info) {
     return connected, socket;
 }
 
-s32 socket_send(Socket socket, void* buffer, s32 length) {
+bool, s32 socket_send(Socket socket, void* buffer, s32 length) {
     assert(length >= 0);
 
     result: s32;
@@ -569,10 +569,10 @@ s32 socket_send(Socket socket, void* buffer, s32 length) {
         result = sendto(socket.socket, buffer, length, SocketMessageFlags.None, null, 0);
     }
 
-    return result;
+    return result >= 0, result;
 }
 
-int socket_receive(Socket socket, void* buffer, u64 length) {
+bool, s32 socket_receive(Socket socket, void* buffer, s32 length) {
     assert(length >= 0);
 
     result: s32;
@@ -584,7 +584,7 @@ int socket_receive(Socket socket, void* buffer, u64 length) {
         result = recvfrom(socket.socket, buffer, length, SocketMessageFlags.None, null, null);
     }
 
-    return result;
+    return result >= 0, result;
 }
 
 bool socket_shutdown(Socket socket) {
