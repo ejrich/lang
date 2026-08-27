@@ -95,6 +95,7 @@ enum OS : u8 {
 os: OS; #const
 
 interface void* Allocate(u64 size)
+interface void* AllocateWithData(u64 size, void* data)
 interface void* Reallocate(void* data, u64 old_size, u64 size)
 interface Free(void* data)
 interface void* ThreadProcedure(void* arg)

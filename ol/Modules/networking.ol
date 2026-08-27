@@ -251,7 +251,7 @@ struct HTTPRequest {
     body: string;
 }
 
-string serialize_http_request(HTTPRequest request, Allocate allocator = default_allocator) {
+string serialize_http_request(HTTPRequest request, AllocateWithData allocator = default_allocator_with_data, void* data = null) {
     // Determine the buffer size before allocating
     length: u64;
     method := get_enum_name(request.method);
@@ -305,7 +305,7 @@ string serialize_http_request(HTTPRequest request, Allocate allocator = default_
 
     length += 2;
 
-    result: string = { length = length; data = allocator(length); }
+    result: string = { length = length; data = allocator(length, data); }
 
     // Serialize the request into the result buffer
     memory_copy(result.data, method.data, method.length);
@@ -390,7 +390,7 @@ struct HTTPResponse {
     body: string;
 }
 
-bool, u64, HTTPResponse parse_http_response(string text) {
+bool, u64, HTTPResponse parse_http_response(string text, bool store_headers = false, Allocate allocator = default_allocator, Reallocate reallocator = default_reallocator) {
     response: HTTPResponse;
 
     // Parse version
@@ -438,8 +438,9 @@ bool, u64, HTTPResponse parse_http_response(string text) {
                 response.content_length += value[j] - '0';
             }
         }
-        else {
-            // TODO Add others to headers array
+        else if store_headers {
+            header: HTTPHeader = { name = name; value = value; }
+            array_insert(&response.headers, header, allocator, reallocator);
         }
     }
 

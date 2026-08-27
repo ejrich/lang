@@ -131,3 +131,21 @@ bool, SSL* connect_socket_openssl(Socket socket, string hostname, SSL_CTX* conte
 
     return success, ssl;
 }
+
+bool, u64 socket_send_ssl(SSL* ssl, void* buffer, u64 length) {
+    assert(length >= 0);
+
+    written: u64;
+    result := SSL_write_ex(ssl, buffer, length, &written);
+
+    return result == 1, written;
+}
+
+bool, u64 socket_receive_ssl(SSL* ssl, void* buffer, u64 length) {
+    assert(length >= 0);
+
+    read: u64;
+    result := SSL_read_ex(ssl, buffer, length, &read);
+
+    return result == 1, read;
+}

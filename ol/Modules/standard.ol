@@ -346,6 +346,11 @@ void* default_allocator(u64 size) {
     return pointer;
 }
 
+void* default_allocator_with_data(u64 size, void* data) {
+    return default_allocator(size);
+}
+
+
 void* default_reallocator(void* pointer, u64 old_size, u64 size) {
     each allocation in default_allocations {
         if allocation.pointer == pointer {
