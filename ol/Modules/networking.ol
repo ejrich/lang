@@ -479,6 +479,14 @@ bool, AddressInfo lookup_ip_address_tcp(string domain, string port) {
     success: bool;
     address_info: AddressInfo;
 
+    null_terminated_domain: Array<u8>[domain.length + 1];
+    memory_copy(null_terminated_domain.data, domain.data, domain.length);
+    null_terminated_domain[domain.length] = 0;
+
+    null_terminated_port: Array<u8>[port.length + 1];
+    memory_copy(null_terminated_port.data, port.data, port.length);
+    null_terminated_port[port.length] = 0;
+
     #if os == OS.Windows {
         __init_wsa();
         hints: ADDRINFOA = {
@@ -487,7 +495,7 @@ bool, AddressInfo lookup_ip_address_tcp(string domain, string port) {
             ai_protocol = SocketProtocol.IPPROTO_TCP;
         }
 
-        success = getaddrinfo(domain, port, &hints, &address_info.addr_info) == 0;
+        success = getaddrinfo(null_terminated_domain.data, null_terminated_port.data, &hints, &address_info.addr_info) == 0;
     }
     #if os == OS.Linux {
         hints: addrinfo = {
@@ -496,7 +504,7 @@ bool, AddressInfo lookup_ip_address_tcp(string domain, string port) {
             ai_protocol = SocketProtocol.IPPROTO_TCP;
         }
 
-        success = getaddrinfo(domain, port, &hints, &address_info.addr_info) == 0;
+        success = getaddrinfo(null_terminated_domain.data, null_terminated_port.data, &hints, &address_info.addr_info) == 0;
     }
 
     return success, address_info;
