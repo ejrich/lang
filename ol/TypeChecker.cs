@@ -3583,10 +3583,17 @@ public static class TypeChecker
 
     private static void VerifyEach(EachAst each, IFunction currentFunction, IScope scope)
     {
+        if (each.IterationVariable == null)
+        {
+            ErrorReporter.Report($"Iteration variable not defined", each);
+            return;
+        }
+
         if (GetScopeIdentifier(scope, each.IterationVariable.Name, out _))
         {
             ErrorReporter.Report($"Iteration variable '{each.IterationVariable.Name}' already exists in scope", each);
-        };
+        }
+
         if (each.Iteration != null)
         {
             var iterationType = VerifyExpression(each.Iteration, currentFunction, scope);
