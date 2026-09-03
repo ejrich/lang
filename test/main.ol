@@ -40,7 +40,7 @@ bool run_test(string test_dir, string test) {
         skip_file_name := "no_linux"; #const
         compile_only_file_name := "no_run_linux"; #const
     }
-    executable := "./ol/bin/Debug/net8.0/ol"; #const
+    executable := "./ol/bin/Debug/net10.0/ol"; #const
 
     skip_file := format_string("%/%", test_dir, skip_file_name);
     skip := file_exists(skip_file);

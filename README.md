@@ -20,11 +20,11 @@
     * Linux - run `./build_runtime.sh`
     * Windows - run `.\build_runtime.bat`
 * __FOR WINDOWS ONLY__ - Download the [Windows SDK](https://developer.microsoft.com/en-us/windows/downloads/windows-sdk/) (can also be installed with Visual Studio)
-* Install the [.Net 8 SDK](https://dotnet.microsoft.com/download)
+* Install the [.Net 10 SDK](https://dotnet.microsoft.com/download)
 * Run `dotnet restore`
 * Once the dependencies are installed, run `dotnet build --no-restore`
     * If using vim, this can be run using `<leader><F8>`
-* The executable can be found in `ol/bin/{Debug|Release}/net8.0/ol`
+* The executable can be found in `ol/bin/{Debug|Release}/net10.0/ol`
 
 #### GitHub users
 
