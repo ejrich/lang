@@ -446,6 +446,7 @@ public static class Parser
             switch (token.Type)
             {
                 case TokenType.Identifier:
+                case TokenType.Literal:
                     if (commaRequired)
                     {
                         ErrorReporter.Report("Expected comma between attributes", enumerator.FileIndex, token);
