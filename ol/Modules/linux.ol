@@ -628,8 +628,8 @@ struct addrinfo {
     ai_socktype: SocketType;
     ai_protocol: SocketProtocol;
     ai_addrlen: u64;
-    ai_canonname: u8*;
     ai_addr: sockaddr*;
+    ai_canonname: u8*;
     ai_next: addrinfo*;
 }
 
