@@ -1015,7 +1015,7 @@ u64 file_size(string path) {
     #if os == OS.Linux {
         stat_buf: Stat;
         if stat(null_terminated_path.data, &stat_buf) == 0 {
-            result = stat_buf.size;
+            result = stat_buf.st_size;
         }
     }
     #if os == OS.Windows {
