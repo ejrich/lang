@@ -1005,6 +1005,31 @@ bool file_exists(string path) {
     return exists;
 }
 
+u64 file_size(string path) {
+    null_terminated_path: Array<u8>[path.length + 1];
+    memory_copy(null_terminated_path.data, path.data, path.length);
+    null_terminated_path[path.length] = 0;
+
+    result: u64;
+
+    #if os == OS.Linux {
+        stat_buf: Stat;
+        if stat(null_terminated_path.data, &stat_buf) == 0 {
+            result = stat_buf.size;
+        }
+    }
+    #if os == OS.Windows {
+        file_handle := CreateFileA(null_terminated_path.data, DesiredAccess.FILE_READ_DATA, ShareMode.FILE_SHARE_READ | ShareMode.FILE_SHARE_WRITE | ShareMode.FILE_SHARE_DELETE, null, CreationDisposition.OPEN_EXISTING, FileAttribute.FILE_ATTRIBUTE_NORMAL, null);
+
+        if file_handle {
+            GetFileSizeEx(file_handle, &result);
+            CloseHandle(file_handle);
+        }
+    }
+
+    return result;
+}
+
 bool is_directory(string path) {
     null_terminated_path: Array<u8>[path.length + 1];
     memory_copy(null_terminated_path.data, path.data, path.length);
