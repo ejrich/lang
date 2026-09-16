@@ -1182,6 +1182,28 @@ bool, File open_file(string path, FileFlags flags = FileFlags.Read) {
     return true, file;
 }
 
+bool rename_file(string old_path, string new_path) {
+    renamed: bool;
+
+    null_terminated_old_path: Array<u8>[old_path.length + 1];
+    memory_copy(null_terminated_old_path.data, old_path.data, old_path.length);
+    null_terminated_old_path[old_path.length] = 0;
+
+    null_terminated_new_path: Array<u8>[new_path.length + 1];
+    memory_copy(null_terminated_new_path.data, new_path.data, new_path.length);
+    null_terminated_new_path[new_path.length] = 0;
+
+    #if os == OS.Linux {
+        result := rename(null_terminated_old_path.data, null_terminated_new_path.data);
+        renamed = result == 0;
+    }
+    #if os == OS.Windows {
+        renamed = MoveFileA(null_terminated_old_path.data, null_terminated_new_path.data);
+    }
+
+    return renamed;
+}
+
 bool delete_file(string path) {
     deleted: bool;
 
